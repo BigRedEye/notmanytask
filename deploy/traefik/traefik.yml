@@ -1,0 +1,42 @@
+log:
+  level: INFO
+  filepath: "/var/log/traefik/logs/traefik.log"
+
+accessLog:
+  filePath: "/var/log/traefik/logs/access.log"
+  bufferingSize: 100
+
+#api:
+#  dashboard: true
+#  insecure: true
+#  debug: true
+
+metrics:
+  prometheus: {}
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+
+providers:
+  file:
+    directory: "/etc/traefik/configs"
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: mail@sskvor.dev
+      storage: "/acme/acme.json"
+      httpChallenge:
+        entryPoint: web

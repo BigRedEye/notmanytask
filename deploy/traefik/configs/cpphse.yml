@@ -1,0 +1,19 @@
+http:
+  routers:
+    cpphse-router:
+      rule: "Host(`cpp-hse.org`)"
+      entryPoints:
+        - websecure
+      service: cpphse
+      #middlewares:
+      #  - authelia-auth
+
+
+  middlewares:
+
+
+  services:
+    cpphse:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:18080/" 

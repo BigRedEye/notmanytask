@@ -1,0 +1,24 @@
+version: "3"
+
+services:
+  notmanytask:
+    image: bigredye/notmanytask:latest
+    ports:
+      - 18080:18080
+    restart: unless-stopped
+
+  traefik:
+    image: traefik
+    ports:
+      - 80:80
+      - 443:443
+      - 8080:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml
+      - ./traefik/configs:/etc/traefik/configs
+      - ./traefik/logs:/var/log/traefik/logs
+      - traefik-acme:/acme
+
+volumes:
+  traefik-acme:
