@@ -1,0 +1,5 @@
+*.pb.go linguist-generated
+*.gw.go linguist-generated
+*.blob.go linguist-generated
+docs/*.json linguist-documentation
+pkg/statik/statik.go linguist-generated
