@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -104,7 +105,16 @@ func (s *server) run() error {
 
 	r.SetHTMLTemplate(tmpl)
 
-	store := cookie.NewStore([]byte("Secret"))
+	// TODO(BigRedEye): Move cookies to the separate file
+	authKey, err := hex.DecodeString(s.config.Server.Cookies.AuthenticationKey)
+	if err != nil {
+		return errors.Wrap(err, "Failed to decode hex authenticationKey")
+	}
+	encryptKey, err := hex.DecodeString(s.config.Server.Cookies.EncryptionKey)
+	if err != nil {
+		return errors.Wrap(err, "Failed to decode hex encryptionKey")
+	}
+	store := cookie.NewStore(authKey, encryptKey)
 	store.Options(sessions.Options{
 		Secure:   true,
 		HttpOnly: true,
@@ -133,11 +143,6 @@ func (s *server) run() error {
 		}
 
 		c.String(http.StatusOK, fmt.Sprintf("count: %d", count))
-	})
-
-	// Example when panic happen.
-	r.GET("/panic", func(c *gin.Context) {
-		panic("An unexpected error happen!")
 	})
 
 	r.GET(s.config.Endpoints.Signup, func(c *gin.Context) {

@@ -18,6 +18,10 @@ type Config struct {
 	}
 	Server struct {
 		ListenAddress string
+		Cookies       struct {
+			AuthenticationKey string
+			EncryptionKey     string
+		}
 	}
 }
 
