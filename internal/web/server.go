@@ -2,13 +2,17 @@ package web
 
 import (
 	"fmt"
+	"html/template"
+	"io/fs"
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
+	ginzap "github.com/gin-contrib/zap"
+	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	"github.com/rakyll/statik/fs"
+	statik "github.com/rakyll/statik/fs"
 	"go.uber.org/zap"
 
 	_ "github.com/bigredeye/notmanytask/pkg/statik"
@@ -17,61 +21,121 @@ import (
 type server struct {
 	config *Config
 	logger *zap.Logger
+
+	auth *AuthClient
 }
 
 func newServer(config *Config, logger *zap.Logger) (*server, error) {
-	return &server{config, logger}, nil
+	return &server{
+		config: config,
+		logger: logger,
+		auth:   NewAuthClient(config),
+	}, nil
 }
 
-func loggingMiddleware(l *zap.Logger) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
-			reqid := middleware.GetReqID(r.Context())
-			l.Info("Starting request",
-				zap.String("proto", r.Proto),
-				zap.String("method", r.Method),
-				zap.String("path", r.URL.Path),
-				zap.String("reqid", reqid),
-			)
+type Session struct {
+	Login string
+}
 
-			writer := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-
-			defer func() {
-				l.Info("Served",
-					zap.String("proto", r.Proto),
-					zap.String("method", r.Method),
-					zap.String("path", r.URL.Path),
-					zap.Duration("latency", time.Since(start)),
-					zap.Int("status", writer.Status()),
-					zap.Int("size", writer.BytesWritten()),
-					zap.String("reqid", reqid))
-			}()
-
-			next.ServeHTTP(writer, r)
-		}
-		return http.HandlerFunc(handler)
+func (s *server) validateSession(c *gin.Context) {
+	session := sessions.Default(c)
+	v := session.Get("login")
+	if v == nil {
+		// TODO(BigRedEye): reqid
+		s.logger.Info("Undefined session")
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Login)
+		return
 	}
+	info := v.(Session)
+	s.logger.Info("Valid session", zap.String("login", info.Login))
+
+	c.Set("session", info)
+	c.Next()
+}
+
+func buildHtmlTemplates(hfs http.FileSystem, funcMap template.FuncMap) (*template.Template, error) {
+	tmpl := template.New("").Funcs(funcMap)
+	err := statik.Walk(hfs, "/", func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Path %s\n", path)
+
+		if !info.IsDir() {
+			bytes, err := statik.ReadFile(hfs, path)
+			if err != nil {
+				return err
+			}
+
+			template.Must(tmpl.New(path).Parse(string(bytes)))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to collect html templates")
+	}
+
+	return tmpl, nil
 }
 
 func (s *server) run() error {
-	r := chi.NewMux()
-
-	r.Use(middleware.RequestID)
-	r.Use(middleware.Recoverer)
-	r.Use(loggingMiddleware(s.logger))
-
-	statikFS, err := fs.New()
+	statikFS, err := statik.New()
 	if err != nil {
 		return errors.Wrap(err, "Failed to open statik fs")
 	}
+	tmpl, err := buildHtmlTemplates(statikFS, make(template.FuncMap))
+	if err != nil {
+		return errors.Wrap(err, "Failed to build html templates")
+	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Hello, world!")
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+
+	r.Use(ginzap.Ginzap(s.logger, time.RFC3339, true))
+	r.Use(ginzap.RecoveryWithZap(s.logger, true))
+
+	r.SetHTMLTemplate(tmpl)
+
+	store := cookie.NewStore([]byte("Secret"))
+	store.Options(sessions.Options{
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 	})
-	r.Handle("/kek*", http.FileServer(statikFS))
+	r.Use(sessions.Sessions("session", store))
+
+	r.GET("/ping", s.validateSession, func(c *gin.Context) {
+		c.String(200, "pong "+fmt.Sprint(time.Now().Unix()))
+	})
+
+	r.GET("/incr", s.validateSession, func(c *gin.Context) {
+		session := sessions.Default(c)
+		var count int
+		v := session.Get("count")
+		if v == nil {
+			count = 0
+		} else {
+			count = v.(int)
+			count++
+		}
+		session.Set("count", count)
+		session.Save()
+		c.String(http.StatusOK, fmt.Sprintf("count: %d", count))
+	})
+
+	// Example when panic happen.
+	r.GET("/panic", func(c *gin.Context) {
+		panic("An unexpected error happen!")
+	})
+
+	r.GET(s.config.Endpoints.Login, func(c *gin.Context) {
+		c.HTML(http.StatusOK, "/login.tmpl", gin.H{})
+	})
+
+	r.StaticFS("/static", statikFS)
+
 	s.logger.Info("Starting server", zap.String("bind_address", s.config.Server.ListenAddress))
-	return http.ListenAndServe(s.config.Server.ListenAddress, r)
+	return r.Run(s.config.Server.ListenAddress)
 }

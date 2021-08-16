@@ -11,7 +11,9 @@ type Config struct {
 		Secret   string
 	}
 	Endpoints struct {
-		Redirect string
+		HostName      string
+		Login         string
+		OauthCallback string
 	}
 	Server struct {
 		ListenAddress string
