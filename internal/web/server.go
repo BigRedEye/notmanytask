@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/gob"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	statik "github.com/rakyll/statik/fs"
 	"go.uber.org/zap"
@@ -37,13 +39,17 @@ type Session struct {
 	Login string
 }
 
+func init() {
+	gob.Register(Session{})
+}
+
 func (s *server) validateSession(c *gin.Context) {
 	session := sessions.Default(c)
 	v := session.Get("login")
 	if v == nil {
 		// TODO(BigRedEye): reqid
 		s.logger.Info("Undefined session")
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Login)
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 		return
 	}
 	info := v.(Session)
@@ -121,7 +127,11 @@ func (s *server) run() error {
 			count++
 		}
 		session.Set("count", count)
-		session.Save()
+		err = session.Save()
+		if err != nil {
+			s.logger.Error("Failed to save session", zap.Error(err))
+		}
+
 		c.String(http.StatusOK, fmt.Sprintf("count: %d", count))
 	})
 
@@ -130,8 +140,25 @@ func (s *server) run() error {
 		panic("An unexpected error happen!")
 	})
 
+	r.GET(s.config.Endpoints.Signup, func(c *gin.Context) {
+		c.HTML(http.StatusOK, "/signup.tmpl", gin.H{
+			"CourseName": "HSE Advanced C++",
+		})
+	})
+
 	r.GET(s.config.Endpoints.Login, func(c *gin.Context) {
-		c.HTML(http.StatusOK, "/login.tmpl", gin.H{})
+		session := sessions.Default(c)
+
+		oauthState := uuid.New().String()
+		session.Set("oauth_state", oauthState)
+		session.Set("login", Session{Login: "kek123kjsdf"})
+		err = session.Save()
+		if err != nil {
+			s.logger.Error("Failed to save session", zap.Error(err))
+		}
+
+		s.logger.Info("Login", zap.String("oauth_state", oauthState))
+		c.Redirect(http.StatusTemporaryRedirect, s.auth.LoginUrl(oauthState))
 	})
 
 	r.StaticFS("/static", statikFS)
