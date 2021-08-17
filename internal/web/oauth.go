@@ -16,8 +16,8 @@ type AuthClient struct {
 func NewAuthClient(config *Config) *AuthClient {
 	return &AuthClient{
 		conf: &oauth2.Config{
-			ClientID:     config.GitLab.ClientID,
-			ClientSecret: config.GitLab.Secret,
+			ClientID:     config.GitLab.Application.ClientID,
+			ClientSecret: config.GitLab.Application.Secret,
 			Scopes:       []string{"read_user"},
 			Endpoint:     gitlab.Endpoint,
 			RedirectURL:  config.Endpoints.HostName + config.Endpoints.OauthCallback,

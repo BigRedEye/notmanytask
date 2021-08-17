@@ -207,6 +207,13 @@ func (s *server) run() error {
 		})
 	})
 
+	r.GET(s.config.Endpoints.Logout, func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Clear()
+
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+	})
+
 	r.StaticFS("/static", statikFS)
 
 	s.logger.Info("Starting server", zap.String("bind_address", s.config.Server.ListenAddress))

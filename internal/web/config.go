@@ -7,13 +7,19 @@ import (
 
 type Config struct {
 	GitLab struct {
-		ClientID string
-		Secret   string
+		Application struct {
+			ClientID string
+			Secret   string
+		}
+		Api struct {
+			Token string
+		}
 	}
 	Endpoints struct {
 		HostName      string
 		Home          string
 		Login         string
+		Logout        string
 		Signup        string
 		OauthCallback string
 	}
