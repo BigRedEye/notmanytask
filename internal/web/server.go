@@ -155,6 +155,7 @@ func (s *server) run() error {
 		session := sessions.Default(c)
 
 		oauthState := uuid.New().String()
+		oauthState = "oauthSecret"
 		session.Set("oauth_state", oauthState)
 		session.Set("login", Session{Login: "kek123kjsdf"})
 		err = session.Save()
@@ -164,6 +165,31 @@ func (s *server) run() error {
 
 		s.logger.Info("Login", zap.String("oauth_state", oauthState))
 		c.Redirect(http.StatusTemporaryRedirect, s.auth.LoginUrl(oauthState))
+	})
+
+	r.GET(s.config.Endpoints.OauthCallback, func(c *gin.Context) {
+		session := sessions.Default(c)
+		if v := session.Get("oauth_state"); v == nil || v != "oauthSecret" {
+			s.logger.Info("Invalid oauth state", zap.String("state", v.(string)))
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+			return
+		}
+
+		session.Set("login", Session{Login: "kek123kjsdf"})
+		err = session.Save()
+		if err != nil {
+			s.logger.Error("Failed to save session", zap.Error(err))
+		}
+
+		// TODO: Create user repo
+
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Home)
+	})
+
+	r.GET(s.config.Endpoints.Home, s.validateSession, func(c *gin.Context) {
+		c.HTML(http.StatusOK, "/home.tmpl", gin.H{
+			"CourseName": "HSE Advanced C++",
+		})
 	})
 
 	r.StaticFS("/static", statikFS)

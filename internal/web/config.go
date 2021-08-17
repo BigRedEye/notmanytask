@@ -12,6 +12,7 @@ type Config struct {
 	}
 	Endpoints struct {
 		HostName      string
+		Home          string
 		Login         string
 		Signup        string
 		OauthCallback string
