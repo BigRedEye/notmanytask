@@ -16,7 +16,7 @@ type AuthClient struct {
 func NewAuthClient(config *Config) *AuthClient {
 	return &AuthClient{
 		conf: &oauth2.Config{
-			ClientID:     config.GitLab.ClientId,
+			ClientID:     config.GitLab.ClientID,
 			ClientSecret: config.GitLab.Secret,
 			Scopes:       []string{"read_user"},
 			Endpoint:     gitlab.Endpoint,
@@ -25,7 +25,7 @@ func NewAuthClient(config *Config) *AuthClient {
 	}
 }
 
-func (c *AuthClient) LoginUrl(state string) string {
+func (c *AuthClient) LoginURL(state string) string {
 	return c.conf.AuthCodeURL(state, oauth2.AccessTypeOnline)
 }
 

@@ -28,6 +28,6 @@ func initLogger(config zap.Config) *zap.Logger {
 	return logger
 }
 
-func Sync() {
-	logger.Sync()
+func Sync() error {
+	return logger.Sync()
 }

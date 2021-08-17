@@ -9,11 +9,14 @@ import (
 	"github.com/bigredeye/notmanytask/internal/web"
 )
 
-func run() error {
+func run() (err error) {
 	logger := zlog.InitDev()
-	defer zlog.Sync()
+	defer func() {
+		err = zlog.Sync()
+	}()
 
-	return web.Run(logger)
+	err = web.Run(logger)
+	return
 }
 
 func main() {

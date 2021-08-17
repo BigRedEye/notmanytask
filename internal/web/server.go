@@ -156,7 +156,7 @@ func (s *server) run() error {
 		}
 
 		s.logger.Info("Login", zap.String("oauth_state", oauthState))
-		c.Redirect(http.StatusTemporaryRedirect, s.auth.LoginUrl(oauthState))
+		c.Redirect(http.StatusTemporaryRedirect, s.auth.LoginURL(oauthState))
 	})
 
 	r.GET(s.config.Endpoints.OauthCallback, func(c *gin.Context) {

@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	GitLab struct {
-		ClientId string
+		ClientID string
 		Secret   string
 	}
 	Endpoints struct {
