@@ -49,10 +49,9 @@ func bindEnvs(iface interface{}, parts ...string) {
 		if !ok {
 			name = t.Name
 		}
-		switch v.Kind() {
-		case reflect.Struct:
+		if v.Kind() == reflect.Struct {
 			bindEnvs(v.Interface(), append(parts, name)...)
-		default:
+		} else {
 			err := viper.BindEnv(strings.Join(append(parts, name), "."))
 			if err != nil {
 				panic(err)
