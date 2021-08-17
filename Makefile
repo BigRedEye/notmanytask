@@ -22,3 +22,9 @@ all: web callback
 
 run_web: web
 	./build/web
+
+docker_image:
+	docker build . -t bigredeye/notmanytask:latest
+
+docker_hub: docker_image
+	docker push bigredeye/notmanytask:latest
