@@ -65,7 +65,7 @@ func (s *server) validateSession(c *gin.Context) {
 		return
 	}
 
-	s.logger.Info("Valid session", zap.String("login", info.Login))
+	s.logger.Info("Valid session", zap.String("login", info.Login), zap.Int("id", info.ID))
 
 	c.Set("session", info)
 	c.Next()
@@ -147,9 +147,7 @@ func (s *server) run() error {
 		session := sessions.Default(c)
 
 		oauthState := uuid.New().String()
-		oauthState = "oauthSecret"
 		session.Set("oauth_state", oauthState)
-		session.Set("login", Session{Login: "kek123kjsdf"})
 		err = session.Save()
 		if err != nil {
 			s.logger.Error("Failed to save session", zap.Error(err))
@@ -160,10 +158,15 @@ func (s *server) run() error {
 	})
 
 	r.GET(s.config.Endpoints.OauthCallback, func(c *gin.Context) {
+		oauthState := c.Query("state")
 		session := sessions.Default(c)
-		if v := session.Get("oauth_state"); v == nil || v != "oauthSecret" {
+		if v := session.Get("oauth_state"); v == nil || v != oauthState {
+			if v == nil {
+				s.logger.Info("No oauth state found")
+			} else {
+				s.logger.Info("Mismatched oauth state", zap.String("query", oauthState), zap.String("cookie", v.(string)))
+			}
 			// TODO(BigRedEye): Render error to user
-			s.logger.Info("Invalid oauth state")
 			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 			return
 		}
@@ -185,7 +188,7 @@ func (s *server) run() error {
 			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 			return
 		}
-		s.logger.Info("New user registered", zap.String("username", user.Login), zap.Int("id", user.ID))
+		s.logger.Info("Fetched gitlab user", zap.String("username", user.Login), zap.Int("id", user.ID))
 
 		session.Set("login", Session{Login: user.Login, ID: user.ID})
 		err = session.Save()
