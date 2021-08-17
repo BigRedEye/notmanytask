@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
@@ -38,6 +39,7 @@ func newServer(config *Config, logger *zap.Logger) (*server, error) {
 
 type Session struct {
 	Login string
+	ID    int
 }
 
 func init() {
@@ -54,14 +56,22 @@ func (s *server) validateSession(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	info := v.(Session)
+	info, ok := v.(Session)
+	if !ok {
+		s.logger.Error("Failed to deserialize session")
+		session.Clear()
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
+		return
+	}
+
 	s.logger.Info("Valid session", zap.String("login", info.Login))
 
 	c.Set("session", info)
 	c.Next()
 }
 
-func buildHtmlTemplates(hfs http.FileSystem, funcMap template.FuncMap) (*template.Template, error) {
+func buildHTMLTemplates(hfs http.FileSystem, funcMap template.FuncMap) (*template.Template, error) {
 	tmpl := template.New("").Funcs(funcMap)
 	err := statik.Walk(hfs, "/", func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -93,7 +103,7 @@ func (s *server) run() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to open statik fs")
 	}
-	tmpl, err := buildHtmlTemplates(statikFS, make(template.FuncMap))
+	tmpl, err := buildHTMLTemplates(statikFS, make(template.FuncMap))
 	if err != nil {
 		return errors.Wrap(err, "Failed to build html templates")
 	}
@@ -123,27 +133,8 @@ func (s *server) run() error {
 	})
 	r.Use(sessions.Sessions("session", store))
 
-	r.GET("/ping", s.validateSession, func(c *gin.Context) {
-		c.String(200, "pong "+fmt.Sprint(time.Now().Unix()))
-	})
-
-	r.GET("/incr", s.validateSession, func(c *gin.Context) {
-		session := sessions.Default(c)
-		var count int
-		v := session.Get("count")
-		if v == nil {
-			count = 0
-		} else {
-			count = v.(int)
-			count++
-		}
-		session.Set("count", count)
-		err = session.Save()
-		if err != nil {
-			s.logger.Error("Failed to save session", zap.Error(err))
-		}
-
-		c.String(http.StatusOK, fmt.Sprintf("count: %d", count))
+	r.GET("/ping", func(c *gin.Context) {
+		c.String(http.StatusOK, "pong "+fmt.Sprint(time.Now().Unix()))
 	})
 
 	r.GET(s.config.Endpoints.Signup, func(c *gin.Context) {
@@ -171,12 +162,32 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.OauthCallback, func(c *gin.Context) {
 		session := sessions.Default(c)
 		if v := session.Get("oauth_state"); v == nil || v != "oauthSecret" {
+			// TODO(BigRedEye): Render error to user
 			s.logger.Info("Invalid oauth state")
 			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 			return
 		}
 
-		session.Set("login", Session{Login: "kek123kjsdf"})
+		ctx, cancel := context.WithTimeout(c, time.Second*5)
+		defer cancel()
+		token, err := s.auth.Exchange(ctx, c.Query("code"))
+		if err != nil {
+			// TODO(BigRedEye): Render error to user
+			s.logger.Error("Failed to exchange tokens", zap.Error(err))
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+			return
+		}
+
+		user, err := GetGitLabUser(token.AccessToken)
+		if err != nil {
+			s.logger.Error("Failed to get gitlab user", zap.Error(err))
+			// TODO(BigRedEye): Render error to user
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+			return
+		}
+		s.logger.Info("New user registered", zap.String("username", user.Login), zap.Int("id", user.ID))
+
+		session.Set("login", Session{Login: user.Login, ID: user.ID})
 		err = session.Save()
 		if err != nil {
 			s.logger.Error("Failed to save session", zap.Error(err))
