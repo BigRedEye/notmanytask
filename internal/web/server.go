@@ -51,6 +51,7 @@ func (s *server) validateSession(c *gin.Context) {
 		// TODO(BigRedEye): reqid
 		s.logger.Info("Undefined session")
 		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
 		return
 	}
 	info := v.(Session)
@@ -118,7 +119,7 @@ func (s *server) run() error {
 	store.Options(sessions.Options{
 		Secure:   true,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 	r.Use(sessions.Sessions("session", store))
 
@@ -170,7 +171,7 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.OauthCallback, func(c *gin.Context) {
 		session := sessions.Default(c)
 		if v := session.Get("oauth_state"); v == nil || v != "oauthSecret" {
-			s.logger.Info("Invalid oauth state", zap.String("state", v.(string)))
+			s.logger.Info("Invalid oauth state")
 			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 			return
 		}
