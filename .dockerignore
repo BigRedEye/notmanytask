@@ -1,3 +1,4 @@
+.git
 .env
 .idea
 .github
@@ -5,3 +6,4 @@ Dockerfile
 docker-compose.yml
 build
 deploy
+config.yml

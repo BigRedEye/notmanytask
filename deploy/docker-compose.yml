@@ -2,9 +2,11 @@ version: "3"
 
 services:
   notmanytask:
-    image: bigredye/notmanytask:latest
+    image: bigredeye/notmanytask:latest
     ports:
       - 18080:18080
+    volumes:
+      - ./notmanytask/config.yml:/etc/notmanytask/config.yml
     restart: unless-stopped
 
   traefik:
@@ -19,6 +21,7 @@ services:
       - ./traefik/configs:/etc/traefik/configs
       - ./traefik/logs:/var/log/traefik/logs
       - traefik-acme:/acme
+    network_mode: host
 
 volumes:
   traefik-acme:

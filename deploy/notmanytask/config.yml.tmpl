@@ -1,0 +1,16 @@
+gitlab:
+  secret: <APP_SECRET>
+  clientId: <APP_CLIENT_ID>
+
+endpoints:
+  hostname: <HOSTNAME>
+  home: /
+  login: /login
+  signup: /signup
+  oauthCallback: /finish
+
+server:
+  listenAddress: ":18080"
+  cookies:
+    authenticationKey: <COOKIE_AUTH_KEY>
+    encryptionKey: <COOKIE_ENCRYPTION_KEY>

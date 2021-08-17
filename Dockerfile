@@ -15,7 +15,7 @@ RUN go mod download
 
 COPY . .
 RUN make all
-RUN cp build/callback /app
+RUN cp build/web /notmanytask
 
 
 FROM alpine:3.13
@@ -30,6 +30,7 @@ RUN apk add --update \
         openssl \
     && rm /var/cache/apk/*
 
-COPY --from=go-builder /app ./
+COPY --from=go-builder /notmanytask /
 
-CMD [ "./app" ]
+ENTRYPOINT ["/notmanytask"]
+CMD ["-config", "/etc/notmanytask/config.yml"]
