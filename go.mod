@@ -17,4 +17,7 @@ require (
 	github.com/xanzy/go-gitlab v0.50.3
 	go.uber.org/zap v1.19.0
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602
+	gopkg.in/yaml.v2 v2.4.0
+	gorm.io/driver/postgres v1.1.0
+	gorm.io/gorm v1.21.13
 )

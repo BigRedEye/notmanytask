@@ -9,6 +9,16 @@ services:
       - ./notmanytask/config.yml:/etc/notmanytask/config.yml
     restart: unless-stopped
 
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_PASSWORD: 1234
+    ports:
+      - 5432:5432
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   traefik:
     image: traefik
     ports:
@@ -22,12 +32,14 @@ services:
       - ./traefik/logs:/var/log/traefik/logs
       - traefik-acme:/acme
     network_mode: host
+    restart: unless-stopped
 
   watchtower:
     image: v2tec/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --interval 5
+    restart: unless-stopped
 
 volumes:
   traefik-acme:
