@@ -172,7 +172,7 @@ func (s *server) run() error {
 			s.logger.Error("Failed to save session", zap.Error(err))
 		}
 
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Login)
+		c.Redirect(http.StatusFound, s.config.Endpoints.Login)
 	})
 
 	r.GET(s.config.Endpoints.Login, func(c *gin.Context) {
