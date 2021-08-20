@@ -19,6 +19,8 @@ import (
 	statik "github.com/rakyll/statik/fs"
 	"go.uber.org/zap"
 
+	"github.com/bigredeye/notmanytask/internal/database"
+	"github.com/bigredeye/notmanytask/internal/models"
 	_ "github.com/bigredeye/notmanytask/pkg/statik"
 )
 
@@ -27,13 +29,15 @@ type server struct {
 	logger *zap.Logger
 
 	auth *AuthClient
+	db   *database.DataBase
 }
 
-func newServer(config *Config, logger *zap.Logger) (*server, error) {
+func newServer(config *Config, logger *zap.Logger, db *database.DataBase) (*server, error) {
 	return &server{
 		config: config,
 		logger: logger,
 		auth:   NewAuthClient(config),
+		db:     db,
 	}, nil
 }
 
@@ -42,8 +46,15 @@ type Session struct {
 	ID    int
 }
 
+type RegisterInfo struct {
+	FirstName string
+	LastName  string
+	GroupName string
+}
+
 func init() {
 	gob.Register(Session{})
+	gob.Register(RegisterInfo{})
 }
 
 func (s *server) validateSession(c *gin.Context) {
@@ -143,6 +154,25 @@ func (s *server) run() error {
 		})
 	})
 
+	r.POST(s.config.Endpoints.Signup, func(c *gin.Context) {
+		firstName := c.PostForm("firstname")
+		lastName := c.PostForm("lastname")
+		groupName := c.PostForm("secret")
+
+		// TODO(BigRedEye): Validate form
+
+		session := sessions.Default(c)
+		session.Set("firstname", firstName)
+		session.Set("lastname", lastName)
+		session.Set("groupname", groupName)
+		err = session.Save()
+		if err != nil {
+			s.logger.Error("Failed to save session", zap.Error(err))
+		}
+
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Login)
+	})
+
 	r.GET(s.config.Endpoints.Login, func(c *gin.Context) {
 		session := sessions.Default(c)
 
@@ -171,6 +201,22 @@ func (s *server) run() error {
 			return
 		}
 
+		// TODO(BigRedEye): Move to separate function
+		v := session.Get("register")
+		if v == nil {
+			s.logger.Info("No register info found")
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+			c.Abort()
+			return
+		}
+		info, ok := v.(RegisterInfo)
+		if !ok {
+			s.logger.Error("Failed to load register info")
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+			c.Abort()
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(c, time.Second*5)
 		defer cancel()
 		token, err := s.auth.Exchange(ctx, c.Query("code"))
@@ -194,6 +240,19 @@ func (s *server) run() error {
 		err = session.Save()
 		if err != nil {
 			s.logger.Error("Failed to save session", zap.Error(err))
+		}
+
+		err = s.db.AddUser(&models.User{
+			ID:        user.ID,
+			Login:     user.Login,
+			FirstName: info.FirstName,
+			LastName:  info.LastName,
+			GroupName: info.GroupName,
+		})
+		if err != nil {
+			s.logger.Error("Failed to add user", zap.Error(err))
+			// TODO(BigRedEye): s.RenderSignupPage("")
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 		}
 
 		// TODO: Create user repo

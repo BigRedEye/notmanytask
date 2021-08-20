@@ -30,11 +30,18 @@ type Config struct {
 			EncryptionKey     string
 		}
 	}
+	Postgres struct {
+		Host     string
+		Port     uint16
+		Username string
+		Password string
+		DataBase string
+	}
 }
 
 func ParseConfig() (*Config, error) {
 	config := &Config{}
-	if err := conf.ParseConfig(config, conf.EnvPrefix("WEB")); err != nil {
+	if err := conf.ParseConfig(config, conf.EnvPrefix("NMT")); err != nil {
 		return nil, errors.Wrap(err, "Failed to parse config")
 	}
 	return config, nil

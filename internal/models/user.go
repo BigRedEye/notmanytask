@@ -1,11 +1,11 @@
 package models
 
-type Student struct {
+type User struct {
 	ID         int    `gorm:"primaryKey"`
 	Login      string `gorm:"uniqueIndex"`
 	Repository *string
 
-	GroupName string
 	FirstName string
 	LastName  string
+	GroupName string
 }

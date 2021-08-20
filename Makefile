@@ -15,6 +15,9 @@ statik: get_statik protos
 web: make_build statik
 	go build -o build ./cmd/web
 
+deadlines: make_build
+	go build -o build ./cmd/deadlines
+
 callback: make_build statik
 	go build -o build ./cmd/callback
 
