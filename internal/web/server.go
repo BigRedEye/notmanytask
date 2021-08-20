@@ -162,9 +162,11 @@ func (s *server) run() error {
 		// TODO(BigRedEye): Validate form
 
 		session := sessions.Default(c)
-		session.Set("firstname", firstName)
-		session.Set("lastname", lastName)
-		session.Set("groupname", groupName)
+		session.Set("register", RegisterInfo{
+			FirstName: firstName,
+			LastName:  lastName,
+			GroupName: groupName,
+		})
 		err = session.Save()
 		if err != nil {
 			s.logger.Error("Failed to save session", zap.Error(err))
