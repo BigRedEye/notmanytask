@@ -18,11 +18,11 @@ func Run(logger *zap.Logger) error {
 	log.Printf("Parsed config: %+v", config)
 
 	db, err := database.OpenDataBase(fmt.Sprintf("postgresql://%s:%s@%s:%d/%s",
-		config.Postgres.Username,
-		config.Postgres.Password,
-		config.Postgres.Host,
-		config.Postgres.Port,
-		config.Postgres.DataBase,
+		config.DataBase.User,
+		config.DataBase.Pass,
+		config.DataBase.Host,
+		config.DataBase.Port,
+		config.DataBase.Name,
 	))
 	if err != nil {
 		return errors.Wrap(err, "Failed to open database")

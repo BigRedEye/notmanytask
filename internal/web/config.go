@@ -30,12 +30,12 @@ type Config struct {
 			EncryptionKey     string
 		}
 	}
-	Postgres struct {
-		Host     string
-		Port     uint16
-		Username string
-		Password string
-		DataBase string
+	DataBase struct {
+		Host string
+		Port uint16
+		User string
+		Pass string
+		Name string
 	}
 }
 
