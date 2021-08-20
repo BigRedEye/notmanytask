@@ -75,6 +75,12 @@ func (s *server) validateSession(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	if info.Login == "" {
+		s.logger.Info("Empty session")
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
+		return
+	}
 
 	s.logger.Info("Valid session", zap.String("login", info.Login), zap.Int("id", info.ID))
 
@@ -270,7 +276,11 @@ func (s *server) run() error {
 
 	r.GET(s.config.Endpoints.Logout, func(c *gin.Context) {
 		session := sessions.Default(c)
-		session.Clear()
+		session.Set("login", Session{})
+		err = session.Save()
+		if err != nil {
+			s.logger.Error("Failed to save session", zap.Error(err))
+		}
 
 		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 	})
