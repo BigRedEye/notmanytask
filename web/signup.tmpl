@@ -9,7 +9,7 @@
     <body class="home">
         <div class="signup">
             <div class="login">
-                <a class="login-button" href="/login">
+                <a class="login-button" href="{{ .Config.Endpoints.Login }}">
                     <div class="text">
                         Login
                     </div>
@@ -27,16 +27,12 @@
                     <div class="form-header">
                         <h1>Sign Up</h1>
                     </div>
-                    <form method="post">
+                    <form method="post" action="{{ .Config.Endpoints.Signup }}">
                         {{ if .ErrorMessage }}
                         <div class="form-element form-error">
                             <div class="error-message">{{ .ErrorMessage }}</div>
                         </div>
                         {{ end }}
-                        <div class="form-element">
-                            <div class="name">Gitlab Username:</div>
-                            <input type="text" name="username">
-                        </div>
                         <div class="form-element">
                             <div class="name">First Name:</div>
                             <input type="text" name="firstname">
@@ -45,12 +41,6 @@
                             <div class="name">Last Name:</div>
                             <input type="text" name="lastname">
                         </div>
-                        {{ if .Login.NeedGroup }}
-                        <div class="form-element">
-                            <div class="name">Group:</div>
-                            <input type="text" name="group">
-                        </div>
-                        {{ end }}
                         <div class="form-element">
                             <div class="name">Secret Code:</div>
                             <input type="text" name="secret">
