@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-contrib/sessions"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -51,37 +50,6 @@ type RegisterInfo struct {
 func init() {
 	gob.Register(Session{})
 	gob.Register(RegisterInfo{})
-}
-
-func (s *server) validateSession(c *gin.Context) {
-	session := sessions.Default(c)
-	v := session.Get("login")
-	if v == nil {
-		// TODO(BigRedEye): reqid
-		s.logger.Info("Undefined session")
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
-		c.Abort()
-		return
-	}
-	info, ok := v.(Session)
-	if !ok {
-		s.logger.Error("Failed to deserialize session")
-		session.Clear()
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
-		c.Abort()
-		return
-	}
-	if info.Login == "" {
-		s.logger.Info("Empty session")
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
-		c.Abort()
-		return
-	}
-
-	s.logger.Info("Valid session", zap.String("login", info.Login), zap.Int("id", info.ID))
-
-	c.Set("session", info)
-	c.Next()
 }
 
 func buildHTMLTemplates(hfs http.FileSystem, funcMap template.FuncMap) (*template.Template, error) {

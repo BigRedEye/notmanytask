@@ -176,3 +176,34 @@ func setupAuth(s *server, r *gin.Engine) error {
 	r.Use(sessions.Sessions("session", store))
 	return nil
 }
+
+func (s *server) validateSession(c *gin.Context) {
+	session := sessions.Default(c)
+	v := session.Get("login")
+	if v == nil {
+		// TODO(BigRedEye): reqid
+		s.logger.Info("Undefined session")
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
+		return
+	}
+	info, ok := v.(Session)
+	if !ok {
+		s.logger.Error("Failed to deserialize session")
+		session.Clear()
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
+		return
+	}
+	if info.Login == "" {
+		s.logger.Info("Empty session")
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
+		return
+	}
+
+	s.logger.Info("Valid session", zap.String("login", info.Login), zap.Int("id", info.ID))
+
+	c.Set("session", info)
+	c.Next()
+}

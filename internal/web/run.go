@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 func Run(logger *zap.Logger) error {
-	config, err := ParseConfig()
+	config, err := config.ParseConfig()
 	if err != nil {
 		return err
 	}

@@ -10,9 +10,11 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
+
+	"github.com/bigredeye/notmanytask/internal/config"
 )
 
-func Fetch(url string) (Deadlines, error) {
+func fetch(url string) (Deadlines, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch deadlines")
@@ -39,7 +41,7 @@ func Fetch(url string) (Deadlines, error) {
 type Fetcher struct {
 	current atomic.Value
 
-	url      string
+	config   *config.Config
 	interval time.Duration
 	logger   *zap.Logger
 
@@ -47,12 +49,23 @@ type Fetcher struct {
 	updater sync.WaitGroup
 }
 
-func NewFetcher(url string, interval time.Duration, logger *zap.Logger) *Fetcher {
-	return &Fetcher{
-		url:    url,
-		stop:   make(chan bool),
+func NewFetcher(config *config.Config, logger *zap.Logger) (*Fetcher, error) {
+	fetcher := &Fetcher{
+		config: config,
 		logger: logger,
+		stop:   make(chan bool),
 	}
+
+	err := fetcher.reload()
+	if err != nil {
+		return nil, err
+	}
+
+	if fetcher.current.Load() == nil {
+		panic("No deadlines found after reload")
+	}
+
+	return fetcher, nil
 }
 
 func (f *Fetcher) RunUpdater() {
@@ -71,20 +84,37 @@ func (f *Fetcher) RunUpdater() {
 	}
 }
 
-func (f *Fetcher) reload() {
+type deadlinesMap = map[string]*Deadlines
+
+func (f *Fetcher) reload() error {
 	f.logger.Debug("Fetching deadlines")
 
-	deadlines, err := Fetch(f.url)
-	if err != nil {
-		f.logger.Error("Failed to reload deadlines", zap.Error(err))
-		return
+	groupDeadlines := make(deadlinesMap)
+	for _, group := range f.config.Groups {
+		deadlines, err := fetch(group.DeadlinesURL)
+		if err != nil {
+			f.logger.Error("Failed to reload deadlines", zap.Error(err))
+			return errors.Wrap(err, "Failed to reload deadlines")
+		}
+		groupDeadlines[group.Name] = &deadlines
+		f.logger.Debug("Sucessfully fetched deadlines", zap.Int("num_task_groups", len(deadlines)), zap.String("group", group.Name))
 	}
+	f.logger.Debug("Sucessfully fetched all deadlines")
 
-	f.logger.Debug("Sucessfully fetched deadlines", zap.Int("num_groups", len(deadlines)))
-	f.current.Store(deadlines)
+	f.current.Store(groupDeadlines)
+	return nil
 }
 
 func (f *Fetcher) StopUpdater() {
 	f.stop <- true
 	f.updater.Wait()
+}
+
+func (f *Fetcher) GroupDeadlines(group string) *Deadlines {
+	cur := f.current.Load()
+	if cur == nil {
+		return nil
+	}
+	groupDeadlines := cur.(deadlinesMap)
+	return groupDeadlines[group]
 }

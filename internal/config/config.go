@@ -5,56 +5,68 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Config struct {
-	GitLab struct {
-		BaseURL string
-		Group   struct {
-			Name string
-			ID   int
-		}
-		DefaultReadme string
-
-		Application struct {
-			ClientID string
-			Secret   string
-		}
-		Api struct {
-			Token string
-		}
-	}
-
-	Endpoints struct {
-		HostName      string
-		Home          string
-		Login         string
-		Logout        string
-		Signup        string
-		OauthCallback string
-	}
-
-	Server struct {
-		ListenAddress string
-		Cookies       struct {
-			AuthenticationKey string
-			EncryptionKey     string
-		}
-	}
-
-	DataBase struct {
-		Host string
-		Port uint16
-		User string
-		Pass string
+type GitLabConfig struct {
+	BaseURL string
+	Group   struct {
 		Name string
+		ID   int
 	}
+	DefaultReadme string
 
+	Application struct {
+		ClientID string
+		Secret   string
+	}
+	Api struct {
+		Token string
+	}
+}
+
+type EndpointsConfig struct {
+	HostName      string
+	Home          string
+	Login         string
+	Logout        string
+	Signup        string
+	OauthCallback string
+}
+type ServerConfig struct {
+	ListenAddress string
+	Cookies       struct {
+		AuthenticationKey string
+		EncryptionKey     string
+	}
+}
+
+type DataBaseConfig struct {
+	Host string
+	Port uint16
+	User string
+	Pass string
+	Name string
+}
+
+type TestingConfig struct {
 	Testing struct {
 		Tokens []string
-		Groups []struct {
-			Name   string
-			Secret string
-		}
 	}
+}
+
+type GroupConfig struct {
+	Name         string
+	Secret       string
+	DeadlinesURL string
+}
+
+type GroupsConfig = []GroupConfig
+
+type Config struct {
+	GitLab    GitLabConfig
+	Endpoints EndpointsConfig
+	Server    ServerConfig
+	DataBase  DataBaseConfig
+	Testing   TestingConfig
+	Groups    GroupsConfig
 }
 
 func ParseConfig() (*Config, error) {
