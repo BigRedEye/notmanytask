@@ -1,4 +1,4 @@
-package web
+package config
 
 import (
 	"github.com/bigredeye/notmanytask/pkg/conf"
@@ -7,6 +7,8 @@ import (
 
 type Config struct {
 	GitLab struct {
+		BaseURL     string
+		CourseGroup string
 		Application struct {
 			ClientID string
 			Secret   string
@@ -15,6 +17,7 @@ type Config struct {
 			Token string
 		}
 	}
+
 	Endpoints struct {
 		HostName      string
 		Home          string
@@ -23,6 +26,7 @@ type Config struct {
 		Signup        string
 		OauthCallback string
 	}
+
 	Server struct {
 		ListenAddress string
 		Cookies       struct {
@@ -30,12 +34,21 @@ type Config struct {
 			EncryptionKey     string
 		}
 	}
+
 	DataBase struct {
 		Host string
 		Port uint16
 		User string
 		Pass string
 		Name string
+	}
+
+	Testing struct {
+		Tokens []string
+		Groups []struct {
+			Name   string
+			Secret string
+		}
 	}
 }
 
