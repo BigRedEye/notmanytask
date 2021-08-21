@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bigredeye/notmanytask/internal/database"
+	"github.com/bigredeye/notmanytask/internal/gitlab"
 	"github.com/bigredeye/notmanytask/internal/models"
 	_ "github.com/bigredeye/notmanytask/pkg/statik"
 )
@@ -235,7 +236,7 @@ func (s *server) run() error {
 			return
 		}
 
-		user, err := GetGitLabUser(token.AccessToken)
+		user, err := gitlab.GetOAuthGitLabUser(token.AccessToken)
 		if err != nil {
 			s.logger.Error("Failed to get gitlab user", zap.Error(err))
 			// TODO(BigRedEye): Render error to user

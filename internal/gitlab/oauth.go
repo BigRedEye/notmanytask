@@ -1,4 +1,4 @@
-package web
+package gitlab
 
 import (
 	"net/http"
@@ -12,7 +12,7 @@ type User struct {
 	Login string
 }
 
-func GetGitLabUser(token string) (*User, error) {
+func GetOAuthGitLabUser(token string) (*User, error) {
 	client, err := gitlab.NewOAuthClient(token)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create gitlab client")

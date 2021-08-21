@@ -7,13 +7,15 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/gitlab"
+
+	"github.com/bigredeye/notmanytask/internal/config"
 )
 
 type AuthClient struct {
 	conf *oauth2.Config
 }
 
-func NewAuthClient(config *Config) *AuthClient {
+func NewAuthClient(config *config.Config) *AuthClient {
 	return &AuthClient{
 		conf: &oauth2.Config{
 			ClientID:     config.GitLab.Application.ClientID,

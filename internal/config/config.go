@@ -7,8 +7,13 @@ import (
 
 type Config struct {
 	GitLab struct {
-		BaseURL     string
-		CourseGroup string
+		BaseURL string
+		Group   struct {
+			Name string
+			ID   int
+		}
+		DefaultReadme string
+
 		Application struct {
 			ClientID string
 			Secret   string
