@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -39,12 +40,41 @@ func (s loginService) signup(c *gin.Context) {
 	})
 }
 
+var nameRe = regexp.MustCompile("^[A-Z][a-z]+$")
+
 func (s loginService) signupForm(c *gin.Context) {
 	firstName := c.PostForm("firstname")
 	lastName := c.PostForm("lastname")
-	groupName := c.PostForm("secret")
+	secret := c.PostForm("secret")
+	s.log.Info("New signup request",
+		zap.String("firstName", firstName),
+		zap.String("lastName", lastName),
+		zap.String("secret", secret),
+	)
 
-	// TODO(BigRedEye): Validate form
+	if !nameRe.MatchString(firstName) {
+		s.log.Warn("Invalid firstName from form", zap.String("value", firstName))
+		// renderer.RenderError();
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+	}
+	if !nameRe.MatchString(lastName) {
+		s.log.Warn("Invalid lastName from form", zap.String("value", lastName))
+		// renderer.RenderError();
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+	}
+
+	// Find group by secret
+	groupName := ""
+	for _, group := range s.config.Groups {
+		if secret == group.Secret {
+			groupName = group.Name
+		}
+	}
+	if groupName == "" {
+		s.log.Warn("Unknown secret", zap.String("secret", secret))
+		// renderer.RenderError();
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+	}
 
 	session := sessions.Default(c)
 	session.Set("register", RegisterInfo{
@@ -55,6 +85,8 @@ func (s loginService) signupForm(c *gin.Context) {
 	err := session.Save()
 	if err != nil {
 		s.log.Error("Failed to save session", zap.Error(err))
+		// renderer.RenderError();
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 	}
 
 	c.Redirect(http.StatusFound, s.config.Endpoints.Login)
