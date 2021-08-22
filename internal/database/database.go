@@ -48,6 +48,15 @@ func (db *DataBase) GetUserByLogin(login string) (*models.User, error) {
 	return &user, nil
 }
 
+func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
+	var users []*models.User
+	err := db.Find(&users, "repository IS NULL").Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (db *DataBase) SetUserRepository(user *models.User) error {
 	return db.Model(user).Update("repository", user.Repository).Error
 }

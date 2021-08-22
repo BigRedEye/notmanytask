@@ -1,9 +1,9 @@
 package deadlines
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -44,16 +44,12 @@ type Fetcher struct {
 	config   *config.Config
 	interval time.Duration
 	logger   *zap.Logger
-
-	stop    chan bool
-	updater sync.WaitGroup
 }
 
 func NewFetcher(config *config.Config, logger *zap.Logger) (*Fetcher, error) {
 	fetcher := &Fetcher{
 		config: config,
 		logger: logger,
-		stop:   make(chan bool),
 	}
 
 	err := fetcher.reload()
@@ -68,15 +64,12 @@ func NewFetcher(config *config.Config, logger *zap.Logger) (*Fetcher, error) {
 	return fetcher, nil
 }
 
-func (f *Fetcher) RunUpdater() {
-	f.updater.Add(1)
-	defer f.updater.Done()
-
+func (f *Fetcher) Run(ctx context.Context) {
 	tick := time.Tick(f.interval)
 
 	for {
 		select {
-		case <-f.stop:
+		case <-ctx.Done():
 			return
 		case <-tick:
 			f.reload()
@@ -103,11 +96,6 @@ func (f *Fetcher) reload() error {
 
 	f.current.Store(groupDeadlines)
 	return nil
-}
-
-func (f *Fetcher) StopUpdater() {
-	f.stop <- true
-	f.updater.Wait()
 }
 
 func (f *Fetcher) GroupDeadlines(group string) *Deadlines {
