@@ -16,6 +16,7 @@ import (
 
 	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
+	"github.com/bigredeye/notmanytask/internal/deadlines"
 	_ "github.com/bigredeye/notmanytask/pkg/statik"
 )
 
@@ -23,16 +24,18 @@ type server struct {
 	config *config.Config
 	logger *zap.Logger
 
-	auth *AuthClient
-	db   *database.DataBase
+	auth      *AuthClient
+	db        *database.DataBase
+	deadlines *deadlines.Fetcher
 }
 
-func newServer(config *config.Config, logger *zap.Logger, db *database.DataBase) (*server, error) {
+func newServer(config *config.Config, logger *zap.Logger, db *database.DataBase, deadlines *deadlines.Fetcher) (*server, error) {
 	return &server{
-		config: config,
-		logger: logger,
-		auth:   NewAuthClient(config),
-		db:     db,
+		config:    config,
+		logger:    logger,
+		auth:      NewAuthClient(config),
+		db:        db,
+		deadlines: deadlines,
 	}, nil
 }
 
