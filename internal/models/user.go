@@ -1,11 +1,27 @@
 package models
 
-type User struct {
-	ID         int    `gorm:"primaryKey"`
-	Login      string `gorm:"uniqueIndex"`
-	Repository *string
+import (
+	"gorm.io/gorm"
+)
 
-	FirstName string
-	LastName  string
-	GroupName string
+type GitlabUser struct {
+	GitlabID    int    `gorm:"uniqueIndex"`
+	GitlabLogin string `gorm:"uniqueIndex"`
+	Repository  *string
+}
+
+type User struct {
+	gorm.Model
+
+	*GitlabUser
+
+	FirstName string `gorm:"uniqueIndex:idx_name"`
+	LastName  string `gorm:"uniqueIndex:idx_name"`
+	GroupName string `gorm:"uniqueIndex:idx_name"`
+}
+
+type Session struct {
+	ID     uint   `gorm:"primaryKey"`
+	Token  string `gorm:"uniqueIndex"`
+	UserID uint
 }

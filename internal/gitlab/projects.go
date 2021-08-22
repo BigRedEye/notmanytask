@@ -17,21 +17,33 @@ type ProjectsMaker struct {
 }
 
 func NewProjectsMaker(client *Client, db *database.DataBase) (*ProjectsMaker, error) {
-	return &ProjectsMaker{client, db, make(chan *models.User, 10)}, nil
+	return &ProjectsMaker{client, db, make(chan *models.User, 4)}, nil
+}
+
+func (p ProjectsMaker) AsyncPrepareProject(user *models.User) {
+	p.users <- user
 }
 
 func (p ProjectsMaker) Run(ctx context.Context) {
 	p.initializeMissingProjects()
 
 	tick := time.Tick(time.Second * 10)
-	select {
-	case user := <-p.users:
-		p.logger.Info("Got user from in-proc channel", zap.Int("user_id", user.ID), zap.String("user_login", user.Login))
-		p.maybeInitializeProject(user)
-	case _ = <-tick:
-		p.initializeMissingProjects()
-	case _ = <-ctx.Done():
-		return
+	for {
+		select {
+		case user := <-p.users:
+			p.logger.Info("Got user from in-proc channel",
+				zap.Int("gitlab_id", user.GitlabID),
+				zap.String("gitlab_login", user.GitlabLogin),
+			)
+			if !p.maybeInitializeProject(user) {
+				p.users <- user
+			}
+		case <-tick:
+			p.initializeMissingProjects()
+		case <-ctx.Done():
+			p.logger.Info("Stopping projects maker")
+			return
+		}
 	}
 }
 
@@ -43,21 +55,23 @@ func (p ProjectsMaker) initializeMissingProjects() {
 	}
 
 	for _, user := range users {
-		p.logger.Info("Got user without repo from database channel", zap.Int("user_id", user.ID), zap.String("user_login", user.Login))
+		p.logger.Info("Got user without repo from database channel",
+			zap.Int("gitlab_id", user.GitlabID),
+			zap.String("gitlab_login", user.GitlabLogin),
+		)
 		p.maybeInitializeProject(user)
 	}
 }
 
-func (p ProjectsMaker) maybeInitializeProject(user *models.User) {
-	log := p.logger.With(zap.Int("user_id", user.ID), zap.String("user_login", user.Login))
+func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
+	log := p.logger.With(zap.Int("gitlab_id", user.GitlabID), zap.String("gitlab_login", user.GitlabLogin))
 
 	err := p.InitializeProject(user)
 	if err != nil {
 		log.Error("Failed to initialize project", zap.Error(err))
-		p.users <- user
 		// TODO(BigRedEye): nice backoff
 		time.Sleep(time.Millisecond * 100)
-		return
+		return false
 	}
 
 	project := p.MakeProjectUrl(user)
@@ -67,8 +81,9 @@ func (p ProjectsMaker) maybeInitializeProject(user *models.User) {
 	err = p.db.SetUserRepository(user)
 	if err != nil {
 		log.Error("Failed to set user repo", zap.Error(err))
-		return
+		return false
 	}
 
 	log.Info("Sucessfully set user repo")
+	return true
 }

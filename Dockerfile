@@ -28,6 +28,7 @@ RUN apk add --update \
         curl \
         jq \
         openssl \
+        tzdata \
     && rm /var/cache/apk/*
 
 COPY --from=go-builder /notmanytask /

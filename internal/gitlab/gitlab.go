@@ -38,7 +38,12 @@ const (
 )
 
 func (c Client) InitializeProject(user *models.User) error {
-	log := c.logger.With(zap.String("user_login", user.Login), zap.Int("user_id", user.ID))
+	if user.GitlabUser == nil {
+		c.logger.Error("Empty gitlab user", zap.Uint("uid", user.ID))
+		return errors.New("Empty gitlab user")
+	}
+
+	log := c.logger.With(zap.String("user_login", user.GitlabLogin), zap.Int("user_id", user.GitlabID))
 	log.Info("Going to initialize project")
 
 	projectName := c.MakeProjectName(user)
@@ -87,7 +92,7 @@ func (c Client) InitializeProject(user *models.User) error {
 
 	// Add our dear user to the project
 	_, _, err = c.gitlab.ProjectMembers.AddProjectMember(project.ID, &gitlab.AddProjectMemberOptions{
-		UserID:      user.ID,
+		UserID:      user.GitlabID,
 		AccessLevel: gitlab.AccessLevel(gitlab.DeveloperPermissions),
 	})
 	if err != nil {
@@ -100,7 +105,7 @@ func (c Client) InitializeProject(user *models.User) error {
 }
 
 func (c Client) MakeProjectName(user *models.User) string {
-	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, user.FirstName, user.LastName, user.Login)
+	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, user.FirstName, user.LastName, user.GitlabLogin)
 }
 
 func (c Client) MakeProjectUrl(user *models.User) string {

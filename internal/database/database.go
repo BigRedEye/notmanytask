@@ -1,6 +1,8 @@
 package database
 
 import (
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -18,7 +20,7 @@ func OpenDataBase(dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{})
 	if err != nil {
 		return nil, err
 	}
@@ -26,11 +28,11 @@ func OpenDataBase(dsn string) (*DataBase, error) {
 	return &DataBase{db}, nil
 }
 
-func (db *DataBase) AddUser(user *models.User) error {
-	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(user).Error
+func (db *DataBase) AddUser(user *models.User) (*models.User, error) {
+	return user, db.Clauses(clause.OnConflict{DoNothing: true}).Create(user).Error
 }
 
-func (db *DataBase) GetUserByID(id int) (*models.User, error) {
+func (db *DataBase) FindUserByID(id uint) (*models.User, error) {
 	var user models.User
 	err := db.First(&user, id).Error
 	if err != nil {
@@ -39,9 +41,18 @@ func (db *DataBase) GetUserByID(id int) (*models.User, error) {
 	return &user, nil
 }
 
-func (db *DataBase) GetUserByLogin(login string) (*models.User, error) {
+func (db *DataBase) FindUserByGitlabLogin(login string) (*models.User, error) {
 	var user models.User
-	err := db.First(&user, "login = ?", login).Error
+	err := db.First(&user, "gitlab_login = ?", login).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (db *DataBase) FindUserByGitlabID(id int) (*models.User, error) {
+	var user models.User
+	err := db.First(&user, "gitlab_id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +68,30 @@ func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
 	return users, nil
 }
 
+func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) error {
+	res := db.Model(&models.User{}).
+		Where("gitlab_id IS NULL").
+		Update("gitlab_id", user.GitlabID).
+		Update("gitlab_login", user.GitlabLogin)
+
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected < 1 {
+		return errors.Errorf("Unknown user %d", uid)
+	}
+	return nil
+}
+
 func (db *DataBase) SetUserRepository(user *models.User) error {
-	return db.Model(user).Update("repository", user.Repository).Error
+	res := db.Model(user).Update("repository", user.Repository)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected < 1 {
+		return errors.Errorf("Unknown user %d", user.ID)
+	}
+	return nil
 }
 
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
@@ -84,4 +117,40 @@ func (db *DataBase) ListAllPipelines() (pipelines []models.Pipeline, err error) 
 		pipelines = nil
 	}
 	return
+}
+
+func (db *DataBase) CreateSession(user uint) (*models.Session, error) {
+	session := &models.Session{
+		Token:  uuid.Must(uuid.NewUUID()).String(),
+		UserID: user,
+	}
+	res := db.DB.Create(session)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	return session, nil
+}
+
+func (db *DataBase) FindSession(token string) (*models.Session, error) {
+	var session models.Session
+	res := db.DB.Where("token", token).Take(&session)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected < 1 {
+		return nil, errors.New("Unknown session")
+	}
+	return &session, nil
+}
+
+func (db *DataBase) FindUserBySession(token string) (*models.User, *models.Session, error) {
+	session, err := db.FindSession(token)
+	if err != nil {
+		return nil, nil, err
+	}
+	user, err := db.FindUserByID(session.ID)
+	if err != nil {
+		return nil, session, err
+	}
+	return user, session, nil
 }

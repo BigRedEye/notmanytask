@@ -67,7 +67,7 @@ func Run(logger *zap.Logger) error {
 		projects.Run(projectsCtx)
 	}()
 
-	s, err := newServer(config, logger, db, deadlines)
+	s, err := newServer(config, logger, db, deadlines, projects)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start server")
 	}

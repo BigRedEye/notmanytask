@@ -17,6 +17,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
+	"github.com/bigredeye/notmanytask/internal/gitlab"
 	_ "github.com/bigredeye/notmanytask/pkg/statik"
 )
 
@@ -27,15 +28,17 @@ type server struct {
 	auth      *AuthClient
 	db        *database.DataBase
 	deadlines *deadlines.Fetcher
+	projects  *gitlab.ProjectsMaker
 }
 
-func newServer(config *config.Config, logger *zap.Logger, db *database.DataBase, deadlines *deadlines.Fetcher) (*server, error) {
+func newServer(config *config.Config, logger *zap.Logger, db *database.DataBase, deadlines *deadlines.Fetcher, projects *gitlab.ProjectsMaker) (*server, error) {
 	return &server{
 		config:    config,
 		logger:    logger,
 		auth:      NewAuthClient(config),
 		db:        db,
 		deadlines: deadlines,
+		projects:  projects,
 	}, nil
 }
 

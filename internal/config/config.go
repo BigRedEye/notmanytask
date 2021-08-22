@@ -47,9 +47,7 @@ type DataBaseConfig struct {
 }
 
 type TestingConfig struct {
-	Testing struct {
-		Tokens []string
-	}
+	Tokens []string
 }
 
 type GroupConfig struct {
