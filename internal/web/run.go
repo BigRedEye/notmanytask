@@ -58,7 +58,14 @@ func Run(logger *zap.Logger) error {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}
 
-	wg.Add(2)
+	pipelinesCtx, pipelinesCancel := context.WithCancel(ctx)
+	defer pipelinesCancel()
+	pipelines, err := gitlab.NewPipelinesFetcher(git, db)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create projects maker")
+	}
+
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		deadlines.Run(deadlinesCtx)
@@ -67,8 +74,12 @@ func Run(logger *zap.Logger) error {
 		defer wg.Done()
 		projects.Run(projectsCtx)
 	}()
+	go func() {
+		defer wg.Done()
+		pipelines.Run(pipelinesCtx)
+	}()
 
-	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects)
+	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects, pipelines)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start server")
 	}

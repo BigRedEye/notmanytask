@@ -110,12 +110,16 @@ func (c Client) InitializeProject(user *models.User) error {
 	foundUser := false
 	options := gitlab.ListProjectMembersOptions{}
 	for {
-		members, _, err := c.gitlab.ProjectMembers.ListAllProjectMembers(project.ID, &options)
+		members, resp, err := c.gitlab.ProjectMembers.ListAllProjectMembers(project.ID, &options)
 		if err != nil {
 			log.Error("Failed to list project members", zap.Error(err))
 			return errors.Wrap(err, "Failed to list project members")
 		}
-		options.Page += 1
+
+		if resp.CurrentPage >= resp.TotalPages {
+			break
+		}
+		options.Page = resp.NextPage
 
 		for _, member := range members {
 			if member.ID == *user.GitlabID {
@@ -154,4 +158,8 @@ func (c Client) MakeProjectName(user *models.User) string {
 func (c Client) MakeProjectUrl(user *models.User) string {
 	name := c.MakeProjectName(user)
 	return fmt.Sprintf("%s/%s/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name)
+}
+
+func (c Client) MakeProjectWithNamespace(project string) string {
+	return fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, project)
 }

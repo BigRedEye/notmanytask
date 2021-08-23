@@ -1,0 +1,146 @@
+package gitlab
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/xanzy/go-gitlab"
+	"go.uber.org/zap"
+
+	"github.com/bigredeye/notmanytask/internal/database"
+	lf "github.com/bigredeye/notmanytask/internal/logfield"
+	"github.com/bigredeye/notmanytask/internal/models"
+)
+
+type PipelinesFetcher struct {
+	*Client
+
+	db *database.DataBase
+}
+
+func NewPipelinesFetcher(client *Client, db *database.DataBase) (*PipelinesFetcher, error) {
+	return &PipelinesFetcher{
+		Client: client,
+		db:     db,
+	}, nil
+}
+
+func (p PipelinesFetcher) Run(ctx context.Context) {
+	tick := time.Tick(time.Second * 10)
+
+	for {
+		select {
+		case <-tick:
+			p.fetchAllPipelines()
+		case <-ctx.Done():
+			p.logger.Info("Stopping pipelines fetcher")
+			return
+		}
+	}
+}
+
+func (p PipelinesFetcher) Fetch(id int, project string) error {
+	log := p.logger.With(
+		lf.PipelineID(id),
+		lf.ProjectName(project),
+	)
+
+	log.Info("Fetching pipeline")
+
+	pipeline, _, err := p.gitlab.Pipelines.GetPipeline(p.Client.MakeProjectWithNamespace(project), id)
+	if err != nil {
+		log.Error("Failed to fetch pipeline", zap.Error(err))
+		return errors.Wrap(err, "Failed to fetch pipeline")
+	}
+
+	return p.addPipeline(project, &gitlab.PipelineInfo{
+		ID:        pipeline.ID,
+		Ref:       pipeline.Ref,
+		Status:    pipeline.Status,
+		CreatedAt: pipeline.CreatedAt,
+		ProjectID: pipeline.ProjectID,
+	})
+}
+
+func (p PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.PipelineInfo) error {
+	return p.db.AddPipeline(&models.Pipeline{
+		ID:        pipeline.ID,
+		Task:      ParseTaskFromBranch(pipeline.Ref),
+		Status:    pipeline.Status,
+		Project:   projectName,
+		CreatedAt: *pipeline.CreatedAt,
+	})
+}
+
+func (p PipelinesFetcher) fetchAllPipelines() {
+	p.logger.Info("Fetching all pipelines")
+	err := p.forEachProject(func(project *gitlab.Project) error {
+		options := &gitlab.ListProjectPipelinesOptions{}
+		for {
+			pipelines, resp, err := p.gitlab.Pipelines.ListProjectPipelines(p.config.GitLab.Group.ID, options)
+			if err != nil {
+				p.logger.Error("Failed to list projects", zap.Error(err))
+				return err
+			}
+
+			if resp.CurrentPage >= resp.TotalPages {
+				break
+			}
+			options.Page = resp.NextPage
+
+			for _, pipeline := range pipelines {
+				if err = p.addPipeline(project.Name, pipeline); err != nil {
+					p.logger.Error("Failed to add pipeline", zap.Error(err), lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID))
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err == nil {
+		p.logger.Info("Sucessfully fetched pipelines")
+	} else {
+		p.logger.Error("Failed to fetch pipelines", zap.Error(err))
+	}
+}
+
+func (p PipelinesFetcher) forEachProject(callback func(project *gitlab.Project) error) error {
+	options := gitlab.ListGroupProjectsOptions{}
+
+	for {
+		projects, resp, err := p.gitlab.Groups.ListGroupProjects(p.config.GitLab.Group.ID, &options)
+		if err != nil {
+			p.logger.Error("Failed to list projects", zap.Error(err))
+			return err
+		}
+
+		if resp.CurrentPage >= resp.TotalPages {
+			break
+		}
+		options.Page = resp.NextPage
+
+		for _, project := range projects {
+			if err = callback(project); err != nil {
+				p.logger.Error("Project callback failed", zap.Error(err))
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+const (
+	branchPrefix = "submits/"
+)
+
+func ParseTaskFromBranch(task string) string {
+	return strings.TrimPrefix(task, branchPrefix)
+}
+
+func MakeBranchForTask(task string) string {
+	return branchPrefix + task
+}

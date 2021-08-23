@@ -28,9 +28,17 @@ type server struct {
 	db        *database.DataBase
 	deadlines *deadlines.Fetcher
 	projects  *gitlab.ProjectsMaker
+	pipelines *gitlab.PipelinesFetcher
 }
 
-func newServer(config *config.Config, logger *zap.Logger, db *database.DataBase, deadlines *deadlines.Fetcher, projects *gitlab.ProjectsMaker) (*server, error) {
+func newServer(
+	config *config.Config,
+	logger *zap.Logger,
+	db *database.DataBase,
+	deadlines *deadlines.Fetcher,
+	projects *gitlab.ProjectsMaker,
+	pipelines *gitlab.PipelinesFetcher,
+) (*server, error) {
 	return &server{
 		config:    config,
 		logger:    logger,

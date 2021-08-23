@@ -5,9 +5,10 @@ import (
 )
 
 type Pipeline struct {
-	ID       uint   `gorm:"primaryKey"`
-	Task     string `gorm:"index"`
-	Login    string `gorm:"index"`
-	Status   string
-	OpenedAt time.Time
+	ID      int    `gorm:"primaryKey"`
+	Project string `gorm:"index"`
+
+	Task      string `gorm:"index"`
+	Status    string
+	CreatedAt time.Time
 }

@@ -29,7 +29,12 @@ type EndpointsConfig struct {
 	Logout        string
 	Signup        string
 	OauthCallback string
+
+	Api struct {
+		Report string
+	}
 }
+
 type ServerConfig struct {
 	ListenAddress string
 	Cookies       struct {
