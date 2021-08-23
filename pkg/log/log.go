@@ -19,7 +19,7 @@ func InitDev() *zap.Logger {
 
 func initLogger(config zap.Config) *zap.Logger {
 	var err error
-	logger, err = config.Build(zap.AddStacktrace(zap.WarnLevel))
+	logger, err = config.Build(zap.AddStacktrace(zap.ErrorLevel))
 	if err != nil {
 		fmt.Printf("Failed to init zap logger: %v", err)
 		os.Exit(1)
