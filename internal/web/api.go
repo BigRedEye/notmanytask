@@ -35,19 +35,19 @@ func (s apiService) report(c *gin.Context) {
 
 	req := api.ReportRequest{}
 	if err := c.BindJSON(&req); err != nil {
-		onError(http.StatusBadRequest, err)
+		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse json body: %w", err))
 		return
 	}
 
 	id, err := strconv.Atoi(req.PipelineID)
 	if err != nil {
-		onError(http.StatusBadRequest, err)
+		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse pipeline_id: %w", err))
 		return
 	}
 
 	userID, err := strconv.Atoi(req.UserID)
 	if err != nil {
-		onError(http.StatusBadRequest, err)
+		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse user_id: %w", err))
 		return
 	}
 
