@@ -150,7 +150,7 @@ func (db *DataBase) FindUserBySession(token string) (*models.User, *models.Sessi
 	if err != nil {
 		return nil, nil, err
 	}
-	user, err := db.FindUserByID(session.ID)
+	user, err := db.FindUserByID(session.UserID)
 	if err != nil {
 		return nil, session, err
 	}
