@@ -116,11 +116,6 @@ func (c Client) InitializeProject(user *models.User) error {
 			return errors.Wrap(err, "Failed to list project members")
 		}
 
-		if resp.CurrentPage >= resp.TotalPages {
-			break
-		}
-		options.Page = resp.NextPage
-
 		for _, member := range members {
 			if member.ID == *user.GitlabID {
 				foundUser = true
@@ -131,6 +126,11 @@ func (c Client) InitializeProject(user *models.User) error {
 		if foundUser {
 			break
 		}
+
+		if resp.CurrentPage >= resp.TotalPages {
+			break
+		}
+		options.Page = resp.NextPage
 	}
 
 	if foundUser {

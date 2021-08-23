@@ -3,14 +3,15 @@ package lf
 import "go.uber.org/zap"
 
 const (
-	FieldModule      = "module"
-	FieldToken       = "token"
-	FieldUserID      = "user_id"
-	FieldGitlabID    = "gitlab_id"
-	FieldGitlabLogin = "gitlab_login"
-	FieldProjectName = "project_name"
-	FieldProjectID   = "project_id"
-	FieldPipelineID  = "pipeline_id"
+	FieldModule         = "module"
+	FieldToken          = "token"
+	FieldUserID         = "user_id"
+	FieldGitlabID       = "gitlab_id"
+	FieldGitlabLogin    = "gitlab_login"
+	FieldProjectName    = "project_name"
+	FieldProjectID      = "project_id"
+	FieldPipelineID     = "pipeline_id"
+	FieldPipelineStatus = "pipeline_status"
 )
 
 func Module(module string) zap.Field {
@@ -43,4 +44,8 @@ func ProjectID(ID int) zap.Field {
 
 func PipelineID(ID int) zap.Field {
 	return zap.Int(FieldPipelineID, ID)
+}
+
+func PipelineStatus(status string) zap.Field {
+	return zap.String(FieldPipelineStatus, status)
 }

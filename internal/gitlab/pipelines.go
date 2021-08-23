@@ -77,24 +77,26 @@ func (p PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.Pipel
 func (p PipelinesFetcher) fetchAllPipelines() {
 	p.logger.Info("Fetching all pipelines")
 	err := p.forEachProject(func(project *gitlab.Project) error {
+		p.logger.Info("Found project", lf.ProjectName(project.Name))
 		options := &gitlab.ListProjectPipelinesOptions{}
 		for {
-			pipelines, resp, err := p.gitlab.Pipelines.ListProjectPipelines(p.config.GitLab.Group.ID, options)
+			pipelines, resp, err := p.gitlab.Pipelines.ListProjectPipelines(project.ID, options)
 			if err != nil {
 				p.logger.Error("Failed to list projects", zap.Error(err))
 				return err
+			}
+
+			for _, pipeline := range pipelines {
+				p.logger.Info("Found pipeline", lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID), lf.PipelineStatus(pipeline.Status))
+				if err = p.addPipeline(project.Name, pipeline); err != nil {
+					p.logger.Error("Failed to add pipeline", zap.Error(err), lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID))
+				}
 			}
 
 			if resp.CurrentPage >= resp.TotalPages {
 				break
 			}
 			options.Page = resp.NextPage
-
-			for _, pipeline := range pipelines {
-				if err = p.addPipeline(project.Name, pipeline); err != nil {
-					p.logger.Error("Failed to add pipeline", zap.Error(err), lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID))
-				}
-			}
 		}
 
 		return nil
@@ -117,17 +119,17 @@ func (p PipelinesFetcher) forEachProject(callback func(project *gitlab.Project) 
 			return err
 		}
 
-		if resp.CurrentPage >= resp.TotalPages {
-			break
-		}
-		options.Page = resp.NextPage
-
 		for _, project := range projects {
 			if err = callback(project); err != nil {
 				p.logger.Error("Project callback failed", zap.Error(err))
 				return err
 			}
 		}
+
+		if resp.CurrentPage >= resp.TotalPages {
+			break
+		}
+		options.Page = resp.NextPage
 	}
 
 	return nil
