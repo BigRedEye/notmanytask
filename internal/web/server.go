@@ -97,6 +97,7 @@ func (s *server) run() error {
 	// TODO(BigRedEye): Move cookies to the separate file
 	setupAuth(s, r)
 	setupLoginService(s, r)
+	setupApiService(s, r)
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "pong "+fmt.Sprint(time.Now().Unix()))
