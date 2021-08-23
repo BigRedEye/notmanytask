@@ -46,6 +46,7 @@ func newServer(
 		db:        db,
 		deadlines: deadlines,
 		projects:  projects,
+		pipelines: pipelines,
 	}, nil
 }
 

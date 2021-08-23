@@ -34,8 +34,8 @@ func (s apiService) report(c *gin.Context) {
 	}
 
 	req := api.ReportRequest{}
-	if err := c.BindJSON(&req); err != nil {
-		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse json body: %w", err))
+	if err := c.Bind(&req); err != nil {
+		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse request body: %w", err))
 		return
 	}
 
