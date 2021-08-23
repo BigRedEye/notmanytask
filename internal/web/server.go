@@ -1,7 +1,6 @@
 package web
 
 import (
-	"encoding/gob"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -40,22 +39,6 @@ func newServer(config *config.Config, logger *zap.Logger, db *database.DataBase,
 		deadlines: deadlines,
 		projects:  projects,
 	}, nil
-}
-
-type Session struct {
-	Login string
-	ID    int
-}
-
-type RegisterInfo struct {
-	FirstName string
-	LastName  string
-	GroupName string
-}
-
-func init() {
-	gob.Register(Session{})
-	gob.Register(RegisterInfo{})
 }
 
 func buildHTMLTemplates(hfs http.FileSystem, funcMap template.FuncMap) (*template.Template, error) {
@@ -112,6 +95,10 @@ func (s *server) run() error {
 	})
 
 	r.GET(s.config.Endpoints.Home, s.validateSession, func(c *gin.Context) {
+		if c.IsAborted() {
+			panic("WTF")
+		}
+
 		c.HTML(http.StatusOK, "/home.tmpl", gin.H{
 			"CourseName": "HSE Advanced C++",
 		})

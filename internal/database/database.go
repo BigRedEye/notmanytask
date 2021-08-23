@@ -61,7 +61,7 @@ func (db *DataBase) FindUserByGitlabID(id int) (*models.User, error) {
 
 func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
 	var users []*models.User
-	err := db.Find(&users, "repository IS NULL").Error
+	err := db.Find(&users, "repository IS NULL AND gitlab_id IS NOT NULL AND gitlab_login IS NOT NULL").Error
 	if err != nil {
 		return nil, err
 	}
@@ -70,9 +70,11 @@ func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
 
 func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) error {
 	res := db.Model(&models.User{}).
-		Where("gitlab_id IS NULL").
-		Update("gitlab_id", user.GitlabID).
-		Update("gitlab_login", user.GitlabLogin)
+		Where("id = ? AND (gitlab_id IS NULL OR gitlab_login IS NULL)", uid).
+		Updates(map[string]interface{}{
+			"gitlab_id":    user.GitlabID,
+			"gitlab_login": user.GitlabLogin,
+		})
 
 	if res.Error != nil {
 		return res.Error

@@ -2,12 +2,14 @@ package gitlab
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"github.com/xanzy/go-gitlab"
 	"go.uber.org/zap"
 
 	"github.com/bigredeye/notmanytask/internal/config"
+	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/models"
 )
 
@@ -38,28 +40,42 @@ const (
 )
 
 func (c Client) InitializeProject(user *models.User) error {
-	if user.GitlabUser == nil {
+	if user.GitlabID == nil || user.GitlabLogin == nil {
 		c.logger.Error("Empty gitlab user", zap.Uint("uid", user.ID))
 		return errors.New("Empty gitlab user")
 	}
 
-	log := c.logger.With(zap.String("user_login", user.GitlabLogin), zap.Int("user_id", user.GitlabID))
+	log := c.logger.With(zap.Stringp("gitlab_login", user.GitlabLogin), zap.Intp("gitlab_id", user.GitlabID), zap.Uint("user_id", user.ID))
 	log.Info("Going to initialize project")
 
 	projectName := c.MakeProjectName(user)
-	project, _, err := c.gitlab.Projects.CreateProject(&gitlab.CreateProjectOptions{
-		Name:                 &projectName,
-		NamespaceID:          &c.config.GitLab.Group.ID,
-		DefaultBranch:        gitlab.String(master),
-		Visibility:           gitlab.Visibility(gitlab.PrivateVisibility),
-		SharedRunnersEnabled: gitlab.Bool(false),
-	})
-	if err != nil {
-		log.Error("Failed to create project", zap.Error(err), zap.String("project_name", projectName))
-		return errors.Wrap(err, "Failed to create project")
+	log = log.With(lf.ProjectName(projectName))
+
+	// Try to find existing project
+	project, resp, err := c.gitlab.Projects.GetProject(fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName), &gitlab.GetProjectOptions{})
+	if resp.StatusCode == http.StatusNotFound {
+		log.Info("Project was not found", zap.String("escaped_project", fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName)))
+		// Create project
+		project, _, err = c.gitlab.Projects.CreateProject(&gitlab.CreateProjectOptions{
+			Name:                 &projectName,
+			NamespaceID:          &c.config.GitLab.Group.ID,
+			DefaultBranch:        gitlab.String(master),
+			Visibility:           gitlab.Visibility(gitlab.PrivateVisibility),
+			SharedRunnersEnabled: gitlab.Bool(false),
+		})
+		if err != nil {
+			log.Error("Failed to create project", zap.Error(err))
+			return errors.Wrap(err, "Failed to create project")
+		}
+		log = log.With(zap.Int("project_id", project.ID))
+		log.Info("Created project")
+	} else if err != nil {
+		log.Error("Failed to find project", zap.Error(err))
+		return errors.Wrap(err, "Failed to find project")
+	} else {
+		log = log.With(zap.Int("project_id", project.ID))
+		log.Info("Found existing project")
 	}
-	log = log.With(zap.String("project_name", project.Name), zap.Int("project_id", project.ID))
-	log.Info("Created project")
 
 	// Prepare README.md with basic info
 	_, _, err = c.gitlab.Commits.CreateCommit(project.ID, &gitlab.CreateCommitOptions{
@@ -90,22 +106,49 @@ func (c Client) InitializeProject(user *models.User) error {
 	}
 	log.Info("Protected master branch")
 
-	// Add our dear user to the project
-	_, _, err = c.gitlab.ProjectMembers.AddProjectMember(project.ID, &gitlab.AddProjectMemberOptions{
-		UserID:      user.GitlabID,
-		AccessLevel: gitlab.AccessLevel(gitlab.DeveloperPermissions),
-	})
-	if err != nil {
-		log.Error("Failed to add user to the project", zap.Error(err))
-		return errors.Wrap(err, "Failed to add user to the project")
+	// Check if user is alreay in project
+	foundUser := false
+	options := gitlab.ListProjectMembersOptions{}
+	for {
+		members, _, err := c.gitlab.ProjectMembers.ListAllProjectMembers(project.ID, &options)
+		if err != nil {
+			log.Error("Failed to list project members", zap.Error(err))
+			return errors.Wrap(err, "Failed to list project members")
+		}
+		options.Page += 1
+
+		for _, member := range members {
+			if member.ID == *user.GitlabID {
+				foundUser = true
+				break
+			}
+		}
+
+		if foundUser {
+			break
+		}
 	}
-	log.Info("Added user to the project")
+
+	if foundUser {
+		log.Info("User is already in the project")
+	} else {
+		// Add our dear user to the project
+		_, _, err = c.gitlab.ProjectMembers.AddProjectMember(project.ID, &gitlab.AddProjectMemberOptions{
+			UserID:      *user.GitlabID,
+			AccessLevel: gitlab.AccessLevel(gitlab.DeveloperPermissions),
+		})
+		if err != nil {
+			log.Error("Failed to add user to the project", zap.Error(err))
+			return errors.Wrap(err, "Failed to add user to the project")
+		}
+		log.Info("Added user to the project")
+	}
 
 	return nil
 }
 
 func (c Client) MakeProjectName(user *models.User) string {
-	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, user.FirstName, user.LastName, user.GitlabLogin)
+	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, user.FirstName, user.LastName, *user.GitlabLogin)
 }
 
 func (c Client) MakeProjectUrl(user *models.User) string {

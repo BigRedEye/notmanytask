@@ -10,6 +10,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
+	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -40,12 +41,12 @@ func Run(logger *zap.Logger) error {
 
 	deadlinesCtx, deadlinesCancel := context.WithCancel(ctx)
 	defer deadlinesCancel()
-	deadlines, err := deadlines.NewFetcher(config, logger)
+	deadlines, err := deadlines.NewFetcher(config, logger.With(lf.Module("fetcher")))
 	if err != nil {
 		return errors.Wrap(err, "Failed to create deadlines fetcher")
 	}
 
-	git, err := gitlab.NewClient(config, logger)
+	git, err := gitlab.NewClient(config, logger.With(lf.Module("gitlab")))
 	if err != nil {
 		return errors.Wrap(err, "Failed to create gitlab client")
 	}
@@ -67,7 +68,7 @@ func Run(logger *zap.Logger) error {
 		projects.Run(projectsCtx)
 	}()
 
-	s, err := newServer(config, logger, db, deadlines, projects)
+	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start server")
 	}

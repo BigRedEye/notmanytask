@@ -32,8 +32,8 @@ func (p ProjectsMaker) Run(ctx context.Context) {
 		select {
 		case user := <-p.users:
 			p.logger.Info("Got user from in-proc channel",
-				zap.Int("gitlab_id", user.GitlabID),
-				zap.String("gitlab_login", user.GitlabLogin),
+				zap.Intp("gitlab_id", user.GitlabID),
+				zap.Stringp("gitlab_login", user.GitlabLogin),
 			)
 			if !p.maybeInitializeProject(user) {
 				p.users <- user
@@ -55,22 +55,28 @@ func (p ProjectsMaker) initializeMissingProjects() {
 	}
 
 	for _, user := range users {
-		p.logger.Info("Got user without repo from database channel",
-			zap.Int("gitlab_id", user.GitlabID),
-			zap.String("gitlab_login", user.GitlabLogin),
+		p.logger.Info("Got user without repo from database",
+			zap.Intp("gitlab_id", user.GitlabID),
+			zap.Stringp("gitlab_login", user.GitlabLogin),
 		)
 		p.maybeInitializeProject(user)
 	}
 }
 
 func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
-	log := p.logger.With(zap.Int("gitlab_id", user.GitlabID), zap.String("gitlab_login", user.GitlabLogin))
+	log := p.logger
+	if user.GitlabID == nil || user.GitlabLogin == nil {
+		log.Error("Trying to initialize repo for user without login, aborting", zap.Uint("user_id", user.ID))
+		return false
+	}
+
+	log = log.With(zap.Intp("gitlab_id", user.GitlabID), zap.Stringp("gitlab_login", user.GitlabLogin))
 
 	err := p.InitializeProject(user)
 	if err != nil {
 		log.Error("Failed to initialize project", zap.Error(err))
 		// TODO(BigRedEye): nice backoff
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Second * 1)
 		return false
 	}
 

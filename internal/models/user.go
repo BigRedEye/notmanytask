@@ -5,15 +5,15 @@ import (
 )
 
 type GitlabUser struct {
-	GitlabID    int    `gorm:"uniqueIndex"`
-	GitlabLogin string `gorm:"uniqueIndex"`
+	GitlabID    *int    `gorm:"uniqueIndex"`
+	GitlabLogin *string `gorm:"uniqueIndex"`
 	Repository  *string
 }
 
 type User struct {
 	gorm.Model
 
-	*GitlabUser
+	GitlabUser
 
 	FirstName string `gorm:"uniqueIndex:idx_name"`
 	LastName  string `gorm:"uniqueIndex:idx_name"`

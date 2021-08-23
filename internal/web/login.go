@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bigredeye/notmanytask/internal/gitlab"
+	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/models"
 )
 
@@ -23,7 +24,6 @@ type loginService struct {
 }
 
 const (
-	sessionKeyLogin = "login"
 	sessionKeyToken = "token"
 	sessionKeyOAuth = "oauthState"
 )
@@ -35,7 +35,7 @@ func setupLoginService(server *server, r *gin.Engine) error {
 	r.GET(server.config.Endpoints.Logout, s.logout)
 	r.GET(server.config.Endpoints.Signup, s.signup)
 	r.POST(server.config.Endpoints.Signup, s.signupForm)
-	r.GET(server.config.Endpoints.OauthCallback, s.server.validateSession, s.oauth)
+	r.GET(server.config.Endpoints.OauthCallback, s.oauth)
 
 	return nil
 }
@@ -101,32 +101,22 @@ func (s loginService) signupForm(c *gin.Context) {
 		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 		return
 	}
-	if user.GitlabUser != nil {
+	if user.GitlabID != nil || user.GitlabLogin != nil {
 		log.Warn("User is already registered",
 			zap.Error(err),
-			zap.Int("gitlab_id", user.GitlabID),
-			zap.String("gitlab_login", user.GitlabLogin),
+			zap.Intp("gitlab_id", user.GitlabID),
+			zap.Stringp("gitlab_login", user.GitlabLogin),
 		)
 		// renderer.RenderError();
 		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 		return
 	}
 
-	session, err := s.server.db.CreateSession(user.ID)
-	if err != nil {
+	if err = s.fillSessionForUser(c, user); err != nil {
 		log.Error("Failed to create session", zap.Error(err))
 		// renderer.RenderError();
 		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 		return
-	}
-
-	storage := sessions.Default(c)
-	storage.Set(sessionKeyToken, session.Token)
-	err = storage.Save()
-	if err != nil {
-		s.log.Error("Failed to save session", zap.Error(err))
-		// renderer.RenderError();
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 	}
 
 	c.Redirect(http.StatusFound, s.config.Endpoints.Login)
@@ -147,6 +137,7 @@ func (s loginService) login(c *gin.Context) {
 }
 
 func (s loginService) oauth(c *gin.Context) {
+	// Compare oauth state in query and cookie
 	oauthState := c.Query("state")
 	storage := sessions.Default(c)
 	if v := storage.Get(sessionKeyOAuth); v == nil || v != oauthState {
@@ -156,37 +147,68 @@ func (s loginService) oauth(c *gin.Context) {
 			s.log.Info("Mismatched oauth state", zap.String("query", oauthState), zap.String("cookie", v.(string)))
 		}
 		// TODO(BigRedEye): Render error to user
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 		return
 	}
 
+	// Get users and session from database
+	user, _, err := s.server.tryFindUserByToken(c)
+	if err != nil {
+		s.log.Error("Failed to find user session", zap.Error(err))
+		// TODO(BigRedEye): Render error to user
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		return
+	}
+
+	// Resolve gitlab user
 	ctx, cancel := context.WithTimeout(c, time.Second*10)
 	defer cancel()
 	token, err := s.server.auth.Exchange(ctx, c.Query("code"))
 	if err != nil {
 		// TODO(BigRedEye): Render error to user
 		s.log.Error("Failed to exchange tokens", zap.Error(err))
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Login)
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 		return
 	}
-
 	gitlabUser, err := gitlab.GetOAuthGitLabUser(token.AccessToken)
 	if err != nil {
 		s.log.Error("Failed to get gitlab user", zap.Error(err))
 		// TODO(BigRedEye): Render error to user
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Login)
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
 		return
 	}
 	s.log.Info("Fetched gitlab user", zap.String("gitlab_login", gitlabUser.Login), zap.Int("gitlab_id", gitlabUser.ID))
 
-	session := c.MustGet("session").(*models.Session)
-	user := c.MustGet("user").(*models.User)
-	user.GitlabUser = &models.GitlabUser{
-		GitlabID:    gitlabUser.ID,
-		GitlabLogin: gitlabUser.Login,
+	// user == nil iff the token was not provided
+	// This may happen after /logout and /login
+	if user == nil {
+		user, err = s.server.db.FindUserByGitlabID(gitlabUser.ID)
+		if err != nil {
+			s.log.Error("Unknown user", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
+			// TODO(BigRedEye): Render error to user
+			c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+			return
+		}
 	}
 
-	err = s.server.db.SetUserGitlabAccount(session.UserID, user.GitlabUser)
+	if user.GitlabLogin != nil && user.GitlabID != nil {
+		if err = s.fillSessionForUser(c, user); err != nil {
+			s.log.Error("Failed to create session", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
+			// renderer.RenderError();
+			c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+			return
+		}
+		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GitlabLogin(gitlabUser.Login), lf.GitlabID(gitlabUser.ID))
+		c.Redirect(http.StatusFound, s.config.Endpoints.Home)
+		return
+	}
+
+	user.GitlabUser = models.GitlabUser{
+		GitlabID:    &gitlabUser.ID,
+		GitlabLogin: &gitlabUser.Login,
+	}
+
+	err = s.server.db.SetUserGitlabAccount(user.ID, &user.GitlabUser)
 	if err != nil {
 		s.log.Error("Failed to set user gitlab account", zap.Error(err))
 		// TODO(BigRedEye): s.RenderSignupPage("")
@@ -194,7 +216,6 @@ func (s loginService) oauth(c *gin.Context) {
 		return
 	}
 
-	storage.Set(sessionKeyLogin, Session{Login: user.GitlabLogin, ID: user.GitlabID})
 	err = storage.Save()
 	if err != nil {
 		s.log.Error("Failed to save session", zap.Error(err))
@@ -235,48 +256,82 @@ func setupAuth(s *server, r *gin.Engine) error {
 	return nil
 }
 
-func (s *server) validateSession(c *gin.Context) {
+func tryGetToken(c *gin.Context) *string {
 	storage := sessions.Default(c)
 	v := storage.Get(sessionKeyToken)
 	if v == nil {
-		// TODO(BigRedEye): reqid
-		s.logger.Info("Undefined session")
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
-		c.Abort()
-		return
+		return nil
 	}
-	token, ok := v.(string)
-	if !ok {
-		s.logger.Error("Failed to deserialize session token")
-		storage.Set("token", "")
-		storage.Save()
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
-		c.Abort()
-		return
+	res, _ := v.(string)
+	if len(res) == 0 {
+		return nil
 	}
-	if token == "" {
-		s.logger.Info("Empty token")
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
-		c.Abort()
-		return
+	return &res
+}
+
+func (s *server) tryFindUserByToken(c *gin.Context) (*models.User, *models.Session, error) {
+	token := tryGetToken(c)
+	if token == nil {
+		s.logger.Info("No token found")
+		return nil, nil, nil
 	}
 
-	user, session, err := s.db.FindUserBySession(token)
+	user, session, err := s.db.FindUserBySession(*token)
 	if err != nil {
-		s.logger.Warn("Failed to find session", zap.Error(err), zap.String("token", token))
+		s.logger.Warn("Failed to find session", zap.Error(err), zap.Stringp("token", token))
+		return nil, nil, err
+	}
+
+	return user, session, nil
+}
+
+func (s *server) validateSession(c *gin.Context) {
+	user, session, err := s.tryFindUserByToken(c)
+	if err != nil || session == nil {
+		s.logger.Warn("Failed to find user session", zap.Error(err))
 		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
 		c.Abort()
 		return
 	}
 
 	c.Set("user", user)
-	c.Set("session", user)
+	c.Set("session", session)
 
 	s.logger.Info("Valid session",
 		zap.Uint("session_id", session.ID),
-		zap.String("gitlab_login", user.GitlabLogin),
-		zap.Int("gitlab_id", user.GitlabID),
+		zap.Uint("user_id", user.ID),
+		zap.Stringp("gitlab_login", user.GitlabLogin),
+		zap.Intp("gitlab_id", user.GitlabID),
 	)
 
+	if user.GitlabID == nil || user.GitlabLogin == nil {
+		s.logger.Warn("Found user without gitlab account, redirecting to /login",
+			zap.String("token", session.Token),
+			zap.Uint("user_id", user.ID),
+		)
+		c.Redirect(http.StatusFound, s.config.Endpoints.Login)
+		c.Abort()
+		return
+	}
+
 	c.Next()
+}
+
+func (s loginService) fillSessionForUser(c *gin.Context, user *models.User) error {
+	session, err := s.server.db.CreateSession(user.ID)
+	if err != nil {
+		return err
+	}
+
+	storage := sessions.Default(c)
+	storage.Set(sessionKeyToken, session.Token)
+	return storage.Save()
+}
+
+func (s *server) getUser(c *gin.Context) *models.User {
+	return c.MustGet("user").(*models.User)
+}
+
+func (s *server) getSession(c *gin.Context) *models.Session {
+	return c.MustGet("session").(*models.Session)
 }
