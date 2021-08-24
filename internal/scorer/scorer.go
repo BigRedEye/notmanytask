@@ -20,10 +20,11 @@ func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher) *Scorer {
 }
 
 func pipelineLess(left *models.Pipeline, right *models.Pipeline) bool {
-	if classifyPipelineStatus(left.Status) < classifyPipelineStatus(right.Status) {
-		return true
+	if classifyPipelineStatus(left.Status) == classifyPipelineStatus(right.Status) {
+		return left.CreatedAt.Before(right.CreatedAt)
 	}
-	return left.CreatedAt.Before(right.CreatedAt)
+
+	return classifyPipelineStatus(left.Status) > classifyPipelineStatus(right.Status)
 }
 
 func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
@@ -48,7 +49,7 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 	}
 
 	scores := &UserScores{
-		Gropus: make([]ScoredTaskGroup, 0),
+		Groups: make([]ScoredTaskGroup, 0),
 	}
 
 	for _, group := range *currentDeadlines {
@@ -81,7 +82,7 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 			tasks[i].Score = s.scorePipeline(&task, &group, minPipeline)
 		}
 
-		scores.Gropus = append(scores.Gropus, ScoredTaskGroup{
+		scores.Groups = append(scores.Groups, ScoredTaskGroup{
 			Title:    group.Group,
 			Deadline: group.Deadline,
 			Score:    totalScore,

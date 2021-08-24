@@ -75,7 +75,9 @@ func (p PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.Pipel
 }
 
 func (p PipelinesFetcher) fetchAllPipelines() {
-	p.logger.Info("Fetching all pipelines")
+	p.logger.Info("Start pipelines fetcher iteration")
+	defer p.logger.Info("Finish pipelines fetcher iteration")
+
 	err := p.forEachProject(func(project *gitlab.Project) error {
 		p.logger.Info("Found project", lf.ProjectName(project.Name))
 		options := &gitlab.ListProjectPipelinesOptions{}

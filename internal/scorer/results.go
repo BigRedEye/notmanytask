@@ -44,5 +44,5 @@ type ScoredTaskGroup struct {
 }
 
 type UserScores struct {
-	Gropus []ScoredTaskGroup
+	Groups []ScoredTaskGroup
 }

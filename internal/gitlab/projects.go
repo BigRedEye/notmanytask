@@ -48,6 +48,10 @@ func (p ProjectsMaker) Run(ctx context.Context) {
 }
 
 func (p ProjectsMaker) initializeMissingProjects() {
+	p.logger.Info("Start projectsMaker iteration")
+	numProjectsInitialized := 0
+	defer p.logger.Info("Finish projectsMaker iteration", zap.Int("num_projects_initialized", numProjectsInitialized))
+
 	users, err := p.db.ListUsersWithoutRepos()
 	if err != nil {
 		p.logger.Error("Failed to list users without repos", zap.Error(err))
@@ -59,7 +63,10 @@ func (p ProjectsMaker) initializeMissingProjects() {
 			zap.Intp("gitlab_id", user.GitlabID),
 			zap.Stringp("gitlab_login", user.GitlabLogin),
 		)
-		p.maybeInitializeProject(user)
+		ok := p.maybeInitializeProject(user)
+		if ok {
+			numProjectsInitialized++
+		}
 	}
 }
 
