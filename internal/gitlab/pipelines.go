@@ -28,7 +28,7 @@ func NewPipelinesFetcher(client *Client, db *database.DataBase) (*PipelinesFetch
 }
 
 func (p PipelinesFetcher) Run(ctx context.Context) {
-	tick := time.Tick(time.Second * 10)
+	tick := time.Tick(p.config.PullIntervals.Pipelines)
 
 	for {
 		select {

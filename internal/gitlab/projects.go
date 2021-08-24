@@ -27,7 +27,7 @@ func (p ProjectsMaker) AsyncPrepareProject(user *models.User) {
 func (p ProjectsMaker) Run(ctx context.Context) {
 	p.initializeMissingProjects()
 
-	tick := time.Tick(time.Second * 10)
+	tick := time.Tick(p.config.PullIntervals.Projects)
 	for {
 		select {
 		case user := <-p.users:

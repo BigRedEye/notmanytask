@@ -11,7 +11,11 @@ type Date struct {
 }
 
 // FIXME(BigRedEye): Do not hardcode Moscow
-const defaultTimeZone = "Europe/Moscow"
+
+const (
+	defaultTimeZone = "Europe/Moscow"
+	dateFormat      = "02-01-2006 15:04"
+)
 
 var defaultLoc *time.Location
 var defaultLocOnce sync.Once
@@ -28,14 +32,8 @@ func getDefaultLocation() *time.Location {
 	return defaultLoc
 }
 
-func (t *Date) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var buf string
-	err := unmarshal(&buf)
-	if err != nil {
-		return nil
-	}
-
-	tt, err := time.ParseInLocation("02-01-2006 15:04", strings.TrimSpace(buf), getDefaultLocation())
+func (t *Date) UnmarshalText(buf []byte) error {
+	tt, err := time.ParseInLocation(dateFormat, strings.TrimSpace(string(buf)), getDefaultLocation())
 	if err != nil {
 		return err
 	}
@@ -43,8 +41,8 @@ func (t *Date) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func (t Date) MarshalYAML() (interface{}, error) {
-	return t.Time.Format("02-01-2006 15:04"), nil
+func (t Date) MarshalText() ([]byte, error) {
+	return []byte(t.Time.Format(dateFormat)), nil
 }
 
 type Task struct {

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/bigredeye/notmanytask/pkg/conf"
 	"github.com/pkg/errors"
 )
@@ -63,13 +65,20 @@ type GroupConfig struct {
 
 type GroupsConfig = []GroupConfig
 
+type PullIntervalsConfig struct {
+	Projects  time.Duration
+	Deadlines time.Duration
+	Pipelines time.Duration
+}
+
 type Config struct {
-	GitLab    GitLabConfig
-	Endpoints EndpointsConfig
-	Server    ServerConfig
-	DataBase  DataBaseConfig
-	Testing   TestingConfig
-	Groups    GroupsConfig
+	GitLab        GitLabConfig
+	Endpoints     EndpointsConfig
+	Server        ServerConfig
+	DataBase      DataBaseConfig
+	Testing       TestingConfig
+	Groups        GroupsConfig
+	PullIntervals PullIntervalsConfig
 }
 
 func ParseConfig() (*Config, error) {

@@ -41,9 +41,8 @@ func fetch(url string) (Deadlines, error) {
 type Fetcher struct {
 	current atomic.Value
 
-	config   *config.Config
-	interval time.Duration
-	logger   *zap.Logger
+	config *config.Config
+	logger *zap.Logger
 }
 
 func NewFetcher(config *config.Config, logger *zap.Logger) (*Fetcher, error) {
@@ -65,7 +64,7 @@ func NewFetcher(config *config.Config, logger *zap.Logger) (*Fetcher, error) {
 }
 
 func (f *Fetcher) Run(ctx context.Context) {
-	tick := time.Tick(f.interval)
+	tick := time.Tick(f.config.PullIntervals.Deadlines)
 
 	for {
 		select {
