@@ -11,6 +11,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
+	"github.com/bigredeye/notmanytask/internal/scorer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -65,6 +66,8 @@ func Run(logger *zap.Logger) error {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}
 
+	scorer := scorer.NewScorer(db, deadlines)
+
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
@@ -79,7 +82,7 @@ func Run(logger *zap.Logger) error {
 		pipelines.Run(pipelinesCtx)
 	}()
 
-	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects, pipelines)
+	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects, pipelines, scorer)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start server")
 	}

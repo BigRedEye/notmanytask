@@ -17,6 +17,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
+	"github.com/bigredeye/notmanytask/internal/scorer"
 	_ "github.com/bigredeye/notmanytask/pkg/statik"
 )
 
@@ -29,6 +30,7 @@ type server struct {
 	deadlines *deadlines.Fetcher
 	projects  *gitlab.ProjectsMaker
 	pipelines *gitlab.PipelinesFetcher
+	scorer    *scorer.Scorer
 }
 
 func newServer(
@@ -38,6 +40,7 @@ func newServer(
 	deadlines *deadlines.Fetcher,
 	projects *gitlab.ProjectsMaker,
 	pipelines *gitlab.PipelinesFetcher,
+	scorer *scorer.Scorer,
 ) (*server, error) {
 	return &server{
 		config:    config,
@@ -47,6 +50,7 @@ func newServer(
 		deadlines: deadlines,
 		projects:  projects,
 		pipelines: pipelines,
+		scorer:    scorer,
 	}, nil
 }
 
