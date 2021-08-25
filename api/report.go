@@ -1,12 +1,5 @@
 package api
 
-import "github.com/bigredeye/notmanytask/internal/scorer"
-
-type Status struct {
-	Ok    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
-}
-
 // IDs are strings for compatibility
 type ReportRequest struct {
 	Token       string `json:"token" form:"token"`
@@ -19,14 +12,4 @@ type ReportRequest struct {
 
 type ReportResponse struct {
 	Status
-}
-
-type UserScoresRequest struct {
-	Login string `json:"login" form:"login"`
-}
-
-type UserScoresResponse struct {
-	Status
-
-	Scores *scorer.UserScores
 }
