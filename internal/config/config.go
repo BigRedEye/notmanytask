@@ -14,6 +14,7 @@ type GitLabConfig struct {
 		ID   int
 	}
 	DefaultReadme string
+	TaskUrlPrefix string
 
 	Application struct {
 		ClientID string

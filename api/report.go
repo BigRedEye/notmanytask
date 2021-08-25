@@ -8,6 +8,7 @@ type ReportRequest struct {
 	PipelineID  string `json:"pipeline_id" form:"pipeline_id"`
 	ProjectName string `json:"project_name" form:"project_name"`
 	Failed      int    `json:"failed,omitempty" form:"failed"`
+	Status      string `json:"status,omitempty" form:"status"`
 }
 
 type ReportResponse struct {

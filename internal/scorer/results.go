@@ -34,12 +34,16 @@ type ScoredTask struct {
 	Status   TaskStatus
 	Score    int
 	MaxScore int
+
+	TaskUrl     string
+	PipelineUrl string
 }
 
 type ScoredTaskGroup struct {
-	Title    string
-	Deadline deadlines.Date
-	Tasks    []ScoredTask
+	Title       string
+	PrettyTitle string
+	Deadline    deadlines.Date
+	Tasks       []ScoredTask
 
 	Score    int
 	MaxScore int

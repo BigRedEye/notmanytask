@@ -163,3 +163,12 @@ func (c Client) MakeProjectUrl(user *models.User) string {
 func (c Client) MakeProjectWithNamespace(project string) string {
 	return fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, project)
 }
+
+func (c Client) MakePipelineUrl(user *models.User, pipeline *models.Pipeline) string {
+	name := c.MakeProjectName(user)
+	return fmt.Sprintf("%s/%s/%s/-/pipelines/%d", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.ID)
+}
+
+func (c Client) MakeTaskUrl(task string) string {
+	return fmt.Sprintf("%s/%s", c.config.GitLab.TaskUrlPrefix, task)
+}

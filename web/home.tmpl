@@ -1,158 +1,83 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <title>Hello, world!</title>
-  </head>
-  <body>
-    <div class="container">
-    </div>
+        <title>Hello, world!</title>
+        <style>
+.shadow-hover:hover {
+    transition: all 0.1s ease;
+    box-shadow:0 .5rem 1rem rgba(0,0,0,.15)!important
+}
+.shadow-hover {
+    -webkit-transition: all 0.1s ease;
+    -moz-transition: all 0.1s ease;
+    -o-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+    box-shadow:0 .125rem .25rem rgba(0,0,0,.075)!important
+}
 
-    <div class="container p-3 my-3">
-      <h1 class="display-2">Deadlines</h1>
-    </div>
+.task-success {
+    background-color: #a6e9d5!important;
+    border-color: #198754 !important;
+}
 
-    <div class="container p-3 my-3">
-      <div class="p-2">
-        <h1>Intro</h1>
-      </div>
-      <div class="row row-cols-1 row-cols-md-3 g-4">
+.task-failed {
+    background-color: #f8d7da !important;
+    border-color: #dc3545 !important;
+}
 
-        <div class="col">
-          <div class="card h-100 border-success">
-            <div class="card-body">
-              <h2 class="card-title">multiplication</h2>
-              <p class="card-text fs-1 text-success">100 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Pipeline passed</small>
-            </div>
-          </div>
+.task-checking {
+    border-color: #0d6efd !important;
+    background-color:#cfe2ff!important;
+}
+
+.task-assigned {
+    background-color: #f8f9fa !important;
+}
+        </style>
+    </head>
+    <body>
+        <div class="container p-2 my-2">
+            <h1 class="display-2">Deadlines</h1>
         </div>
 
-        <div class="col">
-          <div class="card h-100 border-danger">
-            <div class="card-body">
-              <h2 class="card-title">dedup</h2>
-              <p class="card-text fs-1 text-danger">0 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Pipeline failed</small>
-            </div>
-          </div>
-        </div>
+        {{ if .Scores }}
+            {{ range .Scores.Groups }}
+                <div class="container p-2 my-2">
+                    <div class="p-2">
+                        <h1>{{ .PrettyTitle }} <span class="text-muted">{{ .Deadline.String }}</span></h1>
+                    </div>
+                    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-4 text-center">
+                        {{ range .Tasks }}
+                            <div class="col">
+                                <a href="{{ .TaskUrl }}" class="text-decoration-none text-dark">
+                                    <div class="card h-100 task-{{ .Status }} shadow-hover">
+                                        <div class="card-body">
+                                            <h3 class="card-title text-nowrap text-dark">{{ .Task }}</h3>
+                                            {{ if .PipelineUrl }}
+                                                <a href="{{ .PipelineUrl }}" class="text-decoration-none">
+                                            {{ end }}
+                                                <p class="card-text fs-1 text-decoration-none text-dark">
+                                                    {{.Score}} / {{.MaxScore}}
+                                                </p>
+                                            {{ if .PipelineUrl }}
+                                                </a>
+                                            {{ end }}
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        {{ end }}
+                    </div>
 
-        <div class="col">
-          <div class="card h-100">
-            <div class="card-body">
-              <h2 class="card-title">harakiri</h2>
-              <p class="card-text fs-1 fg-primary">0 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Assigned</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card h-100">
-            <div class="card-body">
-              <h2 class="card-title">cow-vector</h2>
-              <p class="card-text fs-1 fg-primary">0 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Assigned</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card h-100">
-            <div class="card-body">
-              <h2 class="card-title">deque</h2>
-              <p class="card-text fs-1 fg-primary">0 / 400</p>
-            </div>
-            <div class="card-footer">
-              <small>Assigned</small>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <div class="container p-3 my-3">
-      <div class="p-2">
-        <h1>Intro</h1>
-      </div>
-      <div class="row row-cols-1 row-cols-md-3 g-4 text-white">
-
-        <div class="col">
-          <div class="card h-100 bg-success">
-            <div class="card-body">
-              <h2 class="card-title">multiplication</h2>
-              <p class="card-text fs-1">100 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Pipeline passed</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card h-100 bg-danger">
-            <div class="card-body">
-              <h2 class="card-title">dedup</h2>
-              <p class="card-text fs-1">0 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Pipeline failed</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card h-100 bg-primary">
-            <div class="card-body">
-              <h2 class="card-title">harakiri</h2>
-              <p class="card-text fs-1">0 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Assigned</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card h-100 bg-primary">
-            <div class="card-body">
-              <h2 class="card-title">cow-vector</h2>
-              <p class="card-text fs-1 fg-primary">0 / 100</p>
-            </div>
-            <div class="card-footer">
-              <small>Assigned</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card h-100 bg-primary">
-            <div class="card-body">
-              <h2 class="card-title">deque</h2>
-              <p class="card-text fs-1 fg-primary">0 / 400</p>
-            </div>
-            <div class="card-footer">
-              <small>Assigned</small>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-  </body>
+                    <div class="p-2">
+                        <h1>Total score: {{ .Score }} / {{ .MaxScore }}</h1>
+                    </div>
+                </div>
+            {{ end }}
+        {{ end}}
+    </body>
 </html>
-

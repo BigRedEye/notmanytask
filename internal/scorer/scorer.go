@@ -2,6 +2,8 @@ package scorer
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/bigredeye/notmanytask/internal/database"
@@ -12,6 +14,8 @@ import (
 
 type ProjectNameFactory interface {
 	MakeProjectName(user *models.User) string
+	MakePipelineUrl(user *models.User, pipeline *models.Pipeline) string
+	MakeTaskUrl(task string) string
 }
 
 type Scorer struct {
@@ -92,6 +96,7 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 				Status:   TaskStatusAssigned,
 				Score:    0,
 				MaxScore: task.Score,
+				TaskUrl:  s.projects.MakeTaskUrl(task.Task),
 			}
 			maxTotalScore += tasks[i].MaxScore
 
@@ -107,21 +112,37 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 				}
 			}
 
-			tasks[i].Status = minPipeline.Status
+			tasks[i].Status = ClassifyPipelineStatus(minPipeline.Status)
 			tasks[i].Score = s.scorePipeline(&task, &group, minPipeline)
+			tasks[i].PipelineUrl = s.projects.MakePipelineUrl(user, minPipeline)
 			totalScore += tasks[i].Score
 		}
 
 		scores.Groups = append(scores.Groups, ScoredTaskGroup{
-			Title:    group.Group,
-			Deadline: group.Deadline,
-			Score:    totalScore,
-			MaxScore: maxTotalScore,
-			Tasks:    tasks,
+			Title:       group.Group,
+			PrettyTitle: prettifyTitle(group.Group),
+			Deadline:    group.Deadline,
+			Score:       totalScore,
+			MaxScore:    maxTotalScore,
+			Tasks:       tasks,
 		})
 	}
 
 	return scores, nil
+}
+
+var re = regexp.MustCompile(`^\d+-(.*)$`)
+
+func prettifyTitle(title string) string {
+	submatches := re.FindStringSubmatch(title)
+	if len(submatches) < 2 {
+		return capitalize(title)
+	}
+	return capitalize(submatches[1])
+}
+
+func capitalize(title string) string {
+	return strings.Title(title)
 }
 
 const (

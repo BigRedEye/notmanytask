@@ -19,7 +19,6 @@ func setupApiService(server *server, r *gin.Engine) error {
 	s := apiService{webService{server, server.config, server.logger}}
 
 	r.POST(server.config.Endpoints.Api.Report, s.report)
-	r.GET("api/scores", s.userScores)
 
 	return nil
 }
@@ -59,6 +58,7 @@ func (s apiService) report(c *gin.Context) {
 		lf.ProjectName(req.ProjectName),
 		lf.GitlabID(userID),
 		lf.PipelineID(id),
+		zap.String("report_status", req.Status),
 	)
 
 	// Check token

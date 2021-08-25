@@ -32,6 +32,10 @@ func getDefaultLocation() *time.Location {
 	return defaultLoc
 }
 
+func (t *Date) String() string {
+	return t.Time.Format(dateFormat)
+}
+
 func (t *Date) UnmarshalText(buf []byte) error {
 	tt, err := time.ParseInLocation(dateFormat, strings.TrimSpace(string(buf)), getDefaultLocation())
 	if err != nil {
@@ -42,7 +46,7 @@ func (t *Date) UnmarshalText(buf []byte) error {
 }
 
 func (t Date) MarshalText() ([]byte, error) {
-	return []byte(t.Time.Format(dateFormat)), nil
+	return []byte(t.String()), nil
 }
 
 func (t *Date) UnmarshalJSON(buf []byte) error {

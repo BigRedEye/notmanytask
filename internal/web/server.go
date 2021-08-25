@@ -108,15 +108,7 @@ func (s *server) run() error {
 		c.String(http.StatusOK, "pong "+fmt.Sprint(time.Now().Unix()))
 	})
 
-	r.GET(s.config.Endpoints.Home, s.validateSession, func(c *gin.Context) {
-		if c.IsAborted() {
-			panic("WTF")
-		}
-
-		c.HTML(http.StatusOK, "/home.tmpl", gin.H{
-			"CourseName": "HSE Advanced C++",
-		})
-	})
+	r.GET(s.config.Endpoints.Home, s.validateSession, s.RenderHomePage)
 
 	r.StaticFS("/static", statikFS)
 

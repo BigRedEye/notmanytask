@@ -7,11 +7,11 @@ body {
 .site {
     max-width: 1200px;
     width: 100%;
-    
+
     margin: 0 auto;
     padding-left: 4em;
     padding-right: 4em;
-    
+
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -256,15 +256,7 @@ body {
     color: white;
 }
 
-.password a {
-    text-decoration: none;
-}
-
 /* ========================================================================== */
-
-.arbitrage {
-    display: flex;
-}
 
 .status {
     display: flex;
@@ -287,48 +279,5 @@ table td {
 }
 
 table th {
-    text-align: center;    
+    text-align: center;
 }
-
-.server-status.online {
-    color: green;
-}
-
-.server-status.offline {
-    color: red;
-}
-
-.coins {
-    margin-top: 30px;
-}
-
-.leaderboard {
-    display: flex;
-    flex-direction: column;
-    width: 400px;
-    margin-left: 60px;
-}
-
-.leaderboard h1 {
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.token {
-    margin-top: 30px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.token div {
-    display: none;
-}
-
-.token:hover div {
-    display: inline;
-}
-
-.token:not(:hover)::after {
-    content: "Show My Token";
-}
-
