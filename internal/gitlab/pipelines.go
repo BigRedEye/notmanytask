@@ -70,7 +70,7 @@ func (p PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.Pipel
 		Task:      ParseTaskFromBranch(pipeline.Ref),
 		Status:    pipeline.Status,
 		Project:   projectName,
-		CreatedAt: *pipeline.CreatedAt,
+		StartedAt: *pipeline.CreatedAt,
 	})
 }
 

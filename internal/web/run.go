@@ -66,7 +66,7 @@ func Run(logger *zap.Logger) error {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}
 
-	scorer := scorer.NewScorer(db, deadlines)
+	scorer := scorer.NewScorer(db, deadlines, git)
 
 	wg.Add(3)
 	go func() {

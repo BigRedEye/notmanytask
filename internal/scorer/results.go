@@ -6,19 +6,21 @@ import (
 )
 
 const (
-	TaskStatusAssigned = iota
-	TaskStatusFailed
-	TaskStatusChecking
-	TaskStatusSuccess
+	TaskStatusAssigned = "assigned"
+	TaskStatusFailed   = "failed"
+	TaskStatusChecking = "checking"
+	TaskStatusSuccess  = "success"
 )
 
-type TaskStatus = int
+type TaskStatus = string
 
-func classifyPipelineStatus(status models.PipelineStatus) TaskStatus {
+func ClassifyPipelineStatus(status models.PipelineStatus) TaskStatus {
 	switch status {
 	case models.PipelineStatusFailed:
 		return TaskStatusFailed
 	case models.PipelineStatusPending:
+		return TaskStatusChecking
+	case models.PipelineStatusRunning:
 		return TaskStatusChecking
 	case models.PipelineStatusSuccess:
 		return TaskStatusSuccess

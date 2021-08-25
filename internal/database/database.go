@@ -103,9 +103,9 @@ func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	}).Create(pipeline).Error
 }
 
-func (db *DataBase) ListUserPipelines(login string) (pipelines []models.Pipeline, err error) {
+func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pipeline, err error) {
 	pipelines = make([]models.Pipeline, 0)
-	err = db.Find(&pipelines, "login = ?", login).Error
+	err = db.Find(&pipelines, "project = ?", project).Error
 	if err != nil {
 		pipelines = nil
 	}

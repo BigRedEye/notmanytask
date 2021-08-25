@@ -10,18 +10,47 @@ import (
 	"github.com/pkg/errors"
 )
 
+type ProjectNameFactory interface {
+	MakeProjectName(user *models.User) string
+}
+
 type Scorer struct {
 	deadlines *deadlines.Fetcher
 	db        *database.DataBase
+	projects  ProjectNameFactory
 }
 
-func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher) *Scorer {
-	return &Scorer{deadlines, db}
+func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher, projects ProjectNameFactory) *Scorer {
+	return &Scorer{deadlines, db, projects}
+}
+
+const (
+	taskStatusAssigned = iota
+	taskStatusFailed
+	taskStatusChecking
+	taskStatusSuccess
+)
+
+type taskStatus = int
+
+func classifyPipelineStatus(status models.PipelineStatus) taskStatus {
+	switch status {
+	case models.PipelineStatusFailed:
+		return taskStatusFailed
+	case models.PipelineStatusPending:
+		return taskStatusChecking
+	case models.PipelineStatusRunning:
+		return taskStatusChecking
+	case models.PipelineStatusSuccess:
+		return taskStatusSuccess
+	default:
+		return taskStatusAssigned
+	}
 }
 
 func pipelineLess(left *models.Pipeline, right *models.Pipeline) bool {
 	if classifyPipelineStatus(left.Status) == classifyPipelineStatus(right.Status) {
-		return left.CreatedAt.Before(right.CreatedAt)
+		return left.StartedAt.Before(right.StartedAt)
 	}
 
 	return classifyPipelineStatus(left.Status) > classifyPipelineStatus(right.Status)
@@ -33,19 +62,19 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 		return nil, fmt.Errorf("No deadlines found")
 	}
 
-	pipelines, err := s.db.ListUserPipelines(user.LastName)
+	pipelines, err := s.db.ListProjectPipelines(s.projects.MakeProjectName(user))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to list pipelines")
 	}
 
 	pipelinesMap := make(map[string][]*models.Pipeline)
-	for _, pipeline := range pipelines {
+	for i, pipeline := range pipelines {
 		prev, found := pipelinesMap[pipeline.Task]
 		if !found {
-			prev = make([]*models.Pipeline, 1)
-			pipelinesMap[pipeline.Task] = prev
+			prev = make([]*models.Pipeline, 0, 1)
 		}
-		prev = append(prev, &pipeline)
+		prev = append(prev, &pipelines[i])
+		pipelinesMap[pipeline.Task] = prev
 	}
 
 	scores := &UserScores{
@@ -78,8 +107,9 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 				}
 			}
 
-			tasks[i].Status = classifyPipelineStatus(minPipeline.Status)
+			tasks[i].Status = minPipeline.Status
 			tasks[i].Score = s.scorePipeline(&task, &group, minPipeline)
+			totalScore += tasks[i].Score
 		}
 
 		scores.Groups = append(scores.Groups, ScoredTaskGroup{
@@ -107,16 +137,16 @@ func (s Scorer) scorePipeline(task *deadlines.Task, group *deadlines.TaskGroup, 
 
 	deadline := group.Deadline.Time
 
-	if pipeline.CreatedAt.Before(deadline) {
+	if pipeline.StartedAt.Before(deadline) {
 		return task.Score
 	}
 
 	weekAfter := group.Deadline.Time.Add(week)
-	if pipeline.CreatedAt.After(weekAfter) {
+	if pipeline.StartedAt.After(weekAfter) {
 		return task.Score / 2
 	}
 
-	mult := 0.5 + 0.5*pipeline.CreatedAt.Sub(deadline).Seconds()/(weekAfter.Sub(deadline)).Seconds()
+	mult := 0.5 + 0.5*pipeline.StartedAt.Sub(deadline).Seconds()/(weekAfter.Sub(deadline)).Seconds()
 
 	return int(float64(task.Score) * mult)
 }
