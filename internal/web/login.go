@@ -146,8 +146,7 @@ func (s loginService) oauth(c *gin.Context) {
 		} else {
 			s.log.Info("Mismatched oauth state", zap.String("query", oauthState), zap.String("cookie", v.(string)))
 		}
-		// TODO(BigRedEye): Render error to user
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.server.RenderSignupPage(c, "GitLab authentication failed, try again")
 		return
 	}
 
@@ -155,8 +154,7 @@ func (s loginService) oauth(c *gin.Context) {
 	user, _, err := s.server.tryFindUserByToken(c)
 	if err != nil {
 		s.log.Error("Failed to find user session", zap.Error(err))
-		// TODO(BigRedEye): Render error to user
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.server.RenderSignupPage(c, "You are not registered, try again")
 		return
 	}
 
@@ -165,16 +163,14 @@ func (s loginService) oauth(c *gin.Context) {
 	defer cancel()
 	token, err := s.server.auth.Exchange(ctx, c.Query("code"))
 	if err != nil {
-		// TODO(BigRedEye): Render error to user
 		s.log.Error("Failed to exchange tokens", zap.Error(err))
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.server.RenderSignupPage(c, "GitLab authentication failed, try again")
 		return
 	}
 	gitlabUser, err := gitlab.GetOAuthGitLabUser(token.AccessToken)
 	if err != nil {
 		s.log.Error("Failed to get gitlab user", zap.Error(err))
-		// TODO(BigRedEye): Render error to user
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.server.RenderSignupPage(c, "GitLab authentication failed, try again")
 		return
 	}
 	s.log.Info("Fetched gitlab user", zap.String("gitlab_login", gitlabUser.Login), zap.Int("gitlab_id", gitlabUser.ID))
@@ -185,8 +181,7 @@ func (s loginService) oauth(c *gin.Context) {
 		user, err = s.server.db.FindUserByGitlabID(gitlabUser.ID)
 		if err != nil {
 			s.log.Error("Unknown user", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
-			// TODO(BigRedEye): Render error to user
-			c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+			s.server.RenderSignupPage(c, "You are not logged in, try again")
 			return
 		}
 	}
@@ -194,8 +189,7 @@ func (s loginService) oauth(c *gin.Context) {
 	if user.GitlabLogin != nil && user.GitlabID != nil {
 		if err = s.fillSessionForUser(c, user); err != nil {
 			s.log.Error("Failed to create session", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
-			// renderer.RenderError();
-			c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+			s.server.RenderSignupPage(c, "Internal server error, try again later")
 			return
 		}
 		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GitlabLogin(gitlabUser.Login), lf.GitlabID(gitlabUser.ID))
@@ -211,8 +205,7 @@ func (s loginService) oauth(c *gin.Context) {
 	err = s.server.db.SetUserGitlabAccount(user.ID, &user.GitlabUser)
 	if err != nil {
 		s.log.Error("Failed to set user gitlab account", zap.Error(err))
-		// TODO(BigRedEye): s.RenderSignupPage("")
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		s.server.RenderSignupPage(c, "Internal server error, try again later")
 		return
 	}
 
