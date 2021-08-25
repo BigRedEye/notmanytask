@@ -45,6 +45,22 @@ func (t Date) MarshalText() ([]byte, error) {
 	return []byte(t.Time.Format(dateFormat)), nil
 }
 
+func (t *Date) UnmarshalJSON(buf []byte) error {
+	return t.UnmarshalText(buf[1 : len(buf)-2])
+}
+
+func (t Date) MarshalJSON() ([]byte, error) {
+	text, err := t.MarshalText()
+	if err != nil {
+		return text, err
+	}
+	res := make([]byte, 0, len(text)+2)
+	res = append(res, '"')
+	res = append(res, text...)
+	res = append(res, '"')
+	return res, nil
+}
+
 type Task struct {
 	Task  string
 	Score int
