@@ -9,5 +9,5 @@ type UserScoresRequest struct {
 type UserScoresResponse struct {
 	Status
 
-	Scores *scorer.UserScores `json:"scores,omitempty"`
+	Scores *scorer.UserScores `json:"Scores,omitempty"`
 }
