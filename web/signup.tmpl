@@ -1,60 +1,69 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>{{ .CourseName }}</title>
-        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css"
-                               integrity="sha256-HxaKz5E/eBbvhGMNwhWRPrAR9i/lG1JeT4mD6hCQ7s4=" crossorigin="anonymous" />
-        <link rel="stylesheet" href="/static/style.css">
-    </head>
-    <body class="home">
-        <div class="signup">
-            <div class="login">
-                <a class="login-button" href="{{ .Config.Endpoints.Login }}">
-                    <div class="text">
-                        Login
-                    </div>
-                </a>
-            </div>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-            <div class="or">
-                <div class="text">
-                    OR
-                </div>
-            </div>
-
-            <div class="register">
-                <div class="form">
-                    <div class="form-header">
-                        <h1>Sign Up</h1>
-                    </div>
-                    <form method="post" action="{{ .Config.Endpoints.Signup }}">
-                        {{ if .ErrorMessage }}
-                        <div class="form-element form-error">
-                            <div class="error-message">{{ .ErrorMessage }}</div>
-                        </div>
-                        {{ end }}
-                        <div class="form-element">
-                            <div class="name">First Name:</div>
-                            <input type="text" name="firstname">
-                        </div>
-                        <div class="form-element">
-                            <div class="name">Last Name:</div>
-                            <input type="text" name="lastname">
-                        </div>
-                        <div class="form-element">
-                            <div class="name">Secret Code:</div>
-                            <input type="text" name="secret">
-                        </div>
-                        <div class="form-element last">
-                            <input type="submit" class="button" value="Register">
-                        </div>
-                    </form>
-                </div>
-            </div>
-
+    <title>HSE Advanced C&#43;&#43;</title>
+    <style>
+.navbar-brand {
+  font-size: 4rem;
+  font-weight: 300
+}
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-light bg-light">
+      <div class="container">
+        <div class="col col-xxl-4 offset-xxl-4 col-lg-6 offset-lg-3 col-md-10 offset-md-1">
+          <p class="navbar-brand mb-0 h1 text-center">Advanced C++</p>
         </div>
+      </div>
+    </nav>
 
-    </body>
+    <div class="container p-2 my-2">
+      <div class="row p-2">
+        <div class="col col-xxl-4 offset-xxl-4 col-lg-6 offset-lg-3 col-md-10 offset-md-1">
+          <div class="card">
+            <div class="card-body">
+              <form method="post" action="{{ .Config.Endpoints.Signup }}" class="needs-validation was-validated">
+                <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="floatingFirstName" placeholder="Ivan" name="firstname" required pattern="[a-z]+">
+                  <label for="floatingFirstName">First name</label>
+                  <div class="invalid-feedback">
+                    Please use only Latin letters
+                  </div>
+                </div>
+                <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="floatingLastName" placeholder="Petrov" name="lastname" required pattern="[a-z]+">
+                  <label for="floatingLastName">Last name</label>
+                  <div class="invalid-feedback">
+                    Please use only Latin letters
+                  </div>
+                </div>
+                <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="floatingSecretCode" placeholder="LolKekCheburek" name="secret" required pattern="[A-Za-z0-9-_]+">
+                  <label for="floatingSecretCode">Secret code</label>
+                  <div class="invalid-feedback">
+                    Ask your teacher
+                  </div>
+                </div>
+
+                <div class="d-grid mb-3">
+                  <button type="submit" class="btn btn-outline-primary">Sign up via GitLab</button>
+                </div>
+              </form>
+
+              <div class="d-grid">
+                <a class="btn btn-outline-success btn-block" href="{{ .Config.Endpoints.Login }}">Login via GitLab</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
 </html>
 

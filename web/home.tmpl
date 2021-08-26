@@ -51,20 +51,20 @@
     <body>
         <nav class="navbar navbar-light bg-light">
             <div class="container">
-                <div class="col">
-                    <span class="navbar-brand mb-0 h1">Deadlines</span>
-                </div>
-                <div class="col-auto">
-                    <a class="nav-link" href="{{ .Links.TasksRepository }}">Main Repository</a>
-                </div>
-                <div class="col-auto">
-                    <a class="nav-link" href="{{ .Links.Repository }}">My Repository</a>
-                </div>
-                <div class="col-auto">
-                    <a class="nav-link" href="{{ .Links.Submits }}">My Submits</a>
-                </div>
-                <div class="col-auto">
-                    <a class="nav-link" href="{{ .Links.Logout }}">Logout</a>
+                <span class="navbar-brand mb-0 h1">Deadlines</span>
+                <div class="row">
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.TasksRepository }}"><h5>Main Repository</h5></a>
+                    </div>
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.Repository }}"><h5>My Repository</h5></a>
+                    </div>
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.Submits }}"><h5>My Submits</h5></a>
+                    </div>
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.Logout }}"><h5>Logout</h5></a>
+                    </div>
                 </div>
             </div>
             </div>
