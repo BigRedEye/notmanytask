@@ -74,7 +74,9 @@
             {{ range .Scores.Groups }}
                 <div class="container p-2 my-2">
                     <div class="p-2">
-                        <h1>{{ .PrettyTitle }} <span class="text-muted">{{ .Deadline.String }}</span></h1>
+                        <a name="{{ .PrettyTitle }}" href="#{{ .PrettyTitle }}" class="text-decoration-none text-dark">
+                            <h1>{{ .PrettyTitle }} <span class="text-muted">{{ .Deadline.String }}</span></h1>
+                        </a>
                     </div>
                     <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-4 text-center">
                         {{ range .Tasks }}
