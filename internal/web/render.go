@@ -24,16 +24,31 @@ func reverseScores(scores *scorer.UserScores) {
 	}
 }
 
+type Links struct {
+	TasksRepository string
+	Repository      string
+	Submits         string
+	Logout          string
+}
+
 func (s *server) RenderHomePage(c *gin.Context) {
 	user := c.MustGet("user").(*models.User)
 	scores, err := s.scorer.CalcScores(user)
 	reverseScores(scores)
 
 	c.HTML(http.StatusOK, "/home.tmpl", gin.H{
+		// FIXME(BigRedEye): Do not hardcode title
 		"CourseName": "HSE Advanced C++",
+		"Title":      "HSE Advanced C++",
 		"Config":     s.config,
 		"Scores":     scores,
 		"Error":      err,
+		"Links": Links{
+			TasksRepository: s.config.GitLab.TaskUrlPrefix,
+			Repository:      s.gitlab.MakeProjectUrl(user),
+			Submits:         s.gitlab.MakeProjectSubmitsUrl(user),
+			Logout:          s.config.Endpoints.Logout,
+		},
 	})
 }
 

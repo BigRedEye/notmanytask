@@ -160,6 +160,11 @@ func (c Client) MakeProjectUrl(user *models.User) string {
 	return fmt.Sprintf("%s/%s/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name)
 }
 
+func (c Client) MakeProjectSubmitsUrl(user *models.User) string {
+	url := c.MakeProjectUrl(user)
+	return fmt.Sprintf("%s/-/jobs", url)
+}
+
 func (c Client) MakeProjectWithNamespace(project string) string {
 	return fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, project)
 }

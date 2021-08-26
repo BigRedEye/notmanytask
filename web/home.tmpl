@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-        <title>Hello, world!</title>
+        <title>{{ .Title }}</title>
         <style>
 .shadow-hover:hover {
     transition: all 0.1s ease;
@@ -20,29 +20,55 @@
 }
 
 .task-success {
-    background-color: #a6e9d5!important;
-    border-color: #198754 !important;
+    background-color: #a6e9d5;
+    border-color: #4dd4ac;
 }
 
 .task-failed {
-    background-color: #f8d7da !important;
-    border-color: #dc3545 !important;
+    background-color: #f8d7da;
+    border-color: #f1aeb5;
 }
 
 .task-checking {
-    border-color: #0d6efd !important;
-    background-color:#cfe2ff!important;
+    border-color: #0d6efd;
+    background-color:#9ec5fe;
 }
 
 .task-assigned {
-    background-color: #f8f9fa !important;
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+  font-size: 4.5rem;
+  font-weight: 300
+}
+
+.nav-link {
+  color: rgba(0, 0, 0, 0.9);
 }
         </style>
     </head>
     <body>
-        <div class="container p-2 my-2">
-            <h1 class="display-2">Deadlines</h1>
-        </div>
+        <nav class="navbar navbar-light bg-light">
+            <div class="container">
+                <div class="col">
+                    <span class="navbar-brand mb-0 h1">Deadlines</span>
+                </div>
+                <div class="col-auto">
+                    <a class="nav-link" href="{{ .Links.TasksRepository }}">Main Repository</a>
+                </div>
+                <div class="col-auto">
+                    <a class="nav-link" href="{{ .Links.Repository }}">My Repository</a>
+                </div>
+                <div class="col-auto">
+                    <a class="nav-link" href="{{ .Links.Submits }}">My Submits</a>
+                </div>
+                <div class="col-auto">
+                    <a class="nav-link" href="{{ .Links.Logout }}">Logout</a>
+                </div>
+            </div>
+            </div>
+        </nav>
 
         {{ if .Scores }}
             {{ range .Scores.Groups }}

@@ -82,7 +82,7 @@ func Run(logger *zap.Logger) error {
 		pipelines.Run(pipelinesCtx)
 	}()
 
-	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects, pipelines, scorer)
+	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects, pipelines, scorer, git)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start server")
 	}

@@ -31,6 +31,7 @@ type server struct {
 	projects  *gitlab.ProjectsMaker
 	pipelines *gitlab.PipelinesFetcher
 	scorer    *scorer.Scorer
+	gitlab    *gitlab.Client
 }
 
 func newServer(
@@ -41,6 +42,7 @@ func newServer(
 	projects *gitlab.ProjectsMaker,
 	pipelines *gitlab.PipelinesFetcher,
 	scorer *scorer.Scorer,
+	gitlab *gitlab.Client,
 ) (*server, error) {
 	return &server{
 		config:    config,
@@ -51,6 +53,7 @@ func newServer(
 		projects:  projects,
 		pipelines: pipelines,
 		scorer:    scorer,
+		gitlab:    gitlab,
 	}, nil
 }
 
