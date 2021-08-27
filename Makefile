@@ -15,13 +15,10 @@ statik: get_statik protos
 web: make_build statik
 	go build -o build ./cmd/web
 
-deadlines: make_build
-	go build -o build ./cmd/deadlines
+crashme: make_build statik
+	go build -o build ./cmd/crashme
 
-callback: make_build statik
-	go build -o build ./cmd/callback
-
-all: web callback
+all: web crashme
 
 run_web: web
 	./build/web
