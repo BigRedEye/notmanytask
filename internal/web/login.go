@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -14,6 +15,7 @@ import (
 	perrors "github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/models"
@@ -47,7 +49,11 @@ func (s loginService) signup(c *gin.Context) {
 	})
 }
 
-var nameRe = regexp.MustCompile("^[A-Z][a-z]+$")
+var nameRe = regexp.MustCompile("^[A-Za-z]+$")
+
+func unifyName(name string) string {
+	return strings.Title(strings.ToLower(name))
+}
 
 func (s loginService) signupForm(c *gin.Context) {
 	firstName := c.PostForm("firstname")
@@ -64,14 +70,12 @@ func (s loginService) signupForm(c *gin.Context) {
 
 	if !nameRe.MatchString(firstName) {
 		log.Warn("Invalid firstName from form")
-		// renderer.RenderError();
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.RedirectToSignup(c, "Invalid first name, use only Latin letters")
 		return
 	}
 	if !nameRe.MatchString(lastName) {
 		log.Warn("Invalid lastName from form")
-		// renderer.RenderError();
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.RedirectToSignup(c, "Invalid last name, use only Latin letters")
 		return
 	}
 
@@ -84,21 +88,24 @@ func (s loginService) signupForm(c *gin.Context) {
 	}
 	if groupName == "" {
 		log.Warn("Unknown secret")
-		// renderer.RenderError();
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.RedirectToSignup(c, "Invalid secret")
 		return
 	}
 	log = log.With(zap.String("group_name", groupName))
 
 	user, err := s.server.db.AddUser(&models.User{
-		FirstName: firstName,
-		LastName:  lastName,
+		FirstName: unifyName(firstName),
+		LastName:  unifyName(lastName),
 		GroupName: groupName,
 	})
 	if err != nil {
-		log.Warn("Failed to add user", zap.Error(err))
-		// renderer.RenderError();
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		if database.IsDuplicateKey(err) {
+			log.Warn("Duplicate user", zap.Error(err))
+			s.RedirectToSignup(c, "User is already registered")
+		} else {
+			log.Warn("Failed to add user", zap.Error(err))
+			s.RedirectToSignup(c, "Internal error, try again later")
+		}
 		return
 	}
 	if user.GitlabID != nil || user.GitlabLogin != nil {
@@ -107,15 +114,13 @@ func (s loginService) signupForm(c *gin.Context) {
 			zap.Intp("gitlab_id", user.GitlabID),
 			zap.Stringp("gitlab_login", user.GitlabLogin),
 		)
-		// renderer.RenderError();
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.RedirectToSignup(c, "User is already registered")
 		return
 	}
 
 	if err = s.fillSessionForUser(c, user); err != nil {
 		log.Error("Failed to create session", zap.Error(err))
-		// renderer.RenderError();
-		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		s.RedirectToSignup(c, "Failed to create session, try again later")
 		return
 	}
 
@@ -146,7 +151,7 @@ func (s loginService) oauth(c *gin.Context) {
 		} else {
 			s.log.Info("Mismatched oauth state", zap.String("query", oauthState), zap.String("cookie", v.(string)))
 		}
-		s.server.RenderSignupPage(c, "GitLab authentication failed, try again")
+		s.RedirectToSignup(c, "GitLab authentication failed, try again")
 		return
 	}
 
@@ -154,7 +159,7 @@ func (s loginService) oauth(c *gin.Context) {
 	user, _, err := s.server.tryFindUserByToken(c)
 	if err != nil {
 		s.log.Error("Failed to find user session", zap.Error(err))
-		s.server.RenderSignupPage(c, "You are not registered, try again")
+		s.RedirectToSignup(c, "You are not registered, try again")
 		return
 	}
 
@@ -164,13 +169,13 @@ func (s loginService) oauth(c *gin.Context) {
 	token, err := s.server.auth.Exchange(ctx, c.Query("code"))
 	if err != nil {
 		s.log.Error("Failed to exchange tokens", zap.Error(err))
-		s.server.RenderSignupPage(c, "GitLab authentication failed, try again")
+		s.RedirectToSignup(c, "GitLab authentication failed, try again")
 		return
 	}
 	gitlabUser, err := gitlab.GetOAuthGitLabUser(token.AccessToken)
 	if err != nil {
 		s.log.Error("Failed to get gitlab user", zap.Error(err))
-		s.server.RenderSignupPage(c, "GitLab authentication failed, try again")
+		s.RedirectToSignup(c, "GitLab authentication failed, try again")
 		return
 	}
 	s.log.Info("Fetched gitlab user", zap.String("gitlab_login", gitlabUser.Login), zap.Int("gitlab_id", gitlabUser.ID))
@@ -181,7 +186,7 @@ func (s loginService) oauth(c *gin.Context) {
 		user, err = s.server.db.FindUserByGitlabID(gitlabUser.ID)
 		if err != nil {
 			s.log.Error("Unknown user", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
-			s.server.RenderSignupPage(c, "You are not logged in, try again")
+			s.RedirectToSignup(c, "You are not logged in, try again")
 			return
 		}
 	}
@@ -189,7 +194,7 @@ func (s loginService) oauth(c *gin.Context) {
 	if user.GitlabLogin != nil && user.GitlabID != nil {
 		if err = s.fillSessionForUser(c, user); err != nil {
 			s.log.Error("Failed to create session", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
-			s.server.RenderSignupPage(c, "Internal server error, try again later")
+			s.RedirectToSignup(c, "Internal server error, try again later")
 			return
 		}
 		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GitlabLogin(gitlabUser.Login), lf.GitlabID(gitlabUser.ID))
@@ -204,8 +209,13 @@ func (s loginService) oauth(c *gin.Context) {
 
 	err = s.server.db.SetUserGitlabAccount(user.ID, &user.GitlabUser)
 	if err != nil {
-		s.log.Error("Failed to set user gitlab account", zap.Error(err))
-		s.server.RenderSignupPage(c, "Internal server error, try again later")
+		if database.IsDuplicateKey(err) {
+			s.log.Error("Duplicate gitlab account", zap.Error(err))
+			s.RedirectToSignup(c, "Gitlab account is already registered")
+		} else {
+			s.log.Error("Failed to set user gitlab account", zap.Error(err))
+			s.RedirectToSignup(c, "Internal server error, try again later")
+		}
 		return
 	}
 
@@ -220,14 +230,7 @@ func (s loginService) oauth(c *gin.Context) {
 }
 
 func (s loginService) logout(c *gin.Context) {
-	session := sessions.Default(c)
-	session.Set(sessionKeyToken, "")
-	err := session.Save()
-	if err != nil {
-		s.log.Error("Failed to save session", zap.Error(err))
-	}
-
-	c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+	s.RedirectToSignup(c, "")
 }
 
 func setupAuth(s *server, r *gin.Engine) error {
@@ -327,4 +330,18 @@ func (s *server) getUser(c *gin.Context) *models.User {
 
 func (s *server) getSession(c *gin.Context) *models.Session {
 	return c.MustGet("session").(*models.Session)
+}
+
+func (s loginService) RedirectToSignup(c *gin.Context, error string) {
+	s.clearSession(c)
+	s.server.RenderSignupPage(c, error)
+}
+
+func (s loginService) clearSession(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Set(sessionKeyToken, "")
+	err := session.Save()
+	if err != nil {
+		s.log.Error("Failed to save session", zap.Error(err))
+	}
 }

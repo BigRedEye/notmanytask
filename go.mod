@@ -9,6 +9,7 @@ require (
 	github.com/go-chi/chi v1.5.4
 	github.com/google/go-cmp v0.5.5
 	github.com/google/uuid v1.1.2
+	github.com/jackc/pgconn v1.8.1
 	github.com/joho/godotenv v1.3.0
 	github.com/pkg/errors v0.8.1
 	github.com/pressly/lg v1.1.1

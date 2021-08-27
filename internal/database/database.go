@@ -1,7 +1,10 @@
 package database
 
 import (
+	goerrors "errors"
+
 	"github.com/google/uuid"
+	"github.com/jackc/pgconn"
 	"github.com/pkg/errors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -12,6 +15,33 @@ import (
 
 type DataBase struct {
 	*gorm.DB
+}
+
+type DuplicateKey struct {
+	nested error
+}
+
+func (e *DuplicateKey) Error() string {
+	return e.nested.Error()
+}
+
+func (e *DuplicateKey) Unwrap() error {
+	return e.nested
+}
+
+func IsDuplicateKey(err error) bool {
+	duplicateKey := &DuplicateKey{}
+	return goerrors.As(err, &duplicateKey)
+}
+
+// gorm sucks huge balls:(
+// https://github.com/go-gorm/gorm/issues/4037
+func isUnqiueViolation(err error) bool {
+	perr, ok := err.(*pgconn.PgError)
+	if ok {
+		return perr.Code == "23505"
+	}
+	return false
 }
 
 func OpenDataBase(dsn string) (*DataBase, error) {
@@ -29,7 +59,15 @@ func OpenDataBase(dsn string) (*DataBase, error) {
 }
 
 func (db *DataBase) AddUser(user *models.User) (*models.User, error) {
-	return user, db.Clauses(clause.OnConflict{DoNothing: true}).Create(user).Error
+	var res models.User
+	err := db.FirstOrCreate(&res, user).Error
+	if err != nil {
+		if isUnqiueViolation(err) {
+			return nil, &DuplicateKey{err}
+		}
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (db *DataBase) FindUserByID(id uint) (*models.User, error) {
@@ -77,8 +115,12 @@ func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) erro
 		})
 
 	if res.Error != nil {
+		if isUnqiueViolation(res.Error) {
+			return &DuplicateKey{res.Error}
+		}
 		return res.Error
 	}
+
 	if res.RowsAffected < 1 {
 		return errors.Errorf("Unknown user %d", uid)
 	}
