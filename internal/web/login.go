@@ -186,7 +186,7 @@ func (s loginService) oauth(c *gin.Context) {
 		user, err = s.server.db.FindUserByGitlabID(gitlabUser.ID)
 		if err != nil {
 			s.log.Error("Unknown user", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
-			s.RedirectToSignup(c, "You are not logged in, try again")
+			s.RedirectToSignup(c, "You are not registered, please try to register first")
 			return
 		}
 	}
