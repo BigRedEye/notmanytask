@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"strings"
+
+	"golang.org/x/sync/semaphore"
 )
 
 func main() {
@@ -16,20 +19,30 @@ func main() {
 	}
 	defer listener.Close()
 
+	sema := semaphore.NewWeighted(8)
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			panic(err)
 		}
 
-		go handleConnection(conn)
+		go handleConnection(conn, sema)
 	}
 }
 
 const MAX_INPUT_SIZE = 10 * 1024 * 1024 // 10MiB
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, sema *semaphore.Weighted) {
 	defer conn.Close()
+	fmt.Printf("New connection from %s\n", conn.RemoteAddr().String())
+
+	err := sema.Acquire(context.Background(), 1)
+	if err != nil {
+		fmt.Printf("Failed to acquire semaphore: %+v", err)
+		return
+	}
+	defer sema.Release(1)
 
 	buf := make([]byte, MAX_INPUT_SIZE)
 	len, err := conn.Read(buf)
@@ -66,7 +79,8 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	cmd := exec.Command(string(task))
+	fields := strings.Fields(string(task))
+	cmd := exec.Command(fields[0], fields[1:]...)
 	cmd.Stdin = file
 
 	output, err := cmd.CombinedOutput()
