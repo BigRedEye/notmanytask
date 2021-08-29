@@ -26,13 +26,19 @@ func main() {
 	}
 }
 
+const MAX_INPUT_SIZE = 10 * 1024 * 1024 // 10MiB
+
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	buf := make([]byte, 1024*1024)
+	buf := make([]byte, MAX_INPUT_SIZE)
 	len, err := conn.Read(buf)
 	if err != nil {
 		fmt.Printf("Failed to read: %+v", err)
+		return
+	}
+	if len == MAX_INPUT_SIZE {
+		conn.Write([]byte("Too large input (max 10MiB)"))
 		return
 	}
 	buf = buf[:len]
