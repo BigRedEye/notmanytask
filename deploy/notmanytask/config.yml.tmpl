@@ -1,17 +1,56 @@
 gitlab:
-  secret: <APP_SECRET>
-  clientId: <APP_CLIENT_ID>
+  baseURL: https://gitlab.com
+  taskURLPrefix: https://gitlab.com/danlark/cpp-advanced-hse/-/tree/main/tasks
+  defaultReadme: '
+    # Решения
+
+    Ваши решения создаются и тестируются в отдельных ветках (кнопка Branches выше). Сливать ветки в master не нужно.
+  '
+  group:
+    name: cpp-advanced-hse-2021
+    id: 13033964
+  api:
+    token: $GITLAB_API_TOKEN
+  application:
+    secret: $GITLAB_APP_SECRET
+    clientId: $GITLAB_APP_CLIENT_ID
 
 endpoints:
-  hostname: https://<HOSTNAME>
+  hostname: $SITE_URL
   home: /
   login: /login
   logout: /logout
   signup: /signup
   oauthCallback: /finish
+  api:
+    report: /api/report
 
 server:
   listenAddress: ":18080"
   cookies:
-    authenticationKey: <COOKIE_AUTH_KEY>
-    encryptionKey: <COOKIE_ENCRYPTION_KEY>
+    authenticationKey: $COOKIE_AUTH_KEY
+    encryptionKey: $COOKIE_ENC_KEY
+
+database:
+  host: DB_HOST
+  port: DB_PORT
+  user: DB_USER
+  pass: DB_PASS
+  name: DB_NAME
+
+testing:
+  tokens:
+  - GRADER_TOKEN
+
+groups:
+- name: hse
+  secret: SECRET1
+  deadlinesUrl: https://gitlab.com/danlark/cpp-advanced-hse/-/raw/main/deadlines/hse.yml
+- name: test
+  secret: SECRET2
+  deadlinesUrl: https://gitlab.com/danlark/cpp-advanced-hse/-/raw/main/deadlines/test.yml
+
+pullIntervals:
+  projects: 10s
+  pipelines: 30s
+  deadlines: 10s
