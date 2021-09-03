@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"sync"
@@ -17,6 +18,7 @@ import (
 )
 
 func Run(logger *zap.Logger) error {
+	flag.Parse()
 	config, err := config.ParseConfig()
 	if err != nil {
 		return err

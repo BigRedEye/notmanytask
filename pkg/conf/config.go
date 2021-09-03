@@ -13,7 +13,6 @@ var configPath string
 
 func init() {
 	flag.StringVar(&configPath, "config", "", "Path to the config")
-	flag.Parse()
 }
 
 type Option interface {
