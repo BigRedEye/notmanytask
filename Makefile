@@ -23,6 +23,11 @@ all: web crashme
 run_web: web
 	./build/web
 
+coverage_html:
+	go test ./... -coverprofile coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	rm coverage.out
+
 docker_image:
 	docker build . -t bigredeye/notmanytask:latest
 

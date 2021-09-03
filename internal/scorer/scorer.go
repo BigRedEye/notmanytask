@@ -152,6 +152,8 @@ const (
 
 // TODO(BigRedEye): Do not hardcode scoring logic
 // Maybe read scoring model from deadlines?
+type scoringFunc = func(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int
+
 func linearScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
 	if pipeline.Status != models.PipelineStatusSuccess {
 		return 0
@@ -168,7 +170,7 @@ func linearScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *mod
 		return task.Score / 2
 	}
 
-	mult := 0.5 + 0.5*pipeline.StartedAt.Sub(deadline).Seconds()/(weekAfter.Sub(deadline)).Seconds()
+	mult := 1.0 - 0.5*pipeline.StartedAt.Sub(deadline).Seconds()/(weekAfter.Sub(deadline)).Seconds()
 
 	return int(float64(task.Score) * mult)
 }
@@ -185,8 +187,7 @@ func exponentialScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline
 
 	deltaDays := pipeline.StartedAt.Sub(deadline).Hours() / 24.0
 
-	mult := 0.3
-	return int(math.Max(mult, 1.0/math.Exp(deltaDays/5.0)) * float64(task.Score))
+	return int(math.Max(0.3, 1.0/math.Exp(deltaDays/5.0)) * float64(task.Score))
 }
 
 func (s Scorer) scorePipeline(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
