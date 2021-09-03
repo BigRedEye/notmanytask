@@ -2,6 +2,7 @@ package scorer
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -151,7 +152,7 @@ const (
 
 // TODO(BigRedEye): Do not hardcode scoring logic
 // Maybe read scoring model from deadlines?
-func (s Scorer) scorePipeline(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
+func linearScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
 	if pipeline.Status != models.PipelineStatusSuccess {
 		return 0
 	}
@@ -170,4 +171,25 @@ func (s Scorer) scorePipeline(task *deadlines.Task, group *deadlines.TaskGroup, 
 	mult := 0.5 + 0.5*pipeline.StartedAt.Sub(deadline).Seconds()/(weekAfter.Sub(deadline)).Seconds()
 
 	return int(float64(task.Score) * mult)
+}
+
+func exponentialScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
+	if pipeline.Status != models.PipelineStatusSuccess {
+		return 0
+	}
+
+	deadline := group.Deadline.Time
+	if pipeline.StartedAt.Before(deadline) {
+		return task.Score
+	}
+
+	deltaDays := pipeline.StartedAt.Sub(deadline).Hours() / 24.0
+
+	mult := 0.3
+	return int(math.Max(mult, 1.0/math.Exp(deltaDays/5.0)) * float64(task.Score))
+}
+
+func (s Scorer) scorePipeline(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
+	// return s.linearScore(task, group, pipeline)
+	return exponentialScore(task, group, pipeline)
 }
