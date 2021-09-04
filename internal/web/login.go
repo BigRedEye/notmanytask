@@ -49,9 +49,9 @@ func (s loginService) signup(c *gin.Context) {
 	})
 }
 
-var nameRe = regexp.MustCompile("^[A-Za-z]+$")
+var nameRe = regexp.MustCompile("^[A-Za-z-]+$")
 
-func unifyName(name string) string {
+func normalizeName(name string) string {
 	return strings.Title(strings.ToLower(name))
 }
 
@@ -94,8 +94,8 @@ func (s loginService) signupForm(c *gin.Context) {
 	log = log.With(zap.String("group_name", groupName))
 
 	user, err := s.server.db.AddUser(&models.User{
-		FirstName: unifyName(firstName),
-		LastName:  unifyName(lastName),
+		FirstName: normalizeName(firstName),
+		LastName:  normalizeName(lastName),
 		GroupName: groupName,
 	})
 	if err != nil {

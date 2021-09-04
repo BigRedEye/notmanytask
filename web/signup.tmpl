@@ -29,14 +29,14 @@
             <div class="card-body">
               <form method="post" action="{{ .Config.Endpoints.Signup }}" class="needs-validation was-validated">
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingFirstName" placeholder="Ivan" name="firstname" required pattern="[A-Za-z]+">
+                  <input type="text" class="form-control" id="floatingFirstName" placeholder="Ivan" name="firstname" required pattern="[A-Za-z-]+">
                   <label for="floatingFirstName">First name</label>
                   <div class="invalid-feedback">
                     Please use only Latin letters
                   </div>
                 </div>
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingLastName" placeholder="Petrov" name="lastname" required pattern="[A-Za-z]+">
+                  <input type="text" class="form-control" id="floatingLastName" placeholder="Petrov" name="lastname" required pattern="[A-Za-z-]+">
                   <label for="floatingLastName">Last name</label>
                   <div class="invalid-feedback">
                     Please use only Latin letters

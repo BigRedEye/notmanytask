@@ -3,6 +3,7 @@ package gitlab
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/xanzy/go-gitlab"
@@ -151,8 +152,12 @@ func (c Client) InitializeProject(user *models.User) error {
 	return nil
 }
 
+func cleanupName(name string) string {
+	return strings.ReplaceAll(name, "-", "")
+}
+
 func (c Client) MakeProjectName(user *models.User) string {
-	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, user.FirstName, user.LastName, *user.GitlabLogin)
+	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, cleanupName(user.FirstName), cleanupName(user.LastName), *user.GitlabLogin)
 }
 
 func (c Client) MakeProjectUrl(user *models.User) string {
