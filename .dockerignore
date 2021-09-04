@@ -3,6 +3,7 @@
 .idea
 .github
 Dockerfile
+Dockerfile.crashme
 docker-compose.yml
 build
 deploy

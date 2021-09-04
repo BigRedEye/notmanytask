@@ -15,7 +15,7 @@ statik: get_statik protos
 web: make_build statik
 	go build -o build ./cmd/web
 
-crashme: make_build statik
+crashme: make_build
 	go build -o build ./cmd/crashme
 
 all: web crashme
@@ -29,7 +29,13 @@ coverage_html:
 	rm coverage.out
 
 docker_image:
-	docker build . -t bigredeye/notmanytask:latest
+	docker build . -f Dockerfile -t bigredeye/notmanytask:latest
 
 docker_hub: docker_image
 	docker push bigredeye/notmanytask:latest
+
+docker_image_crashme:
+	docker build . -f Dockerfile.crashme -t bigredeye/notmanytask:crashme
+
+docker_hub_crashme: docker_image_crashme
+	docker push bigredeye/notmanytask:crashme

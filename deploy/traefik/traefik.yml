@@ -27,6 +27,8 @@ entryPoints:
     http:
       tls:
         certResolver: letsencrypt
+  tcp9k:
+    address: ":9000"
 
 providers:
   file:

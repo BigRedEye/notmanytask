@@ -8,6 +8,12 @@ http:
       #middlewares:
       #  - authelia-auth
 
+tcp:
+  routers:
+    entryPoints:
+      - tcp9k
+    service: crashme
+
 
   middlewares:
 
@@ -17,3 +23,8 @@ http:
       loadBalancer:
         servers:
           - url: "http://localhost:18080/" 
+
+    crashme:
+      loadBalancer:
+        servers:
+          - address: "localhost:18228"

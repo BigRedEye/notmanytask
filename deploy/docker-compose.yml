@@ -9,10 +9,22 @@ services:
       - ./notmanytask/config.yml:/etc/notmanytask/config.yml
     restart: unless-stopped
 
+  crashme:
+    image: bigredeye/notmanytask:crashme
+    ports:
+      - 9090:9090
+    volumes:
+      - ./crashme/config.yml:/etc/crashme/config.yml
+      - ./crashme/submits:/var/run/crashme/submits
+    environment:
+      CRASHME_URL: https://cpp-hse.org/api/flag
+      CRASHME_TOKEN: TOKEN
+    restart: unless-stopped
+
   db:
     image: postgres:13
     environment:
-      POSTGRES_PASSWORD: 1234
+      POSTGRES_PASSWORD: 1a122910851a31bbb828f3861a68882008ff49f9c81747
     ports:
       - 5432:5432
     volumes:
