@@ -39,7 +39,7 @@
 }
 
 .navbar-brand {
-  font-size: 4.5rem;
+  font-size: 3rem;
   font-weight: 300
 }
 
@@ -53,6 +53,9 @@
             <div class="container">
                 <span class="navbar-brand mb-0 h1">Deadlines</span>
                 <div class="row">
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.SubmitFlag }}"><h5>Submit flag</h5></a>
+                    </div>
                     <div class="col-auto">
                         <a class="nav-link" href="{{ .Links.TasksRepository }}"><h5>Main Repository</h5></a>
                     </div>

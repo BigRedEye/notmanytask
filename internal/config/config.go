@@ -28,6 +28,7 @@ type GitLabConfig struct {
 type EndpointsConfig struct {
 	HostName      string
 	Home          string
+	Flag          string
 	Login         string
 	Logout        string
 	Signup        string
@@ -35,6 +36,7 @@ type EndpointsConfig struct {
 
 	Api struct {
 		Report string
+		Flag   string
 	}
 }
 

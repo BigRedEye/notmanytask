@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <title>HSE Advanced C&#43;&#43;</title>
+    <style>
+.navbar-brand {
+  font-size: 3rem;
+  font-weight: 300
+}
+
+#floatingFlag {
+  font-family: monospace;
+}
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-light bg-light">
+      <div class="container">
+        <span class="navbar-brand mb-0 h1">Deadlines</span>
+        <div class="row">
+          <div class="col-auto">
+            <a class="nav-link" href="{{ .Links.SubmitFlag }}"><h5>Submit flag</h5></a>
+          </div>
+          <div class="col-auto">
+            <a class="nav-link" href="{{ .Links.TasksRepository }}"><h5>Main Repository</h5></a>
+          </div>
+          <div class="col-auto">
+            <a class="nav-link" href="{{ .Links.Repository }}"><h5>My Repository</h5></a>
+          </div>
+          <div class="col-auto">
+            <a class="nav-link" href="{{ .Links.Submits }}"><h5>My Submits</h5></a>
+          </div>
+          <div class="col-auto">
+            <a class="nav-link" href="{{ .Links.Logout }}"><h5>Logout</h5></a>
+          </div>
+        </div>
+      </div>
+      </div>
+    </nav>
+
+    <div class="container p-2 my-2">
+      <div class="row p-2">
+        <div class="col col-lg-6 offset-lg-3 col-md-10 offset-md-1">
+          <div class="card">
+            <div class="card-body">
+              <form method="post" action="{{ .Links.SubmitFlag }}" class="needs-validation was-validated">
+                <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="floatingFlag" placeholder="Flag" name="flag" required pattern="\{FLAG(-[a-z0-9_]+)+(-[0-9a-f]+)+\}">
+                  <label for="floatingFlag">Flag value</label>
+                  <div class="invalid-feedback">
+                    Flag should be in form <code>{FLAG-crashme-d18736e-9287-ffaa-8bqe-4e6d891516ef}</code>
+                  </div>
+                </div>
+
+              {{ if .ErrorMessage }}
+              <div class="alert alert-danger" role="alert">
+                {{ .ErrorMessage }}
+              </div>
+              {{ end }}
+
+              {{ if .SuccessMessage }}
+              <div class="alert alert-success" role="alert">
+                {{ .SuccessMessage }}
+              </div>
+              {{ end }}
+
+                <div class="d-grid">
+                  <button type="submit" class="btn btn-outline-success">Submit flag</button>
+                </div>
+              </form>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>
+
+
