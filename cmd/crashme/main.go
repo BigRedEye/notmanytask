@@ -3,18 +3,22 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/bigredeye/notmanytask/api"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -34,14 +38,66 @@ func isDirectory(path string) bool {
 	}
 }
 
+type flagFetcher struct {
+	url   string
+	token string
+}
+
+func (f flagFetcher) doFetchFlag(task string) (string, error) {
+	buf, err := json.Marshal(&api.FlagRequest{
+		Token: f.token,
+		Task:  task,
+	})
+	if err != nil {
+		return "", err
+	}
+	res, err := http.Post(f.url, "application/json", bytes.NewReader(buf))
+	if err != nil {
+		log.Printf("Failed to send flag request: %+v\n", err)
+		return "", err
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf("Failed to read response body: %+v\n", err)
+		return "", err
+	}
+
+	response := api.FlagResponse{}
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		log.Printf("Failed to parse response json: %+v\n", err)
+		return "", err
+	}
+	if !response.Ok {
+		log.Printf("Flag request failed: %s\n", response.Error)
+		return "", fmt.Errorf("Server error: %s", response.Error)
+	}
+	return response.Flag, nil
+}
+
+func (f flagFetcher) fetchFlag(task string) (string, error) {
+	iterations := 5
+	for {
+		flag, err := f.doFetchFlag(task)
+		if err == nil || iterations <= 0 {
+			return flag, err
+		}
+
+		log.Printf("Failed to fetch flag: %+v\n", err)
+		iterations--
+		time.Sleep(time.Second * 5)
+	}
+}
+
 func main() {
 	listenAddress := flag.String("address", ":3333", "Address to listen on")
 	binariesDirectory := flag.String("build", "", "Path to build directory")
 	submitsDirectory := flag.String("submits", "", "Path to directory to store submits")
-	concurrencyLevel := flag.Int64("concurrency", 4, "Max number of computation-heavy tasks to run")
+	concurrencyLevel := flag.Int64("concurrency", 16, "Max number of computation-heavy tasks to run")
 	flag.Parse()
 
-	checker, err := newChecker(*binariesDirectory, *submitsDirectory, *concurrencyLevel)
+	checker, err := newChecker(*binariesDirectory, *submitsDirectory, *concurrencyLevel, os.Getenv("CRASHME_URL"), os.Getenv("CRASHME_TOKEN"))
 	if err != nil {
 		panic(err)
 	}
@@ -81,9 +137,10 @@ type checker struct {
 	binariesDirectory string
 	submitsDirectory  string
 	sema              *semaphore.Weighted
+	flagFetcher       flagFetcher
 }
 
-func newChecker(binariesDirectory, submitsDirectory string, concurrencyLevel int64) (*checker, error) {
+func newChecker(binariesDirectory, submitsDirectory string, concurrencyLevel int64, url, token string) (*checker, error) {
 	err := os.MkdirAll(submitsDirectory, 0755)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to mkdir submits directory: %w", err)
@@ -97,6 +154,10 @@ func newChecker(binariesDirectory, submitsDirectory string, concurrencyLevel int
 		binariesDirectory: binariesDirectory,
 		submitsDirectory:  submitsDirectory,
 		sema:              semaphore.NewWeighted(concurrencyLevel),
+		flagFetcher: flagFetcher{
+			token: token,
+			url:   url,
+		},
 	}, nil
 }
 
@@ -182,7 +243,14 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 		if errors.As(err, &exitError) {
 			log.Printf("Command %s failed with code %d\n", task, exitError.ExitCode())
 			io.WriteString(conn, fmt.Sprintf("Command failed: %s\n", exitError.ProcessState))
-			io.WriteString(conn, fmt.Sprintf("%s\n", "FLAG-123-sdf-sd123"))
+
+			flag, err := c.flagFetcher.fetchFlag(task)
+			if err != nil {
+				log.Printf("Failed to fetch flag for failed task: %+v\n", err)
+				return err
+			}
+
+			io.WriteString(conn, flag)
 			return nil
 		} else {
 			log.Printf("Failed to run command %s: %s", executablePath, stderr)
