@@ -61,25 +61,56 @@ func pipelineLess(left *models.Pipeline, right *models.Pipeline) bool {
 	return classifyPipelineStatus(left.Status) > classifyPipelineStatus(right.Status)
 }
 
+// TODO(BigRedEye): Unify submits?
+type pipelinesMap map[string]*models.Pipeline
+type flagsMap map[string]*models.Flag
+
+func (s Scorer) loadUserPipelines(user *models.User) (pipelinesMap, error) {
+	pipelines, err := s.db.ListProjectPipelines(s.projects.MakeProjectName(user))
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to list use rpipelines")
+	}
+
+	pipelinesMap := make(pipelinesMap)
+	for _, pipeline := range pipelines {
+		prev, found := pipelinesMap[pipeline.Task]
+		if !found || pipelineLess(&pipeline, prev) {
+			prev = &pipeline
+		}
+	}
+	return pipelinesMap, nil
+}
+
+func (s Scorer) loadUserFlags(user *models.User) (flagsMap, error) {
+	flags, err := s.db.ListUserFlags(*user.GitlabLogin)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to list user flags")
+	}
+
+	flagsMap := make(flagsMap)
+	for _, flag := range flags {
+		prev, found := flagsMap[flag.Task]
+		if !found || flag.CreatedAt.Before(prev.CreatedAt) {
+			prev = &flag
+		}
+	}
+	return flagsMap, nil
+}
+
 func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 	currentDeadlines := s.deadlines.GroupDeadlines(user.GroupName)
 	if currentDeadlines == nil {
 		return nil, fmt.Errorf("No deadlines found")
 	}
 
-	pipelines, err := s.db.ListProjectPipelines(s.projects.MakeProjectName(user))
+	pipelinesMap, err := s.loadUserPipelines(user)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to list pipelines")
+		return nil, err
 	}
 
-	pipelinesMap := make(map[string][]*models.Pipeline)
-	for i, pipeline := range pipelines {
-		prev, found := pipelinesMap[pipeline.Task]
-		if !found {
-			prev = make([]*models.Pipeline, 0, 1)
-		}
-		prev = append(prev, &pipelines[i])
-		pipelinesMap[pipeline.Task] = prev
+	flagsMap, err := s.loadUserFlags(user)
+	if err != nil {
+		return nil, err
 	}
 
 	scores := &UserScores{
@@ -101,21 +132,24 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 			}
 			maxTotalScore += tasks[i].MaxScore
 
-			pipelines, found := pipelinesMap[task.Task]
-			if !found || len(pipelines) == 0 {
-				continue
-			}
+			pipeline, found := pipelinesMap[task.Task]
+			if found {
+				tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
+				tasks[i].Score = s.scorePipeline(&task, &group, pipeline)
+				tasks[i].PipelineUrl = s.projects.MakePipelineUrl(user, pipeline)
+			} else {
+				flag, found := flagsMap[task.Task]
+				if found {
+					tasks[i].Status = TaskStatusSuccess
 
-			minPipeline := pipelines[0]
-			for _, pipeline := range pipelines {
-				if pipelineLess(pipeline, minPipeline) {
-					minPipeline = pipeline
+					// FIXME(BigRedEye): I just want to sleep
+					// Do not try to mimic pipelines
+					tasks[i].Score = s.scorePipeline(&task, &group, &models.Pipeline{
+						StartedAt: flag.CreatedAt,
+						Status:    models.PipelineStatusSuccess,
+					})
 				}
 			}
-
-			tasks[i].Status = ClassifyPipelineStatus(minPipeline.Status)
-			tasks[i].Score = s.scorePipeline(&task, &group, minPipeline)
-			tasks[i].PipelineUrl = s.projects.MakePipelineUrl(user, minPipeline)
 			totalScore += tasks[i].Score
 		}
 
