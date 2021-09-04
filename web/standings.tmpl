@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+        <title>{{ .Title }}</title>
+        <style>
+.shadow-hover:hover {
+    transition: all 0.1s ease;
+    box-shadow:0 .5rem 1rem rgba(0,0,0,.15)!important
+}
+.shadow-hover {
+    -webkit-transition: all 0.1s ease;
+    -moz-transition: all 0.1s ease;
+    -o-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+    box-shadow:0 .125rem .25rem rgba(0,0,0,.075)!important
+}
+
+.task-success {
+    background-color: #a6e9d5;
+    border-color: #4dd4ac;
+}
+
+.task-failed {
+    background-color: #f8d7da;
+    border-color: #f1aeb5;
+}
+
+.task-checking {
+    border-color: #0d6efd;
+    background-color:#9ec5fe;
+}
+
+.task-assigned {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-size: 3rem;
+    font-weight: 300
+}
+
+.nav-link {
+    color: rgba(0, 0, 0, 0.9);
+}
+
+.task {
+    width: 120px;
+    max-width: 120px;
+    overflow: hidden;
+}
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-light bg-light">
+            <div class="container">
+                <span class="navbar-brand mb-0 h1"><a href="/" class="text-decoration-none text-dark">Deadlines</a></span>
+                <div class="row">
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.SubmitFlag }}"><h5>Submit flag</h5></a>
+                    </div>
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.TasksRepository }}"><h5>Main Repository</h5></a>
+                    </div>
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.Repository }}"><h5>My Repository</h5></a>
+                    </div>
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.Submits }}"><h5>My Submits</h5></a>
+                    </div>
+                    <div class="col-auto">
+                        <a class="nav-link" href="{{ .Links.Logout }}"><h5>Logout</h5></a>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </nav>
+
+        <div class="container p-2 my-2">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="name">Student</th>
+                            <th scope="col">Score</th>
+                            {{ range .Standings.Deadlines }}
+                                {{ range .Tasks }}
+                                    <th scope="col" class="task">{{ .Task }}</th>
+                                {{ end }}
+                            {{ end }}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ with index .Standings.Users 0 }}
+                            <tr>
+                                <th scope="row" class="name">Chuck Norris</th>
+                                <td>{{ .MaxScore }}</td>
+                                {{ range .Groups }}
+                                    {{ range .Tasks }}
+                                        <td class="task table-success">{{ .MaxScore }}</td>
+                                    {{ end }}
+                                {{ end }}
+                            </tr>
+                        {{ end }}
+                        {{ range .Standings.Users }}
+                            <tr>
+                                <th scope="row" class="name">{{ .User.FirstName }} {{ .User.LastName }}</th>
+                                <td>{{ .Score }}</td>
+                                {{ range .Groups }}
+                                    {{ range .Tasks }}
+                                        {{ if eq .Status "success"}}
+                                        <td class="task table-success">{{ .Score }}</td>
+                                        {{ else if eq .Status "failed"}}
+                                        <td class="task table-danger">{{ .Score }}</td>
+                                        {{ else }}
+                                        <td class="task">{{ .Score }}</td>
+                                        {{ end }}
+                                    {{ end }}
+                                {{ end }}
+                            </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

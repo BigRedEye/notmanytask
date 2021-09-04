@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 )
 
 type ProjectNameFactory interface {
+	MakeProjectUrl(user *models.User) string
 	MakeProjectName(user *models.User) string
 	MakePipelineUrl(user *models.User, pipeline *models.Pipeline) string
 	MakeTaskUrl(task string) string
@@ -65,8 +67,11 @@ func pipelineLess(left *models.Pipeline, right *models.Pipeline) bool {
 type pipelinesMap map[string]*models.Pipeline
 type flagsMap map[string]*models.Flag
 
-func (s Scorer) loadUserPipelines(user *models.User) (pipelinesMap, error) {
-	pipelines, err := s.db.ListProjectPipelines(s.projects.MakeProjectName(user))
+type pipelinesProvider = func(project string) (pipelines []models.Pipeline, err error)
+type flagsProvider = func(gitlabLogin string) (flags []models.Flag, err error)
+
+func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider) (pipelinesMap, error) {
+	pipelines, err := provider(s.projects.MakeProjectName(user))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to list use rpipelines")
 	}
@@ -83,8 +88,8 @@ func (s Scorer) loadUserPipelines(user *models.User) (pipelinesMap, error) {
 	return pipelinesMap, nil
 }
 
-func (s Scorer) loadUserFlags(user *models.User) (flagsMap, error) {
-	flags, err := s.db.ListUserFlags(*user.GitlabLogin)
+func (s Scorer) loadUserFlags(user *models.User, provider flagsProvider) (flagsMap, error) {
+	flags, err := provider(*user.GitlabLogin)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to list user flags")
 	}
@@ -101,24 +106,119 @@ func (s Scorer) loadUserFlags(user *models.User) (flagsMap, error) {
 	return flagsMap, nil
 }
 
-func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
+func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
+	currentDeadlines := s.deadlines.GroupDeadlines(groupName)
+	if currentDeadlines == nil {
+		return nil, fmt.Errorf("No deadlines found")
+	}
+
+	users, err := s.db.ListGroupUsers(groupName)
+	if err != nil {
+		return nil, err
+	}
+
+	pipelines, err := s.makeCachedPipelinesProvider()
+	if err != nil {
+		return nil, err
+	}
+
+	flags, err := s.makeCachedFlagsProvider()
+	if err != nil {
+		return nil, err
+	}
+
+	scores := make([]*UserScores, len(users))
+	for i, user := range users {
+		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags)
+		if err != nil {
+			return nil, err
+		}
+
+		scores[i] = userScores
+	}
+
+	sort.Slice(scores, func(i, j int) bool {
+		if scores[i].Score != scores[j].Score {
+			return scores[i].Score > scores[j].Score
+		}
+		return scores[i].User.FullName() < scores[j].User.FullName()
+	})
+
+	return &Standings{currentDeadlines, scores}, nil
+}
+
+func (s Scorer) makeCachedPipelinesProvider() (pipelinesProvider, error) {
+	pipelines, err := s.db.ListAllPipelines()
+	if err != nil {
+		return nil, err
+	}
+
+	pipelinesMap := make(map[string][]models.Pipeline)
+	for _, pipeline := range pipelines {
+		prev, found := pipelinesMap[pipeline.Project]
+		if !found {
+			prev = make([]models.Pipeline, 0, 1)
+		}
+		prev = append(prev, pipeline)
+		pipelinesMap[pipeline.Project] = prev
+	}
+
+	return func(project string) (pipelines []models.Pipeline, err error) {
+		return pipelinesMap[project], nil
+	}, nil
+}
+
+func (s Scorer) makeCachedFlagsProvider() (flagsProvider, error) {
+	flags, err := s.db.ListSubmittedFlags()
+	if err != nil {
+		return nil, err
+	}
+
+	flagsMap := make(map[string][]models.Flag)
+	for _, flag := range flags {
+		prev, found := flagsMap[*flag.GitlabLogin]
+		if !found {
+			prev = make([]models.Flag, 0, 1)
+		}
+		prev = append(prev, flag)
+		flagsMap[*flag.GitlabLogin] = prev
+	}
+
+	return func(gitlabLogin string) (flags []models.Flag, err error) {
+		return flagsMap[gitlabLogin], nil
+	}, nil
+}
+
+func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 	currentDeadlines := s.deadlines.GroupDeadlines(user.GroupName)
 	if currentDeadlines == nil {
 		return nil, fmt.Errorf("No deadlines found")
 	}
 
-	pipelinesMap, err := s.loadUserPipelines(user)
+	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags)
+}
+
+func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *models.User, pipelinesP pipelinesProvider, flagsP flagsProvider) (*UserScores, error) {
+	pipelinesMap, err := s.loadUserPipelines(user, pipelinesP)
 	if err != nil {
 		return nil, err
 	}
 
-	flagsMap, err := s.loadUserFlags(user)
+	flagsMap, err := s.loadUserFlags(user, flagsP)
 	if err != nil {
 		return nil, err
 	}
 
 	scores := &UserScores{
-		Groups: make([]ScoredTaskGroup, 0),
+		Groups:   make([]ScoredTaskGroup, 0),
+		Score:    0,
+		MaxScore: 0,
+		User: User{
+			FirstName:     user.FirstName,
+			LastName:      user.LastName,
+			GitlabLogin:   *user.GitlabLogin,
+			GitlabProject: s.projects.MakeProjectName(user),
+		},
 	}
 
 	for _, group := range *currentDeadlines {
@@ -165,6 +265,8 @@ func (s Scorer) CalcScores(user *models.User) (*UserScores, error) {
 			MaxScore:    maxTotalScore,
 			Tasks:       tasks,
 		})
+		scores.Score += totalScore
+		scores.MaxScore += maxTotalScore
 	}
 
 	return scores, nil

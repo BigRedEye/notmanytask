@@ -89,7 +89,7 @@ func (s *server) makeLinks(user *models.User) Links {
 
 func (s *server) RenderHomePage(c *gin.Context) {
 	user := c.MustGet("user").(*models.User)
-	scores, err := s.scorer.CalcScores(user)
+	scores, err := s.scorer.CalcUserScores(user)
 	reverseScores(scores)
 
 	c.HTML(http.StatusOK, "/home.tmpl", gin.H{
@@ -107,7 +107,7 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 	user, err := s.db.FindUserByGitlabLogin(c.Query("login"))
 	var scores *scorer.UserScores
 	if err == nil {
-		scores, err = s.scorer.CalcScores(user)
+		scores, err = s.scorer.CalcUserScores(user)
 	}
 	reverseScores(scores)
 
@@ -116,6 +116,19 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 		"Title":      "HSE Advanced C++",
 		"Config":     s.config,
 		"Scores":     scores,
+		"Error":      err,
+		"Links":      s.makeLinks(user),
+	})
+}
+
+func (s *server) RenderStandingsPage(c *gin.Context) {
+	user := c.MustGet("user").(*models.User)
+	scores, err := s.scorer.CalcScoreboard("hse")
+	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{
+		"CourseName": "HSE Advanced C++",
+		"Title":      "HSE Advanced C++",
+		"Config":     s.config,
+		"Standings":  scores,
 		"Error":      err,
 		"Links":      s.makeLinks(user),
 	})

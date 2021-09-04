@@ -108,6 +108,15 @@ func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
 	return users, nil
 }
 
+func (db *DataBase) ListGroupUsers(groupName string) ([]*models.User, error) {
+	var users []*models.User
+	err := db.Find(&users, "repository IS NOT NULL AND group_name = ?", groupName).Order("created_at").Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) error {
 	res := db.Model(&models.User{}).
 		Where("id = ? AND (gitlab_id IS NULL OR gitlab_login IS NULL)", uid).
@@ -231,6 +240,15 @@ func (db *DataBase) SubmitFlag(id string, gitlabLogin string) error {
 func (db *DataBase) ListUserFlags(gitlabLogin string) (flags []models.Flag, err error) {
 	flags = make([]models.Flag, 0)
 	err = db.Find(&flags, "gitlab_login = ?", gitlabLogin).Error
+	if err != nil {
+		flags = nil
+	}
+	return
+}
+
+func (db *DataBase) ListSubmittedFlags() (flags []models.Flag, err error) {
+	flags = make([]models.Flag, 0)
+	err = db.Find(&flags, "gitlab_login IS NOT NULL").Error
 	if err != nil {
 		flags = nil
 	}

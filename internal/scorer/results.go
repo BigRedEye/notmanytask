@@ -49,6 +49,26 @@ type ScoredTaskGroup struct {
 	MaxScore int
 }
 
+type User struct {
+	FirstName     string
+	LastName      string
+	GitlabLogin   string
+	GitlabProject string
+}
+
+func (u User) FullName() string {
+	return u.FirstName + " " + u.LastName
+}
+
 type UserScores struct {
-	Groups []ScoredTaskGroup
+	Groups   []ScoredTaskGroup
+	Score    int
+	MaxScore int
+
+	User User
+}
+
+type Standings struct {
+	Deadlines *deadlines.Deadlines
+	Users     []*UserScores
 }

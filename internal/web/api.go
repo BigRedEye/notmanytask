@@ -167,7 +167,7 @@ func (s apiService) userScores(c *gin.Context) {
 		return
 	}
 
-	scores, err := s.server.scorer.CalcScores(user)
+	scores, err := s.server.scorer.CalcUserScores(user)
 	if err != nil {
 		s.log.Error("Failed to calc scores", lf.GitlabLogin(req.Login), zap.Error(err))
 		onError(http.StatusInternalServerError, fmt.Errorf("Failed to calc scores"))

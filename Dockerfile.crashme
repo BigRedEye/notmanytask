@@ -58,6 +58,7 @@ RUN cp build/crashme /crashme
 
 FROM base AS cmake
 
+RUN echo 'Do not use cache' >/dev/null
 RUN mkdir -p /opt/hse
 RUN git clone https://gitlab.com/danlark/cpp-advanced-hse.git /opt/hse/cpp-advanced-hse
 RUN cmake -B /opt/hse/cpp-advanced-hse/build -S /opt/hse/cpp-advanced-hse -DCMAKE_BUILD_TYPE=Debug
