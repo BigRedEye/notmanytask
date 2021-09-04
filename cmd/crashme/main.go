@@ -1,103 +1,195 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
+	"time"
 
 	"golang.org/x/sync/semaphore"
 )
 
+func isRegularFile(path string) bool {
+	if stat, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return false
+	} else {
+		return stat.Mode().IsRegular()
+	}
+}
+
+func isDirectory(path string) bool {
+	if stat, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return false
+	} else {
+		return stat.Mode().IsDir()
+	}
+}
+
 func main() {
-	listener, err := net.Listen("tcp", "localhost:3333")
+	listenAddress := flag.String("address", ":3333", "Address to listen on")
+	binariesDirectory := flag.String("build", "", "Path to build directory")
+	submitsDirectory := flag.String("submits", "", "Path to directory to store submits")
+	concurrencyLevel := flag.Int64("concurrency", 4, "Max number of computation-heavy tasks to run")
+	flag.Parse()
+
+	checker, err := newChecker(*binariesDirectory, *submitsDirectory, *concurrencyLevel)
+	if err != nil {
+		panic(err)
+	}
+
+	listener, err := net.Listen("tcp", *listenAddress)
 	if err != nil {
 		panic(err)
 	}
 	defer listener.Close()
 
-	sema := semaphore.NewWeighted(8)
+	acceptErrorsBudget := 10
+	currentAcceptErrorsBudget := acceptErrorsBudget
+	connId := 0
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			panic(err)
+			log.Printf("Failed to accept: %+v", err)
+			if currentAcceptErrorsBudget == 0 {
+				panic(err)
+			}
+			currentAcceptErrorsBudget--
+		} else if currentAcceptErrorsBudget < acceptErrorsBudget {
+			currentAcceptErrorsBudget++
 		}
 
-		go handleConnection(conn, sema)
+		go checker.handleConnection(context.Background(), conn, connId)
+		connId++
 	}
 }
 
+// FIXME(BigRedEye): Read from config
 const MAX_INPUT_SIZE = 10 * 1024 * 1024 // 10MiB
+const MAX_FIRST_LINE_SIZE = 100
 
-func handleConnection(conn net.Conn, sema *semaphore.Weighted) {
-	defer conn.Close()
-	fmt.Printf("New connection from %s\n", conn.RemoteAddr().String())
+type checker struct {
+	binariesDirectory string
+	submitsDirectory  string
+	sema              *semaphore.Weighted
+}
 
-	err := sema.Acquire(context.Background(), 1)
+func newChecker(binariesDirectory, submitsDirectory string, concurrencyLevel int64) (*checker, error) {
+	err := os.MkdirAll(submitsDirectory, 0755)
 	if err != nil {
-		fmt.Printf("Failed to acquire semaphore: %+v", err)
-		return
+		return nil, fmt.Errorf("Failed to mkdir submits directory: %w", err)
 	}
-	defer sema.Release(1)
 
-	buf := make([]byte, MAX_INPUT_SIZE)
-	len, err := conn.Read(buf)
+	if !isDirectory(binariesDirectory) {
+		return nil, fmt.Errorf("Binaries directory does not exist")
+	}
+
+	return &checker{
+		binariesDirectory: binariesDirectory,
+		submitsDirectory:  submitsDirectory,
+		sema:              semaphore.NewWeighted(concurrencyLevel),
+	}, nil
+}
+
+func (c *checker) handleConnection(ctx context.Context, conn net.Conn, connID int) {
+	defer func() {
+		conn.Close()
+		log.Printf("Closed connection #%d from %s\n", connID, conn.RemoteAddr())
+	}()
+	log.Printf("New connection from #%d from %s\n", connID, conn.RemoteAddr())
+
+	err := c.doHandleConnection(ctx, conn)
 	if err != nil {
-		fmt.Printf("Failed to read: %+v", err)
-		return
+		log.Printf("Failed to handle connection: %+v", err)
+		io.WriteString(conn, fmt.Sprintf("Error: %s", err.Error()))
 	}
-	if len == MAX_INPUT_SIZE {
-		conn.Write([]byte("Too large input (max 10MiB)"))
-		return
+}
+
+func slowReadFirstLine(reader io.Reader) (string, error) {
+	var str strings.Builder
+	buf := []byte{' '}
+	for buf[0] != '\n' {
+		n, err := reader.Read(buf)
+
+		if err == io.EOF || (err == nil && n != 1) {
+			if str.Len() == MAX_FIRST_LINE_SIZE {
+				return "", fmt.Errorf("Too long first line")
+			}
+			return "", fmt.Errorf("EOF before new line")
+		}
+		if err != nil {
+			return "", err
+		}
+
+		str.WriteByte(buf[0])
 	}
-	buf = buf[:len]
+	return strings.TrimSpace(str.String()), nil
+}
 
-	pos := strings.IndexByte(string(buf), '\n')
-	if pos == -1 {
-		conn.Write([]byte("No task name found"))
-		return
+func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute) // FIXME(BigRedEye): Timeout from config
+	defer cancel()
+
+	if !c.sema.TryAcquire(1) {
+		io.WriteString(conn, "Waiting for an available runner...\n")
+		err := c.sema.Acquire(ctx, 1)
+		if err != nil {
+			return fmt.Errorf("Failed to acquire semaphore: %w", err)
+		}
 	}
+	defer c.sema.Release(1)
 
-	task, input := buf[:pos], buf[pos:]
-	fmt.Printf("Task %s\n", string(task))
-
-	file, err := os.Create("input.txt")
+	io.WriteString(conn, "Enter task name: ")
+	reader := io.LimitReader(conn, MAX_INPUT_SIZE)
+	// User should pass task name in the first line
+	task, err := slowReadFirstLine(io.LimitReader(reader, MAX_FIRST_LINE_SIZE))
 	if err != nil {
-		fmt.Printf("Failed create file: %+v", err)
-		return
-	}
-	file.Write(input)
-	file.Close()
-
-	file, err = os.Open("input.txt")
-	if err != nil {
-		fmt.Printf("Failed open input file: %+v", err)
-		return
+		return fmt.Errorf("Failed to read first line: %w", err)
 	}
 
-	fields := strings.Fields(string(task))
-	cmd := exec.Command(fields[0], fields[1:]...)
-	cmd.Stdin = file
+	executablePath := path.Join(c.binariesDirectory, "ctf_"+strings.ReplaceAll(task, "-", "_"))
+	if !isRegularFile(executablePath) {
+		return fmt.Errorf("Unknown task %s", task)
+	}
 
-	output, err := cmd.CombinedOutput()
+	inputPath := path.Join(c.submitsDirectory, task+"_"+time.Now().Format("2006-01-02T15:04:05.000"))
+	submitFile, err := os.Create(inputPath)
 	if err != nil {
-		conn.Write([]byte("Command failed:\n"))
+		return fmt.Errorf("Failed to create input file: %w", err)
+	}
+
+	reader = io.TeeReader(reader, submitFile)
+	stderr := bytes.Buffer{}
+
+	cmd := exec.Command(executablePath)
+	cmd.Stdin = reader
+	cmd.Stdout = conn
+	cmd.Stderr = &stderr
+
+	io.WriteString(conn, fmt.Sprintf("Running task %s\n", task))
+	err = cmd.Run()
+	if err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
-			fmt.Printf("Command %s failed with code %d\n", task, exitError.ExitCode())
-			conn.Write(exitError.Stderr)
-			conn.Write(output)
+			log.Printf("Command %s failed with code %d\n", task, exitError.ExitCode())
+			io.WriteString(conn, fmt.Sprintf("Command failed: %s\n", exitError.ProcessState))
+			io.WriteString(conn, fmt.Sprintf("%s\n", "FLAG-123-sdf-sd123"))
+			return nil
 		} else {
-			fmt.Printf("Command %s failed: %+v\n", task, err)
-			conn.Write([]byte("Unknown error\n"))
+			log.Printf("Failed to run command %s: %s", executablePath, stderr)
+			return fmt.Errorf("Failed to start command: %w, stderr: %s", err, stderr)
 		}
-		return
 	}
 
-	conn.Write([]byte("Command finished normally,\nstdin:\t"))
-	conn.Write(output)
+	conn.Write([]byte("Command finished normally"))
+	return nil
 }
