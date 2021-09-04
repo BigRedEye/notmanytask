@@ -2,6 +2,8 @@ package database
 
 import (
 	goerrors "errors"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
@@ -50,7 +52,7 @@ func OpenDataBase(dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{})
 	if err != nil {
 		return nil, err
 	}
@@ -197,4 +199,40 @@ func (db *DataBase) FindUserBySession(token string) (*models.User, *models.Sessi
 		return nil, session, err
 	}
 	return user, session, nil
+}
+
+func (db *DataBase) CreateFlag(task string) (*models.Flag, error) {
+	flag := &models.Flag{
+		ID:        fmt.Sprintf("{FLAG-%s-%s}", task, uuid.New().String()),
+		Task:      task,
+		CreatedAt: time.Now(),
+	}
+	err := db.Create(flag).Error
+	if err != nil {
+		return nil, err
+	}
+	return flag, nil
+}
+
+func (db *DataBase) SubmitFlag(id string, gitlabLogin string) error {
+	result := db.Model(&models.Flag{}).Where("id = ? AND gitlab_login IS NULL", id).Update("gitlab_login", gitlabLogin)
+	if goerrors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return errors.New("Unknown flag")
+	}
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("Unknown flag")
+	}
+	return nil
+}
+
+func (db *DataBase) ListUserFlags(gitlabLogin string) (flags []models.Flag, err error) {
+	flags = make([]models.Flag, 0)
+	err = db.Find(&flags, "gitlab_login = ?", gitlabLogin).Error
+	if err != nil {
+		flags = nil
+	}
+	return
 }

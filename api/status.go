@@ -1,6 +1,6 @@
 package api
 
 type Status struct {
-	Ok    bool   `json:"Ok"`
-	Error string `json:"Error,omitempty"`
+	Ok    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
 }

@@ -19,6 +19,7 @@ func setupApiService(server *server, r *gin.Engine) error {
 	s := apiService{webService{server, server.config, server.logger}}
 
 	r.POST(server.config.Endpoints.Api.Report, s.report)
+	r.POST(server.config.Endpoints.Api.Flag, s.createFlag)
 
 	return nil
 }
@@ -72,6 +73,7 @@ func (s apiService) report(c *gin.Context) {
 	if !found {
 		s.log.Warn("Unknown token", lf.Token(req.Token))
 		onError(http.StatusUnauthorized, fmt.Errorf("Invalid or expired token"))
+		return
 	}
 
 	err = s.server.pipelines.Fetch(id, req.ProjectName)
@@ -85,6 +87,59 @@ func (s apiService) report(c *gin.Context) {
 			Ok: true,
 		}},
 	)
+}
+
+func (s apiService) createFlag(c *gin.Context) {
+	s.log.Info("Handling crasme flag request")
+	onError := func(code int, err error) {
+		s.log.Warn("Failed to create flag for crasme", zap.Error(err))
+		c.JSON(code, &api.FlagResponse{
+			Status: api.Status{
+				Ok:    false,
+				Error: err.Error(),
+			}},
+		)
+	}
+
+	req := api.FlagRequest{}
+	if err := c.Bind(&req); err != nil {
+		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse request body: %w", err))
+		return
+	}
+
+	s.log.Info("Parsed flag request json",
+		lf.Token(req.Token),
+		zap.String("task", req.Task),
+	)
+
+	// Check token
+	found := false
+	for _, token := range s.config.Testing.Tokens {
+		if token == req.Token {
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.log.Warn("Unknown token", lf.Token(req.Token))
+		onError(http.StatusUnauthorized, fmt.Errorf("Invalid or expired token"))
+		return
+	}
+
+	flag, err := s.server.db.CreateFlag(req.Task)
+	if err != nil {
+		s.log.Error("Failed to create flag", zap.String("task", req.Task), zap.Error(err))
+		onError(http.StatusInternalServerError, err)
+		return
+	}
+	s.log.Info("Created new flag", zap.String("flag", flag.ID), zap.String("task", flag.Task))
+
+	c.JSON(http.StatusOK, &api.FlagResponse{
+		Status: api.Status{
+			Ok: true,
+		},
+		Flag: flag.ID,
+	})
 }
 
 func (s apiService) userScores(c *gin.Context) {
