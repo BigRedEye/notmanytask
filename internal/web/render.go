@@ -24,7 +24,7 @@ func (s *server) RenderSubmitFlagPage(c *gin.Context) {
 	s.RenderSubmitFlagPageDetails(c, "", "")
 }
 
-func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, success string, err string) {
+func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, err string, success string) {
 	user := c.MustGet("user").(*models.User)
 	c.HTML(http.StatusOK, "/flag.tmpl", gin.H{
 		"CourseName":     "HSE Advanced C++",

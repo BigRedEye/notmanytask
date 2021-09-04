@@ -72,11 +72,13 @@ func (s Scorer) loadUserPipelines(user *models.User) (pipelinesMap, error) {
 	}
 
 	pipelinesMap := make(pipelinesMap)
-	for _, pipeline := range pipelines {
+	for i := range pipelines {
+		pipeline := &pipelines[i]
 		prev, found := pipelinesMap[pipeline.Task]
-		if !found || pipelineLess(&pipeline, prev) {
-			prev = &pipeline
+		if !found || pipelineLess(pipeline, prev) {
+			prev = pipeline
 		}
+		pipelinesMap[pipeline.Task] = prev
 	}
 	return pipelinesMap, nil
 }
@@ -88,11 +90,13 @@ func (s Scorer) loadUserFlags(user *models.User) (flagsMap, error) {
 	}
 
 	flagsMap := make(flagsMap)
-	for _, flag := range flags {
+	for i := range flags {
+		flag := &flags[i]
 		prev, found := flagsMap[flag.Task]
 		if !found || flag.CreatedAt.Before(prev.CreatedAt) {
-			prev = &flag
+			prev = flag
 		}
+		flagsMap[flag.Task] = prev
 	}
 	return flagsMap, nil
 }
