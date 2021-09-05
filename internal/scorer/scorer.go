@@ -3,6 +3,7 @@ package scorer
 import (
 	"fmt"
 	"math"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -228,11 +229,12 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 
 		for i, task := range group.Tasks {
 			tasks[i] = ScoredTask{
-				Task:     task.Task,
-				Status:   TaskStatusAssigned,
-				Score:    0,
-				MaxScore: task.Score,
-				TaskUrl:  s.projects.MakeTaskUrl(task.Task),
+				Task:      task.Task,
+				ShortName: makeShortTaskName(task.Task),
+				Status:    TaskStatusAssigned,
+				Score:     0,
+				MaxScore:  task.Score,
+				TaskUrl:   s.projects.MakeTaskUrl(task.Task),
 			}
 			maxTotalScore += tasks[i].MaxScore
 
@@ -284,6 +286,10 @@ func prettifyTitle(title string) string {
 
 func capitalize(title string) string {
 	return strings.Title(title)
+}
+
+func makeShortTaskName(name string) string {
+	return path.Base(name)
 }
 
 const (

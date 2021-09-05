@@ -30,7 +30,9 @@ func ClassifyPipelineStatus(status models.PipelineStatus) TaskStatus {
 }
 
 type ScoredTask struct {
-	Task     string
+	Task      string
+	ShortName string
+
 	Status   TaskStatus
 	Score    int
 	MaxScore int

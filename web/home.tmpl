@@ -19,6 +19,10 @@
     box-shadow:0 .125rem .25rem rgba(0,0,0,.075)!important
 }
 
+.task {
+    overflow: hidden;
+}
+
 .task-success {
     background-color: #a6e9d5;
     border-color: #4dd4ac;
@@ -85,9 +89,9 @@
                         {{ range .Tasks }}
                             <div class="col">
                                 <a href="{{ .TaskUrl }}" class="text-decoration-none text-dark">
-                                    <div class="card h-100 task-{{ .Status }} shadow-hover">
+                                    <div class="card h-100 task task-{{ .Status }} shadow-hover">
                                         <div class="card-body">
-                                            <h3 class="card-title text-nowrap text-dark">{{ .Task }}</h3>
+                                            <h3 class="card-title text-nowrap text-dark">{{ .ShortName }}</h3>
                                             {{ if .PipelineUrl }}
                                                 <a href="{{ .PipelineUrl }}" class="text-decoration-none">
                                             {{ end }}
