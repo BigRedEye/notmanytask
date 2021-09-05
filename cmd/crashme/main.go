@@ -177,7 +177,7 @@ func (c *checker) handleConnection(ctx context.Context, conn net.Conn, connID in
 	err := c.doHandleConnection(ctx, conn)
 	if err != nil {
 		log.Printf("Failed to handle connection: %+v", err)
-		io.WriteString(conn, fmt.Sprintf("Error: %s", err.Error()))
+		io.WriteString(conn, fmt.Sprintf("Error: %s\n", err.Error()))
 	}
 }
 
@@ -223,9 +223,10 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 		return fmt.Errorf("Failed to read first line: %w", err)
 	}
 
+	task = strings.ReplaceAll(task, "_", "-")
 	executablePath := path.Join(c.binariesDirectory, "ctf_"+strings.ReplaceAll(task, "-", "_"))
 	if !isRegularFile(executablePath) {
-		return fmt.Errorf("Unknown task %s", task)
+		return fmt.Errorf("Unknown task %s (@ %s)", task, executablePath)
 	}
 
 	inputPath := path.Join(c.submitsDirectory, task+"_"+time.Now().Format("2006-01-02T15:04:05.000"))
@@ -264,6 +265,6 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 		}
 	}
 
-	conn.Write([]byte("Command finished normally"))
+	io.WriteString(conn, "Command finished normally\n")
 	return nil
 }
