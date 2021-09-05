@@ -25,6 +25,9 @@ import (
 func isRegularFile(path string) bool {
 	if stat, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		return false
+	} else if err != nil {
+		log.Printf("Failed to stat file %s: %+v", path, err)
+		return false
 	} else {
 		return stat.Mode().IsRegular()
 	}
@@ -32,6 +35,9 @@ func isRegularFile(path string) bool {
 
 func isDirectory(path string) bool {
 	if stat, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return false
+	} else if err != nil {
+		log.Printf("Failed to stat file %s: %+v", path, err)
 		return false
 	} else {
 		return stat.Mode().IsDir()
