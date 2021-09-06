@@ -16,10 +16,14 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
-	"github.com/bigredeye/notmanytask/api"
+	"github.com/cenkalti/backoff/v4"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/bigredeye/notmanytask/api"
 )
 
 func isRegularFile(path string) bool {
@@ -77,23 +81,24 @@ func (f flagFetcher) doFetchFlag(task string) (string, error) {
 	}
 	if !response.Ok {
 		log.Printf("Flag request failed: %s\n", response.Error)
-		return "", fmt.Errorf("Server error: %s", response.Error)
+		return "", fmt.Errorf("server error: %s", response.Error)
 	}
 	return response.Flag, nil
 }
 
 func (f flagFetcher) fetchFlag(task string) (string, error) {
-	iterations := 5
-	for {
-		flag, err := f.doFetchFlag(task)
-		if err == nil || iterations <= 0 {
-			return flag, err
-		}
+	flag := ""
 
+	backoffPolicy := backoff.NewExponentialBackOff()
+	backoffPolicy.MaxElapsedTime = time.Second * 15
+	err := backoff.Retry(func() error {
+		var err error
+		flag, err = f.doFetchFlag(task)
 		log.Printf("Failed to fetch flag: %+v\n", err)
-		iterations--
-		time.Sleep(time.Second * 5)
-	}
+		return err
+	}, backoffPolicy)
+
+	return flag, err
 }
 
 func main() {
@@ -149,11 +154,11 @@ type checker struct {
 func newChecker(binariesDirectory, submitsDirectory string, concurrencyLevel int64, url, token string) (*checker, error) {
 	err := os.MkdirAll(submitsDirectory, 0755)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to mkdir submits directory: %w", err)
+		return nil, fmt.Errorf("failed to mkdir submits directory: %w", err)
 	}
 
 	if !isDirectory(binariesDirectory) {
-		return nil, fmt.Errorf("Binaries directory does not exist")
+		return nil, fmt.Errorf("binaries directory does not exist")
 	}
 
 	return &checker{
@@ -189,7 +194,7 @@ func slowReadFirstLine(reader io.Reader) (string, error) {
 
 		if err == io.EOF || (err == nil && n != 1) {
 			if str.Len() == MAX_FIRST_LINE_SIZE {
-				return "", fmt.Errorf("Too long first line")
+				return "", fmt.Errorf("too long first line")
 			}
 			return "", fmt.Errorf("EOF before new line")
 		}
@@ -210,7 +215,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 		io.WriteString(conn, "Waiting for an available runner...\n")
 		err := c.sema.Acquire(ctx, 1)
 		if err != nil {
-			return fmt.Errorf("Failed to acquire semaphore: %w", err)
+			return fmt.Errorf("failed to acquire semaphore: %w", err)
 		}
 	}
 	defer c.sema.Release(1)
@@ -220,51 +225,148 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 	// User should pass task name in the first line
 	task, err := slowReadFirstLine(io.LimitReader(reader, MAX_FIRST_LINE_SIZE))
 	if err != nil {
-		return fmt.Errorf("Failed to read first line: %w", err)
+		return fmt.Errorf("failed to read first line: %w", err)
 	}
 
 	task = strings.ReplaceAll(task, "_", "-")
 	executablePath := path.Join(c.binariesDirectory, "ctf_"+strings.ReplaceAll(task, "-", "_"))
 	if !isRegularFile(executablePath) {
-		return fmt.Errorf("Unknown task %s (@ %s)", task, executablePath)
+		return fmt.Errorf("unknown task %s (@ %s)", task, executablePath)
 	}
 
 	inputPath := path.Join(c.submitsDirectory, task+"_"+time.Now().Format("2006-01-02T15:04:05.000"))
 	submitFile, err := os.Create(inputPath)
 	if err != nil {
-		return fmt.Errorf("Failed to create input file: %w", err)
+		return fmt.Errorf("failed to create input file: %w", err)
+	}
+	reader = io.TeeReader(reader, submitFile)
+
+	stderr := bytes.Buffer{}
+	cmd := exec.Command(executablePath)
+	proxy, err := newCommandProxy(reader, conn, &stderr, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to prepare command: %w", err)
 	}
 
-	reader = io.TeeReader(reader, submitFile)
-	stderr := bytes.Buffer{}
-
-	cmd := exec.Command(executablePath)
-	cmd.Stdin = reader
-	cmd.Stdout = conn
-	cmd.Stderr = &stderr
-
 	io.WriteString(conn, fmt.Sprintf("Running task %s\n", task))
-	err = cmd.Run()
+	err = proxy.run()
+
 	if err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
-			log.Printf("Command %s failed with code %d\n", task, exitError.ExitCode())
-			io.WriteString(conn, fmt.Sprintf("Command failed: %s\n", exitError.ProcessState))
+			log.Printf("Command %s failed with code %d, status: %s", task, exitError.ExitCode(), exitError.String())
+			status := exitError.Sys().(syscall.WaitStatus)
+			if status.Signal() == os.Interrupt {
+				log.Printf("Command was interrupted")
+				return fmt.Errorf("got EOF before command exit")
+			}
+
+			_, err = io.WriteString(conn, fmt.Sprintf("Command failed: %s\nTrying to fetch flag...\n", exitError.ProcessState))
+			if err != nil {
+				return fmt.Errorf("failed to write to the connection: %w", err)
+			}
 
 			flag, err := c.flagFetcher.fetchFlag(task)
 			if err != nil {
 				log.Printf("Failed to fetch flag for failed task: %+v\n", err)
-				return err
+				return fmt.Errorf("failed to fetch flag, try again a few minutes later")
 			}
 
 			io.WriteString(conn, flag)
 			return nil
 		} else {
 			log.Printf("Failed to run command %s: %s", executablePath, stderr)
-			return fmt.Errorf("Failed to start command: %w, stderr: %s", err, stderr)
+			return fmt.Errorf("failed to start command: %w, stderr: %s", err, stderr)
 		}
 	}
 
 	io.WriteString(conn, "Command finished normally\n")
 	return nil
+}
+
+type commandProxy struct {
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
+	cmd    *exec.Cmd
+
+	stdinPipe  io.WriteCloser
+	stderrPipe io.ReadCloser
+	stdoutPipe io.ReadCloser
+	wg         *sync.WaitGroup
+}
+
+func newCommandProxy(stdin io.Reader, stdout io.Writer, stderr io.Writer, cmd *exec.Cmd) (*commandProxy, error) {
+	proxy := &commandProxy{
+		stdin:  stdin,
+		stdout: stdout,
+		stderr: stderr,
+		cmd:    cmd,
+		wg:     &sync.WaitGroup{},
+	}
+	proxy.wg.Add(2)
+
+	var err error
+	proxy.stdoutPipe, err = cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create command stdout: %w", err)
+	}
+	proxy.stderrPipe, err = cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create command stderr: %w", err)
+	}
+	proxy.stdinPipe, err = cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create command stdin: %w", err)
+	}
+
+	return proxy, nil
+}
+
+func (c *commandProxy) run() error {
+	err := c.cmd.Start()
+	if err != nil {
+		return fmt.Errorf("failed to start command: %w", err)
+	}
+
+	go c.handleStdin()
+	go c.handleStdout()
+	go c.handleStderr()
+
+	err = c.cmd.Wait()
+	c.wg.Wait()
+	return err
+}
+
+func (c *commandProxy) handleStdin() {
+	io.Copy(c.stdinPipe, c.stdin)
+
+	// in case of closed connection
+	// we should try stop other io goroutines
+	c.stdoutPipe.Close()
+	c.stderrPipe.Close()
+
+	// Now try to SIGINT process
+	// It is kind of racy, but who cares anyway
+	err := c.cmd.Process.Signal(os.Interrupt)
+	if err == nil {
+		log.Printf("Sent SIGINT to the child process (connection is closed?)")
+	}
+
+	log.Printf("Done stdin")
+}
+
+func (c *commandProxy) handleStdout() {
+	copyAndDone(c.stdout, c.stdoutPipe, c.wg)
+	log.Printf("Done stdout")
+}
+
+func (c *commandProxy) handleStderr() {
+	copyAndDone(c.stderr, c.stderrPipe, c.wg)
+	log.Printf("Done stderr")
+}
+
+func copyAndDone(dst io.Writer, src io.Reader, wg *sync.WaitGroup) {
+	io.Copy(dst, src)
+	wg.Done()
 }
