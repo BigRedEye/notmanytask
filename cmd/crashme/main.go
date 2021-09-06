@@ -272,7 +272,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 				return fmt.Errorf("failed to fetch flag, try again a few minutes later")
 			}
 
-			io.WriteString(conn, flag)
+			io.WriteString(conn, flag+"\n")
 			return nil
 		} else {
 			log.Printf("Failed to run command %s: %s", executablePath, stderr)
