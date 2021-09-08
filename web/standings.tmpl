@@ -111,12 +111,18 @@
                                 <td>{{ .Score }}</td>
                                 {{ range .Groups }}
                                     {{ range .Tasks }}
+                                        {{ if .PipelineUrl }}
+                                            <a href="{{ .PipelineUrl }}" class="text-decoration-none">
+                                        {{ end }}
                                         {{ if eq .Status "success"}}
-                                        <td class="task table-success">{{ .Score }}</td>
+                                            <td class="task table-success">{{ .Score }}</td>
                                         {{ else if eq .Status "failed"}}
-                                        <td class="task table-danger">{{ .Score }}</td>
+                                            <td class="task table-danger">{{ .Score }}</td>
                                         {{ else }}
-                                        <td class="task">{{ .Score }}</td>
+                                            <td class="task">{{ .Score }}</td>
+                                        {{ end }}
+                                        {{ if .PipelineUrl }}
+                                            </a>
                                         {{ end }}
                                     {{ end }}
                                 {{ end }}
