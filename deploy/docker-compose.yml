@@ -24,7 +24,7 @@ services:
   db:
     image: postgres:13
     environment:
-      POSTGRES_PASSWORD: 1a122910851a31bbb828f3861a68882008ff49f9c81747
+      POSTGRES_PASSWORD: {POSTGRES_PASSWORD}
     ports:
       - 5432:5432
     volumes:

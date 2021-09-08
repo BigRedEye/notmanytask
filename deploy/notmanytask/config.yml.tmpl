@@ -1,54 +1,58 @@
 gitlab:
   baseURL: https://gitlab.com
-  taskURLPrefix: https://gitlab.com/danlark/cpp-advanced-hse/-/tree/main/tasks
+  taskURLPrefix: https://gitlab.com/{USER}/{REPO}/-/tree/main/tasks
   defaultReadme: '
     # Решения
 
     Ваши решения создаются и тестируются в отдельных ветках (кнопка Branches выше). Сливать ветки в master не нужно.
   '
   group:
-    name: cpp-advanced-hse-2021
-    id: 13033964
+    name: {GITLAB_GROUP_NAME}
+    id: {GITLAB_GROUP_ID}
   api:
-    token: $GITLAB_API_TOKEN
+    token: {GITLAB_TOKEN}
   application:
-    secret: $GITLAB_APP_SECRET
-    clientId: $GITLAB_APP_CLIENT_ID
+    secret: {GITLAB_APPLICATION_SECRET}
+    clientId: {GITLAB_APPLICATION_CLIENT_ID}
 
 endpoints:
-  hostname: $SITE_URL
+  hostname: https://{SITE_DOMAIN}
   home: /
+  flag: /flag
   login: /login
   logout: /logout
   signup: /signup
+  standings: /standings
   oauthCallback: /finish
   api:
     report: /api/report
+    flag: /api/flag
 
 server:
   listenAddress: ":18080"
   cookies:
-    authenticationKey: $COOKIE_AUTH_KEY
-    encryptionKey: $COOKIE_ENC_KEY
+    authenticationKey: {RANDOM_COOKIE_AUTH_KEY}
+    encryptionKey: {RANDOM_COOKIE_ENCRYPTION_KEY}
 
 database:
-  host: DB_HOST
-  port: DB_PORT
-  user: DB_USER
-  pass: DB_PASS
-  name: DB_NAME
+  host: db
+  port: 5432
+  user: postgres
+  pass: {POSTGRES_PASSWORD}
+  name: postgres
 
 testing:
   tokens:
-  - GRADER_TOKEN
+  - {GRADER_OR_CRASHME_TOKEN}
+  - {GRADER_OR_CRASHME_TOKEN_2}
 
 groups:
 - name: hse
-  secret: SECRET1
-  deadlinesUrl: https://gitlab.com/danlark/cpp-advanced-hse/-/raw/main/deadlines/hse.yml
+  secret: ihatecpp
+  deadlinesUrl: https://gitlab.com/{USER}/{REPO}/-/raw/main/deadlines/hse.yml
 - name: test
-  secret: SECRET2
-  deadlinesUrl: https://gitlab.com/danlark/cpp-advanced-hse/-/raw/main/deadlines/test.yml
+  secret: ilovecpp
+  deadlinesUrl: https://gitlab.com/{USER}/{REPO}/-/raw/main/deadlines/test.yml
 
 pullIntervals:
   projects: 10s
