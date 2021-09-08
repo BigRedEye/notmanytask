@@ -6,11 +6,6 @@ accessLog:
   filePath: "/var/log/traefik/logs/access.log"
   bufferingSize: 100
 
-#api:
-#  dashboard: true
-#  insecure: true
-#  debug: true
-
 metrics:
   prometheus: {}
 
