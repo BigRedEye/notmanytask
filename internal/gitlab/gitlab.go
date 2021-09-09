@@ -54,7 +54,10 @@ func (c Client) InitializeProject(user *models.User) error {
 
 	// Try to find existing project
 	project, resp, err := c.gitlab.Projects.GetProject(fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName), &gitlab.GetProjectOptions{})
-	if resp.StatusCode == http.StatusNotFound {
+	if err != nil && resp == nil {
+		log.Error("Failed to get project", zap.String("escaped_project", fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName)), zap.Error(err))
+		return errors.Wrap(err, "Failed to get project")
+	} else if resp.StatusCode == http.StatusNotFound {
 		log.Info("Project was not found", zap.String("escaped_project", fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName)))
 		// Create project
 		project, _, err = c.gitlab.Projects.CreateProject(&gitlab.CreateProjectOptions{
