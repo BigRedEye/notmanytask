@@ -62,6 +62,11 @@ func (s *server) handleFlagSubmit(c *gin.Context) {
 	return
 }
 
+func (s *server) handleChuckNorris(c *gin.Context) {
+	c.Redirect(http.StatusTemporaryRedirect, "https://youtu.be/dQw4w9WgXcQ")
+	return
+}
+
 func reverseScores(scores *scorer.UserScores) {
 	groups := scores.Groups
 	for i, j := 0, len(groups)-1; i < j; i, j = i+1, j-1 {

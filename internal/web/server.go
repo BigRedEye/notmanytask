@@ -120,6 +120,7 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.Flag, s.validateSession, s.RenderSubmitFlagPage)
 	r.GET(s.config.Endpoints.Standings, s.validateSession, s.RenderStandingsPage)
 	r.POST(s.config.Endpoints.Flag, s.validateSession, s.handleFlagSubmit)
+	r.GET("/private/solutions/:task", s.handleChuckNorris)
 
 	r.StaticFS("/static", statikFS)
 

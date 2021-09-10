@@ -105,7 +105,7 @@
                                 <td>{{ .MaxScore }}</td>
                                 {{ range .Groups }}
                                     {{ range .Tasks }}
-                                        <td class="task table-success">{{ .MaxScore }}</td>
+                                        <td class="task table-success"><a href="/private/solutions/{{ .Task }}" class="text-decoration-none text-dark">{{ .MaxScore }}</a></td>
                                     {{ end }}
                                 {{ end }}
                             </tr>
