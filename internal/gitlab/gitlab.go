@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	goerrors "errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -82,7 +83,7 @@ func (c Client) InitializeProject(user *models.User) error {
 	}
 
 	// Prepare README.md with basic info
-	_, _, err = c.gitlab.Commits.CreateCommit(project.ID, &gitlab.CreateCommitOptions{
+	_, resp, err = c.gitlab.Commits.CreateCommit(project.ID, &gitlab.CreateCommitOptions{
 		Branch:        gitlab.String(master),
 		CommitMessage: gitlab.String("Initialize repo"),
 		AuthorName:    gitlab.String("notmanytask"),
@@ -93,11 +94,19 @@ func (c Client) InitializeProject(user *models.User) error {
 			Content:  gitlab.String(c.config.GitLab.DefaultReadme),
 		}},
 	})
-	if err != nil {
-		log.Error("Failed to create README", zap.Error(err))
+
+	var errresp *gitlab.ErrorResponse
+	// I'm sorry
+	if err != nil && goerrors.As(err, &errresp) && errresp.Message == "{message: A file with this name already exists}" {
+		log.Warn("Failed to create README (file already exists)", zap.Error(err))
+		// continue
+	} else if err != nil {
 		return errors.Wrap(err, "Failed to create README")
 	}
-	log.Info("Created README")
+
+	if err != nil {
+		log.Info("Created README")
+	}
 
 	// Protect master branch from unintended commits
 	_, _, err = c.gitlab.Branches.ProtectBranch(project.ID, master, &gitlab.ProtectBranchOptions{
