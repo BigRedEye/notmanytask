@@ -231,7 +231,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 	task = strings.ReplaceAll(task, "_", "-")
 	executablePath := path.Join(c.binariesDirectory, "ctf_"+strings.ReplaceAll(task, "-", "_"))
 	if !isRegularFile(executablePath) {
-		return fmt.Errorf("unknown task %s (@ %s)", task, executablePath)
+		return fmt.Errorf("unknown task %s", task)
 	}
 
 	inputPath := path.Join(c.submitsDirectory, task+"_"+time.Now().Format("2006-01-02T15:04:05.000"))
