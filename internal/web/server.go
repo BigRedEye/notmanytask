@@ -89,7 +89,12 @@ func (s *server) run() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to open statik fs")
 	}
-	tmpl, err := buildHTMLTemplates(statikFS, make(template.FuncMap))
+	funcs := template.FuncMap{
+		"inc": func(i int) int {
+			return i + 1
+		},
+	}
+	tmpl, err := buildHTMLTemplates(statikFS, funcs)
 	if err != nil {
 		return errors.Wrap(err, "Failed to build html templates")
 	}

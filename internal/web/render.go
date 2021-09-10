@@ -137,3 +137,16 @@ func (s *server) RenderStandingsPage(c *gin.Context) {
 		"Links":      s.makeLinks(user),
 	})
 }
+
+func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
+	user, err := s.db.FindUserByGitlabLogin(c.Query("login"))
+	scores, err := s.scorer.CalcScoreboard("hse")
+	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{
+		"CourseName": "HSE Advanced C++",
+		"Title":      "HSE Advanced C++",
+		"Config":     s.config,
+		"Standings":  scores,
+		"Error":      err,
+		"Links":      s.makeLinks(user),
+	})
+}

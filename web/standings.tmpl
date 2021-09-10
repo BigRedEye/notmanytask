@@ -87,6 +87,7 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
+                            <th scope="col" class="num">#</th>
                             <th scope="col" class="name">Student</th>
                             <th scope="col">Score</th>
                             {{ range .Standings.Deadlines }}
@@ -99,6 +100,7 @@
                     <tbody>
                         {{ with index .Standings.Users 0 }}
                             <tr>
+                                <th scope="row" class="num">0</th>
                                 <th scope="row" class="name">Chuck Norris</th>
                                 <td>{{ .MaxScore }}</td>
                                 {{ range .Groups }}
@@ -108,25 +110,28 @@
                                 {{ end }}
                             </tr>
                         {{ end }}
-                        {{ range .Standings.Users }}
+                        {{ range $index, $user := .Standings.Users }}
                             <tr>
-                                <th scope="row" class="name">{{ .User.FirstName }} {{ .User.LastName }}</th>
-                                <td>{{ .Score }}</td>
-                                {{ range .Groups }}
+                                <th scope="row" class="num">{{ inc $index }}</th>
+                                <th scope="row" class="name">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
+                                <td>{{ $user.Score }}</td>
+                                {{ range $user.Groups }}
                                     {{ range .Tasks }}
-                                        {{ if .PipelineUrl }}
-                                            <a href="{{ .PipelineUrl }}" class="text-decoration-none">
-                                        {{ end }}
                                         {{ if eq .Status "success"}}
-                                            <td class="task table-success">{{ .Score }}</td>
+                                            <td class="task table-success">
                                         {{ else if eq .Status "failed"}}
-                                            <td class="task table-danger">{{ .Score }}</td>
+                                            <td class="task table-danger">
                                         {{ else }}
-                                            <td class="task">{{ .Score }}</td>
+                                            <td class="task">
                                         {{ end }}
+                                        {{ if .PipelineUrl }}
+                                            <a href="{{ .PipelineUrl }}" class="text-decoration-none text-dark">
+                                        {{ end }}
+                                        {{ .Score }}
                                         {{ if .PipelineUrl }}
                                             </a>
                                         {{ end }}
+                                        </td>
                                     {{ end }}
                                 {{ end }}
                             </tr>
