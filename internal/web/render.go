@@ -70,6 +70,8 @@ func reverseScores(scores *scorer.UserScores) {
 }
 
 type Links struct {
+	Deadlines       string
+	Standings       string
 	TasksRepository string
 	Repository      string
 	Submits         string
@@ -79,6 +81,8 @@ type Links struct {
 
 func (s *server) makeLinks(user *models.User) Links {
 	return Links{
+		Deadlines:       s.config.Endpoints.Home,
+		Standings:       s.config.Endpoints.Standings,
 		TasksRepository: s.config.GitLab.TaskUrlPrefix,
 		Repository:      s.gitlab.MakeProjectUrl(user),
 		Submits:         s.gitlab.MakeProjectSubmitsUrl(user),
