@@ -241,9 +241,15 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 	}
 	reader = io.TeeReader(reader, submitFile)
 
-	stderr := bytes.Buffer{}
+	stderrFile, err := os.Create(inputPath + ".err")
+	if err != nil {
+		return fmt.Errorf("failed to create stderr file: %w", err)
+	}
+	stderrBuffer := &bytes.Buffer{}
+	stderr := io.MultiWriter(stderrFile, stderrBuffer)
+
 	cmd := exec.Command(executablePath)
-	proxy, err := newCommandProxy(reader, conn, &stderr, cmd)
+	proxy, err := newCommandProxy(reader, conn, stderr, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to prepare command: %w", err)
 	}
@@ -275,8 +281,8 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 			io.WriteString(conn, flag+"\n")
 			return nil
 		} else {
-			log.Printf("Failed to run command %s: %s", executablePath, stderr)
-			return fmt.Errorf("failed to start command: %w, stderr: %s", err, stderr)
+			log.Printf("Failed to run command %s: %s", executablePath, stderrBuffer)
+			return fmt.Errorf("failed to start command: %w, stderr: %s", err, stderrBuffer)
 		}
 	}
 
@@ -343,15 +349,7 @@ func (c *commandProxy) handleStdin() {
 
 	// in case of closed connection
 	// we should try stop other io goroutines
-	c.stdoutPipe.Close()
-	c.stderrPipe.Close()
-
-	// Now try to SIGINT process
-	// It is kind of racy, but who cares anyway
-	err := c.cmd.Process.Signal(os.Interrupt)
-	if err == nil {
-		log.Printf("Sent SIGINT to the child process (connection is closed?)")
-	}
+	c.stdinPipe.Close()
 
 	log.Printf("Done stdin")
 }
@@ -366,7 +364,8 @@ func (c *commandProxy) handleStderr() {
 	log.Printf("Done stderr")
 }
 
-func copyAndDone(dst io.Writer, src io.Reader, wg *sync.WaitGroup) {
+func copyAndDone(dst io.Writer, src io.ReadCloser, wg *sync.WaitGroup) {
 	io.Copy(dst, src)
+	src.Close()
 	wg.Done()
 }
