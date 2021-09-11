@@ -23,4 +23,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/postgres v1.1.0
 	gorm.io/gorm v1.21.13
+	moul.io/zapgorm2 v1.1.0
 )

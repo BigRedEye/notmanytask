@@ -8,9 +8,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"moul.io/zapgorm2"
 
 	"github.com/bigredeye/notmanytask/internal/models"
 )
@@ -46,8 +48,12 @@ func isUnqiueViolation(err error) bool {
 	return false
 }
 
-func OpenDataBase(dsn string) (*DataBase, error) {
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
+	zapLogger := zapgorm2.New(logger.Named("gorm"))
+	zapLogger.SetAsDefault()
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: zapLogger,
+	})
 	if err != nil {
 		return nil, err
 	}

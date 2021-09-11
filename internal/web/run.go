@@ -37,7 +37,7 @@ func Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db, err := database.OpenDataBase(fmt.Sprintf("postgresql://%s:%s@%s:%d/%s",
+	db, err := database.OpenDataBase(logger.Named("database"), fmt.Sprintf("postgresql://%s:%s@%s:%d/%s",
 		config.DataBase.User,
 		config.DataBase.Pass,
 		config.DataBase.Host,
