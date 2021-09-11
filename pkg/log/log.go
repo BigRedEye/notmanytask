@@ -2,6 +2,9 @@ package log
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/docker/go-units"
 	"go.uber.org/zap"
@@ -54,12 +57,22 @@ func Init(config Config) (*zap.Logger, error) {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	}
 
-	writer := zapcore.AddSync(&lumberjack.Logger{
+	lj := &lumberjack.Logger{
 		Filename:   config.Filename,
 		MaxSize:    int(maxSize),
 		MaxBackups: config.MaxBackups,
 		MaxAge:     config.MaxAgeDays,
-	})
+	}
+	sighupChan := make(chan os.Signal, 1)
+	signal.Notify(sighupChan, syscall.SIGHUP)
+	go func() {
+		for {
+			<-sighupChan
+			lj.Rotate()
+		}
+	}()
+
+	writer := zapcore.AddSync(lj)
 
 	core := zapcore.NewCore(encoder, writer, level)
 
