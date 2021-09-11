@@ -64,8 +64,6 @@ func buildHTMLTemplates(hfs http.FileSystem, funcMap template.FuncMap) (*templat
 			return err
 		}
 
-		fmt.Printf("Path %s\n", path)
-
 		if !info.IsDir() {
 			bytes, err := statik.ReadFile(hfs, path)
 			if err != nil {
