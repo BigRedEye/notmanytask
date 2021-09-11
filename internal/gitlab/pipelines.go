@@ -17,12 +17,14 @@ import (
 type PipelinesFetcher struct {
 	*Client
 
-	db *database.DataBase
+	logger *zap.Logger
+	db     *database.DataBase
 }
 
 func NewPipelinesFetcher(client *Client, db *database.DataBase) (*PipelinesFetcher, error) {
 	return &PipelinesFetcher{
 		Client: client,
+		logger: client.logger.Named("pipelines"),
 		db:     db,
 	}, nil
 }

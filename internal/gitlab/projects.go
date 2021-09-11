@@ -12,12 +12,13 @@ import (
 type ProjectsMaker struct {
 	*Client
 
-	db    *database.DataBase
-	users chan *models.User
+	logger *zap.Logger
+	db     *database.DataBase
+	users  chan *models.User
 }
 
 func NewProjectsMaker(client *Client, db *database.DataBase) (*ProjectsMaker, error) {
-	return &ProjectsMaker{client, db, make(chan *models.User, 4)}, nil
+	return &ProjectsMaker{client, client.logger.Named("projects"), db, make(chan *models.User, 4)}, nil
 }
 
 func (p ProjectsMaker) AsyncPrepareProject(user *models.User) {

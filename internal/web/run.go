@@ -11,7 +11,6 @@ import (
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
-	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/scorer"
 	zlog "github.com/bigredeye/notmanytask/pkg/log"
 	"github.com/pkg/errors"
@@ -51,12 +50,12 @@ func Run() error {
 
 	deadlinesCtx, deadlinesCancel := context.WithCancel(ctx)
 	defer deadlinesCancel()
-	deadlines, err := deadlines.NewFetcher(config, logger.With(lf.Module("fetcher")))
+	deadlines, err := deadlines.NewFetcher(config, logger.Named("deadlines.fetcher"))
 	if err != nil {
 		return errors.Wrap(err, "Failed to create deadlines fetcher")
 	}
 
-	git, err := gitlab.NewClient(config, logger.With(lf.Module("gitlab")))
+	git, err := gitlab.NewClient(config, logger.Named("gitlab"))
 	if err != nil {
 		return errors.Wrap(err, "Failed to create gitlab client")
 	}
@@ -91,7 +90,7 @@ func Run() error {
 		pipelines.Run(pipelinesCtx)
 	}()
 
-	s, err := newServer(config, logger.With(lf.Module("server")), db, deadlines, projects, pipelines, scorer, git)
+	s, err := newServer(config, logger.Named("server"), db, deadlines, projects, pipelines, scorer, git)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start server")
 	}

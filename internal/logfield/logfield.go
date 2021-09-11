@@ -3,7 +3,6 @@ package lf
 import "go.uber.org/zap"
 
 const (
-	FieldModule         = "module"
 	FieldToken          = "token"
 	FieldUserID         = "user_id"
 	FieldGitlabID       = "gitlab_id"
@@ -13,10 +12,6 @@ const (
 	FieldPipelineID     = "pipeline_id"
 	FieldPipelineStatus = "pipeline_status"
 )
-
-func Module(module string) zap.Field {
-	return zap.String(FieldModule, module)
-}
 
 func Token(token string) zap.Field {
 	return zap.String(FieldToken, token)
