@@ -158,7 +158,7 @@ func (db *DataBase) SetUserRepository(user *models.User) error {
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status", "login"}),
+		DoUpdates: clause.AssignmentColumns([]string{"status"}),
 	}).Create(pipeline).Error
 }
 

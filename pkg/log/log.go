@@ -83,5 +83,8 @@ func Init(config Config) (*zap.Logger, error) {
 }
 
 func Sync() error {
-	return logger.Sync()
+	if logger != nil {
+		return logger.Sync()
+	}
+	return nil
 }

@@ -106,9 +106,18 @@ func (s *server) run() error {
 	r.SetHTMLTemplate(tmpl)
 
 	// TODO(BigRedEye): Move cookies to the separate file
-	setupAuth(s, r)
-	setupLoginService(s, r)
-	setupApiService(s, r)
+	err = setupAuth(s, r)
+	if err != nil {
+		return errors.Wrap(err, "Failed to setup auth")
+	}
+	err = setupLoginService(s, r)
+	if err != nil {
+		return errors.Wrap(err, "Failed to setup login service")
+	}
+	err = setupApiService(s, r)
+	if err != nil {
+		return errors.Wrap(err, "Failed to setup api service")
+	}
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "pong "+fmt.Sprint(time.Now().Unix()))
