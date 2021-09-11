@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/bigredeye/notmanytask/pkg/conf"
+	"github.com/bigredeye/notmanytask/pkg/log"
 	"github.com/pkg/errors"
 )
 
@@ -76,6 +77,7 @@ type PullIntervalsConfig struct {
 }
 
 type Config struct {
+	Log           log.Config
 	GitLab        GitLabConfig
 	Endpoints     EndpointsConfig
 	Server        ServerConfig

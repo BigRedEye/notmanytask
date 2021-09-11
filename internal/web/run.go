@@ -13,18 +13,25 @@ import (
 	"github.com/bigredeye/notmanytask/internal/gitlab"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/scorer"
+	zlog "github.com/bigredeye/notmanytask/pkg/log"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 )
 
-func Run(logger *zap.Logger) error {
+func Run() error {
 	flag.Parse()
 	config, err := config.ParseConfig()
 	if err != nil {
 		return err
 	}
-
 	log.Printf("Parsed config: %+v", config)
+
+	logger, err := zlog.Init(config.Log)
+	if err != nil {
+		return errors.Wrap(err, "Failed to init logger")
+	}
+	defer func() {
+		err = zlog.Sync()
+	}()
 
 	wg := sync.WaitGroup{}
 	defer wg.Wait()

@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/cenkalti/backoff/v4 v4.1.1
+	github.com/docker/go-units v0.4.0
 	github.com/gin-contrib/sessions v0.0.3
 	github.com/gin-contrib/zap v0.0.1
 	github.com/gin-gonic/gin v1.7.4
@@ -18,6 +19,7 @@ require (
 	go.uber.org/zap v1.19.0
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/postgres v1.1.0
 	gorm.io/gorm v1.21.13
