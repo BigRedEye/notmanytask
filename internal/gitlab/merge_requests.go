@@ -22,7 +22,7 @@ type MergeRequestsFetcher struct {
 func NewMergeRequestsFetcher(client *Client, db *database.DataBase) (*MergeRequestsFetcher, error) {
 	return &MergeRequestsFetcher{
 		Client: client,
-		logger: client.logger.Named("pipelines"),
+		logger: client.logger.Named("merge_requests"),
 		db:     db,
 	}, nil
 }
