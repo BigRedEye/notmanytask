@@ -3,14 +3,16 @@ package lf
 import "go.uber.org/zap"
 
 const (
-	FieldToken          = "token"
-	FieldUserID         = "user_id"
-	FieldGitlabID       = "gitlab_id"
-	FieldGitlabLogin    = "gitlab_login"
-	FieldProjectName    = "project_name"
-	FieldProjectID      = "project_id"
-	FieldPipelineID     = "pipeline_id"
-	FieldPipelineStatus = "pipeline_status"
+	FieldToken             = "token"
+	FieldUserID            = "user_id"
+	FieldGitlabID          = "gitlab_id"
+	FieldGitlabLogin       = "gitlab_login"
+	FieldProjectName       = "project_name"
+	FieldProjectID         = "project_id"
+	FieldPipelineID        = "pipeline_id"
+	FieldPipelineStatus    = "pipeline_status"
+	FieldMergeRequestID    = "merge_request_id"
+	FieldMergeRequestState = "merge_request_state"
 )
 
 func Token(token string) zap.Field {
@@ -43,4 +45,12 @@ func PipelineID(ID int) zap.Field {
 
 func PipelineStatus(status string) zap.Field {
 	return zap.String(FieldPipelineStatus, status)
+}
+
+func MergeRequestID(ID int) zap.Field {
+	return zap.Int(FieldMergeRequestID, ID)
+}
+
+func MergeRequestState(state string) zap.Field {
+	return zap.String(FieldMergeRequestState, state)
 }

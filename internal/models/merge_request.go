@@ -1,20 +1,16 @@
 package models
 
-import (
-	"time"
-)
-
 const (
-	MergeRequestStatusFailed  = "failed"
-	MergeRequestStatusOk = "ok"
+	MergeRequestStateOpen  = "open"
+	MergeRequestStateClosed = "closed"
 )
 
-type MergeRequestStatus = string
+type MergeRequestState = string
 
 type MergeRequest struct {
 	ID      int    `gorm:"primaryKey"`
 	Project string `gorm:"index"`
 
 	Task      string `gorm:"index"`
-	Status    MergeRequestStatus
+	State     MergeRequestState
 }
