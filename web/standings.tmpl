@@ -3,8 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
         <title>{{ .Title }}</title>
         <style>
 .shadow-hover:hover {
@@ -48,9 +47,51 @@
 }
 
 .task {
-    width: 120px;
-    max-width: 120px;
+    min-width: 50px;
+    max-width: 50px;
+    overflow-wrap: break-word;
     overflow: hidden;
+}
+
+.sticky-col {
+  position: -webkit-sticky;
+  position: sticky;
+  background-color: white!important;
+}
+
+.sticky-header {
+  position: -webkit-sticky;
+  position: sticky;
+  background-color: white!important;
+
+  z-index: 10;
+  top: 0px;
+  max-height: 10px;
+  overflow: hidden;
+}
+
+.first-col {
+  width: 50px;
+  min-width: 50px;
+  max-width: 50px;
+  left: 0px;
+}
+
+.second-col {
+  left: 50px;
+}
+
+.task-name {
+    writing-mode: vertical-lr;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+
+    max-height: 150px;
+    overflow: hidden;
+}
+
+.corner {
+    z-index: 20;
 }
         </style>
     </head>
@@ -82,17 +123,17 @@
           </div>
       </nav>
 
-        <div class="container p-2 my-2">
-            <div class="table-responsive">
+        <div class="p-2 my-2">
+            <div class="">
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th scope="col" class="num">#</th>
-                            <th scope="col" class="name">Student</th>
-                            <th scope="col">Score</th>
+                            <th scope="col" class="num sticky-header sticky-col first-col corner">#</th>
+                            <th scope="col" class="name sticky-header sticky-col second-col corner">Student</th>
+                            <th scope="col" class="sticky-header">Score</th>
                             {{ range .Standings.Deadlines }}
                                 {{ range .Tasks }}
-                                    <th scope="col" class="task">{{ .Task }}</th>
+                                    <th scope="col" class="task sticky-header"><span class="task-name">{{ .Task | prettifyTaskName }}</span></th>
                                 {{ end }}
                             {{ end }}
                         </tr>
@@ -100,8 +141,8 @@
                     <tbody>
                         {{ with index .Standings.Users 0 }}
                             <tr>
-                                <th scope="row" class="num">0</th>
-                                <th scope="row" class="name">Chuck Norris</th>
+                                <th scope="row" class="num sticky-col first-col">0</th>
+                                <th scope="row" class="name sticky-col second-col">Chuck Norris</th>
                                 <td>{{ .MaxScore }}</td>
                                 {{ range .Groups }}
                                     {{ range .Tasks }}
@@ -112,8 +153,8 @@
                         {{ end }}
                         {{ range $index, $user := .Standings.Users }}
                             <tr>
-                                <th scope="row" class="num">{{ inc $index }}</th>
-                                <th scope="row" class="name">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
+                                <th scope="row" class="num sticky-col first-col">{{ inc $index }}</th>
+                                <th scope="row" class="name sticky-col second-col">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
                                 <td>{{ $user.Score }}</td>
                                 {{ range $user.Groups }}
                                     {{ range .Tasks }}

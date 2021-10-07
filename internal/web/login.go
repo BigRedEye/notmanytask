@@ -313,6 +313,20 @@ func (s *server) validateSession(c *gin.Context) {
 	c.Next()
 }
 
+func (s *server) fillUserFromQuery(c *gin.Context) {
+	login := c.Query("login")
+	user, err := s.db.FindUserByGitlabLogin(login)
+	if err != nil {
+		s.logger.Warn("Failed to find user", lf.GitlabLogin(login))
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
+		return
+	}
+
+	c.Set("user", user)
+	c.Next()
+}
+
 func (s loginService) fillSessionForUser(c *gin.Context, user *models.User) error {
 	session, err := s.server.db.CreateSession(user.ID)
 	if err != nil {

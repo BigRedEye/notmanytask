@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	ginzap "github.com/gin-contrib/zap"
@@ -90,6 +91,9 @@ func (s *server) run() error {
 	funcs := template.FuncMap{
 		"inc": func(i int) int {
 			return i + 1
+		},
+		"prettifyTaskName": func(name string) string {
+			return filepath.Base(name)
 		},
 	}
 	tmpl, err := buildHTMLTemplates(statikFS, funcs)
