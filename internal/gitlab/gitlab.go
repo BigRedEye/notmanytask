@@ -191,6 +191,11 @@ func (c Client) MakePipelineUrl(user *models.User, pipeline *models.Pipeline) st
 	return fmt.Sprintf("%s/%s/%s/-/pipelines/%d", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.ID)
 }
 
+func (c Client) MakeBranchUrl(user *models.User, pipeline *models.Pipeline) string {
+	name := c.MakeProjectName(user)
+	return fmt.Sprintf("%s/%s/%s/-/tree/submits/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.Task)
+}
+
 func (c Client) MakeTaskUrl(task string) string {
 	return fmt.Sprintf("%s/%s", c.config.GitLab.TaskUrlPrefix, task)
 }

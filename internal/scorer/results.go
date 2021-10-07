@@ -39,6 +39,7 @@ type ScoredTask struct {
 
 	TaskUrl     string
 	PipelineUrl string
+	BranchUrl   string
 }
 
 type ScoredTaskGroup struct {
