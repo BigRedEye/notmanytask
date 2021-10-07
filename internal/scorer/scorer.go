@@ -19,6 +19,7 @@ type ProjectNameFactory interface {
 	MakeProjectUrl(user *models.User) string
 	MakeProjectName(user *models.User) string
 	MakePipelineUrl(user *models.User, pipeline *models.Pipeline) string
+	MakeBranchUrl(user *models.User, pipeline *models.Pipeline) string
 	MakeTaskUrl(task string) string
 }
 
@@ -243,6 +244,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 				tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
 				tasks[i].Score = s.scorePipeline(&task, &group, pipeline)
 				tasks[i].PipelineUrl = s.projects.MakePipelineUrl(user, pipeline)
+				tasks[i].BranchUrl = s.projects.MakeBranchUrl(user, pipeline)
 			} else {
 				flag, found := flagsMap[task.Task]
 				if found {

@@ -165,11 +165,11 @@
                                         {{ else }}
                                             <td class="task">
                                         {{ end }}
-                                        {{ if .PipelineUrl }}
-                                            <a href="{{ .PipelineUrl }}" class="text-decoration-none text-dark">
+                                        {{ if .BranchUrl }}
+                                            <a href="{{ .BranchUrl }}" class="text-decoration-none text-dark">
                                         {{ end }}
                                         {{ .Score }}
-                                        {{ if .PipelineUrl }}
+                                        {{ if .BranchUrl }}
                                             </a>
                                         {{ end }}
                                         </td>
