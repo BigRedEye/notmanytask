@@ -161,6 +161,8 @@
                                             <td class="task table-success">
                                         {{ else if eq .Status "failed"}}
                                             <td class="task table-danger">
+                                        {{ else if eq .Status "checking"}}
+                                            <td class="task table-info">
                                         {{ else }}
                                             <td class="task">
                                         {{ end }}
