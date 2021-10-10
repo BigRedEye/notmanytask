@@ -20,6 +20,7 @@ func setupApiService(server *server, r *gin.Engine) error {
 
 	r.POST(server.config.Endpoints.Api.Report, s.report)
 	r.POST(server.config.Endpoints.Api.Flag, s.createFlag)
+	r.GET(server.config.Endpoints.Api.Standings, s.validateToken, s.standings)
 
 	return nil
 }
@@ -62,15 +63,7 @@ func (s apiService) report(c *gin.Context) {
 		zap.String("report_status", req.Status),
 	)
 
-	// Check token
-	found := false
-	for _, token := range s.config.Testing.Tokens {
-		if token == req.Token {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !s.isTokenValid(req.Token) {
 		s.log.Warn("Unknown token", lf.Token(req.Token))
 		onError(http.StatusUnauthorized, fmt.Errorf("Invalid or expired token"))
 		return
@@ -112,15 +105,7 @@ func (s apiService) createFlag(c *gin.Context) {
 		zap.String("task", req.Task),
 	)
 
-	// Check token
-	found := false
-	for _, token := range s.config.Testing.Tokens {
-		if token == req.Token {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !s.isTokenValid(req.Token) {
 		s.log.Warn("Unknown token", lf.Token(req.Token))
 		onError(http.StatusUnauthorized, fmt.Errorf("Invalid or expired token"))
 		return
@@ -180,4 +165,52 @@ func (s apiService) userScores(c *gin.Context) {
 		},
 		Scores: scores,
 	})
+}
+
+func (s apiService) standings(c *gin.Context) {
+	s.log.Info("Handling standings request")
+	onError := func(code int, err error) {
+		s.log.Warn("Failed to create standings report", zap.Error(err))
+		c.JSON(code, &api.StandingsResponse{
+			Status: api.Status{
+				Ok:    false,
+				Error: err.Error(),
+			}},
+		)
+	}
+
+	standings, err := s.server.scorer.CalcScoreboard("hse")
+	if err != nil {
+		onError(http.StatusInternalServerError, fmt.Errorf("Failed to list scores: %w", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, &api.StandingsResponse{
+		Status: api.Status{
+			Ok: true,
+		},
+		Standings: standings,
+	})
+}
+
+func (s apiService) validateToken(c *gin.Context) {
+	token := c.GetHeader("token")
+	if !s.isTokenValid(token) {
+		c.JSON(http.StatusUnauthorized, &api.Status{
+			Ok:    false,
+			Error: "Invalid or expired token",
+		})
+		c.Abort()
+		return
+	}
+	c.Next()
+}
+
+func (s apiService) isTokenValid(token string) bool {
+	for _, ttoken := range s.config.Testing.Tokens {
+		if token == ttoken {
+			return true
+		}
+	}
+	return false
 }

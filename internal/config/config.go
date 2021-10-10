@@ -37,8 +37,9 @@ type EndpointsConfig struct {
 	OauthCallback string
 
 	Api struct {
-		Report string
-		Flag   string
+		Report    string
+		Flag      string
+		Standings string
 	}
 }
 
