@@ -49,7 +49,7 @@ func (p PipelinesFetcher) Fetch(id int, project string) error {
 		lf.ProjectName(project),
 	)
 
-	log.Info("Fetching pipeline")
+	log.Debug("Fetching pipeline")
 
 	pipeline, _, err := p.gitlab.Pipelines.GetPipeline(p.Client.MakeProjectWithNamespace(project), id)
 	if err != nil {
@@ -67,21 +67,32 @@ func (p PipelinesFetcher) Fetch(id int, project string) error {
 }
 
 func (p PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.PipelineInfo) error {
-	return p.db.AddPipeline(&models.Pipeline{
+	updated, err := p.db.AddPipeline(&models.Pipeline{
 		ID:        pipeline.ID,
 		Task:      ParseTaskFromBranch(pipeline.Ref),
 		Status:    pipeline.Status,
 		Project:   projectName,
 		StartedAt: *pipeline.CreatedAt,
 	})
+	if err != nil {
+		return err
+	}
+	if updated {
+		p.logger.Info("Updated pipeline",
+			lf.ProjectName(projectName),
+			lf.PipelineID(pipeline.ID),
+			lf.PipelineStatus(pipeline.Status),
+		)
+	}
+	return nil
 }
 
 func (p PipelinesFetcher) fetchAllPipelines() {
-	p.logger.Info("Start pipelines fetcher iteration")
-	defer p.logger.Info("Finish pipelines fetcher iteration")
+	p.logger.Debug("Start pipelines fetcher iteration")
+	defer p.logger.Debug("Finish pipelines fetcher iteration")
 
 	err := p.forEachProject(func(project *gitlab.Project) error {
-		p.logger.Info("Found project", lf.ProjectName(project.Name))
+		p.logger.Debug("Found project", lf.ProjectName(project.Name))
 		options := &gitlab.ListProjectPipelinesOptions{}
 		for {
 			pipelines, resp, err := p.gitlab.Pipelines.ListProjectPipelines(project.ID, options)
@@ -91,7 +102,7 @@ func (p PipelinesFetcher) fetchAllPipelines() {
 			}
 
 			for _, pipeline := range pipelines {
-				p.logger.Info("Found pipeline", lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID), lf.PipelineStatus(pipeline.Status))
+				p.logger.Debug("Found pipeline", lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID), lf.PipelineStatus(pipeline.Status))
 				if err = p.addPipeline(project.Name, pipeline); err != nil {
 					p.logger.Error("Failed to add pipeline", zap.Error(err), lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID))
 				}
@@ -107,7 +118,7 @@ func (p PipelinesFetcher) fetchAllPipelines() {
 	})
 
 	if err == nil {
-		p.logger.Info("Sucessfully fetched pipelines")
+		p.logger.Debug("Sucessfully fetched pipelines")
 	} else {
 		p.logger.Error("Failed to fetch pipelines", zap.Error(err))
 	}

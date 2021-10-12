@@ -333,6 +333,10 @@ func exponentialScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline
 		return task.Score
 	}
 
+	if strings.HasPrefix(task.Task, "smart-ptrs/") {
+		return 0
+	}
+
 	deltaDays := pipeline.StartedAt.Sub(deadline).Hours() / 24.0
 
 	return int(math.Max(0.3, 1.0/math.Exp(deltaDays/5.0)) * float64(task.Score))

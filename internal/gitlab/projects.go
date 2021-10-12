@@ -49,9 +49,9 @@ func (p ProjectsMaker) Run(ctx context.Context) {
 }
 
 func (p ProjectsMaker) initializeMissingProjects() {
-	p.logger.Info("Start projectsMaker iteration")
+	p.logger.Debug("Start projectsMaker iteration")
 	numProjectsInitialized := 0
-	defer p.logger.Info("Finish projectsMaker iteration", zap.Int("num_projects_initialized", numProjectsInitialized))
+	defer p.logger.Debug("Finish projectsMaker iteration", zap.Int("num_projects_initialized", numProjectsInitialized))
 
 	users, err := p.db.ListUsersWithoutRepos()
 	if err != nil {

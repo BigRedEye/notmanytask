@@ -155,11 +155,15 @@ func (db *DataBase) SetUserRepository(user *models.User) error {
 	return nil
 }
 
-func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
-	return db.Clauses(clause.OnConflict{
+func (db *DataBase) AddPipeline(pipeline *models.Pipeline) (bool, error) {
+	res := db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"status"}),
-	}).Create(pipeline).Error
+	}).Create(pipeline)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pipeline, err error) {

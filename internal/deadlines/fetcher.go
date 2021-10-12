@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -79,8 +80,8 @@ func (f *Fetcher) Run(ctx context.Context) {
 type deadlinesMap = map[string]*Deadlines
 
 func (f *Fetcher) reload() error {
-	f.logger.Info("Start deadlines fetcher iteration")
-	defer f.logger.Info("Finish deadlines fetcher iteration")
+	f.logger.Debug("Start deadlines fetcher iteration")
+	defer f.logger.Debug("Finish deadlines fetcher iteration")
 
 	groupDeadlines := make(deadlinesMap)
 	for _, group := range f.config.Groups {
@@ -90,11 +91,15 @@ func (f *Fetcher) reload() error {
 			return errors.Wrap(err, "Failed to reload deadlines")
 		}
 		groupDeadlines[group.Name] = &deadlines
-		f.logger.Info("Sucessfully fetched deadlines", zap.Int("num_task_groups", len(deadlines)), zap.String("group", group.Name))
+		f.logger.Debug("Sucessfully fetched deadlines", zap.Int("num_task_groups", len(deadlines)), zap.String("group", group.Name))
 	}
-	f.logger.Info("Sucessfully fetched all deadlines")
+	f.logger.Debug("Sucessfully fetched all deadlines")
 
-	f.current.Store(groupDeadlines)
+	prev := f.current.Swap(groupDeadlines)
+	if !reflect.DeepEqual(prev, groupDeadlines) {
+		f.logger.Info("Updated deadlines")
+	}
+
 	return nil
 }
 
