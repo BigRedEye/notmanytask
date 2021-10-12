@@ -23,8 +23,13 @@ type Config struct {
 	Development bool
 }
 
+const (
+	kibibyte = 1024
+	mebibyte = kibibyte * 1024
+)
+
 func Init(config Config) (*zap.Logger, error) {
-	maxSize, err := units.FromHumanSize(config.MaxSize)
+	maxSizeBytes, err := units.FromHumanSize(config.MaxSize)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +64,7 @@ func Init(config Config) (*zap.Logger, error) {
 
 	lj := &lumberjack.Logger{
 		Filename:   config.Filename,
-		MaxSize:    int(maxSize),
+		MaxSize:    int(maxSizeBytes / mebibyte),
 		MaxBackups: config.MaxBackups,
 		MaxAge:     config.MaxAgeDays,
 	}
