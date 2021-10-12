@@ -1,6 +1,6 @@
 module github.com/bigredeye/notmanytask
 
-go 1.16
+go 1.17
 
 require (
 	github.com/cenkalti/backoff/v4 v4.1.1
