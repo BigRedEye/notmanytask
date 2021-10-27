@@ -67,24 +67,13 @@ func (p PipelinesFetcher) Fetch(id int, project string) error {
 }
 
 func (p PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.PipelineInfo) error {
-	updated, err := p.db.AddPipeline(&models.Pipeline{
+	return p.db.AddPipeline(&models.Pipeline{
 		ID:        pipeline.ID,
 		Task:      ParseTaskFromBranch(pipeline.Ref),
 		Status:    pipeline.Status,
 		Project:   projectName,
 		StartedAt: *pipeline.CreatedAt,
 	})
-	if err != nil {
-		return err
-	}
-	if updated {
-		p.logger.Info("Updated pipeline",
-			lf.ProjectName(projectName),
-			lf.PipelineID(pipeline.ID),
-			lf.PipelineStatus(pipeline.Status),
-		)
-	}
-	return nil
 }
 
 func (p PipelinesFetcher) fetchAllPipelines() {
