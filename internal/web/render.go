@@ -130,9 +130,20 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 	})
 }
 
+func reverseScoreboardGroups(standings *scorer.Standings) {
+	deadlines := *standings.Deadlines
+	for i, j := 0, len(deadlines)-1; i < j; i, j = i+1, j-1 {
+		deadlines[i], deadlines[j] = deadlines[j], deadlines[i]
+	}
+	for i := range standings.Users {
+		reverseScores(standings.Users[i])
+	}
+}
+
 func (s *server) RenderStandingsPage(c *gin.Context) {
 	user := c.MustGet("user").(*models.User)
 	scores, err := s.scorer.CalcScoreboard("hse")
+	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
 		"Title":      "HSE Advanced C++",
@@ -146,6 +157,7 @@ func (s *server) RenderStandingsPage(c *gin.Context) {
 func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 	user, err := s.db.FindUserByGitlabLogin(c.Query("login"))
 	scores, err := s.scorer.CalcScoreboard("hse")
+	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
 		"Title":      "HSE Advanced C++",
