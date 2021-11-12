@@ -108,6 +108,12 @@ func (s Scorer) loadUserFlags(user *models.User, provider flagsProvider) (flagsM
 	return flagsMap, nil
 }
 
+func copyDeadlines(src *deadlines.Deadlines) *deadlines.Deadlines {
+	dst := make(deadlines.Deadlines, len(*src))
+	copy(dst, *src)
+	return &dst
+}
+
 func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
 	currentDeadlines := s.deadlines.GroupDeadlines(groupName)
 	if currentDeadlines == nil {
@@ -146,7 +152,7 @@ func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
 		return scores[i].User.FullName() < scores[j].User.FullName()
 	})
 
-	return &Standings{currentDeadlines, scores}, nil
+	return &Standings{copyDeadlines(currentDeadlines), scores}, nil
 }
 
 func (s Scorer) makeCachedPipelinesProvider() (pipelinesProvider, error) {
