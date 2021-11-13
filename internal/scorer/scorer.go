@@ -287,13 +287,18 @@ var re = regexp.MustCompile(`^\d+-(.*)$`)
 func prettifyTitle(title string) string {
 	submatches := re.FindStringSubmatch(title)
 	if len(submatches) < 2 {
-		return capitalize(title)
+		return capitalizeWords(title)
 	}
-	return capitalize(submatches[1])
+	return capitalizeWords(submatches[1])
 }
 
-func capitalize(title string) string {
-	return strings.Title(title)
+func capitalizeWords(title string) string {
+    return strings.Title(func (r rune) rune) {
+        if r == '-' || r == '_' || r == '/' {
+            return ' '
+        }
+		return r
+    }, strings.Map(title))
 }
 
 func makeShortTaskName(name string) string {
