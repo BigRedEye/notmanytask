@@ -180,6 +180,31 @@ func (db *DataBase) ListAllPipelines() (pipelines []models.Pipeline, err error) 
 	return
 }
 
+func (db *DataBase) AddMergeRequest(mergeRequest *models.MergeRequest) error {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"state"}),
+	}).Create(mergeRequest).Error
+}
+
+func (db *DataBase) ListProjectMergeRequests(project string) (mergeRequests []models.MergeRequest, err error) {
+	mergeRequests = make([]models.MergeRequest, 0)
+	err = db.Find(&mergeRequests, "project = ?", project).Error
+	if err != nil {
+		mergeRequests = nil
+	}
+	return
+}
+
+func (db *DataBase) ListAllMergeRequests() (mergeRequests []models.MergeRequest, err error) {
+	mergeRequests = make([]models.MergeRequest, 0)
+	err = db.Find(&mergeRequests).Error
+	if err != nil {
+		mergeRequests = nil
+	}
+	return
+}
+
 func (db *DataBase) CreateSession(user uint) (*models.Session, error) {
 	session := &models.Session{
 		Token:  uuid.Must(uuid.NewUUID()).String(),

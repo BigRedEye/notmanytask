@@ -72,9 +72,10 @@ type GroupConfig struct {
 type GroupsConfig = []GroupConfig
 
 type PullIntervalsConfig struct {
-	Projects  time.Duration
-	Deadlines time.Duration
-	Pipelines time.Duration
+	Projects      time.Duration
+	Deadlines     time.Duration
+	Pipelines     time.Duration
+	MergeRequests time.Duration
 }
 
 type Config struct {
