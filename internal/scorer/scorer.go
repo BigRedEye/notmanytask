@@ -293,12 +293,12 @@ func prettifyTitle(title string) string {
 }
 
 func capitalizeWords(title string) string {
-    return strings.Title(func (r rune) rune) {
+    return strings.Title(strings.Map(func (r rune) rune {
         if r == '-' || r == '_' || r == '/' {
             return ' '
         }
 		return r
-    }, strings.Map(title))
+    }, title))
 }
 
 func makeShortTaskName(name string) string {
