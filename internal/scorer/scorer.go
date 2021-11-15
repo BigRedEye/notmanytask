@@ -293,12 +293,12 @@ func prettifyTitle(title string) string {
 }
 
 func capitalizeWords(title string) string {
-    return strings.Title(strings.Map(func (r rune) rune {
-        if r == '-' || r == '_' || r == '/' {
-            return ' '
-        }
+	return strings.Title(strings.Map(func(r rune) rune {
+		if r == '-' || r == '_' || r == '/' {
+			return ' '
+		}
 		return r
-    }, title))
+	}, title))
 }
 
 func makeShortTaskName(name string) string {
@@ -334,6 +334,12 @@ func linearScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *mod
 	return int(float64(task.Score) * mult)
 }
 
+// TODO(BigRedEye): Do not hardcode
+var hardDeadlinesPrefixes = []string{
+	"smart-ptrs/",
+	"scheme/",
+}
+
 func exponentialScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
 	if pipeline.Status != models.PipelineStatusSuccess {
 		return 0
@@ -344,8 +350,10 @@ func exponentialScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline
 		return task.Score
 	}
 
-	if strings.HasPrefix(task.Task, "smart-ptrs/") {
-		return 0
+	for _, prefix := range hardDeadlinesPrefixes {
+		if strings.HasPrefix(task.Task, prefix) {
+			return 0
+		}
 	}
 
 	deltaDays := pipeline.StartedAt.Sub(deadline).Hours() / 24.0
