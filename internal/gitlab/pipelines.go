@@ -172,7 +172,6 @@ func (p *PipelinesFetcher) fetchFreshPipelines() {
 	removed := make([]interface{}, 0)
 	p.fresh.Range(func(key, value interface{}) bool {
 		id := key.(*qualifiedPipelineId)
-		p.logger.Info("Fetching fresh pipeline", lf.ProjectName(id.project), lf.PipelineID(id.id))
 		info, err := p.fetch(id.id, id.project)
 		if err != nil {
 			p.logger.Error("Failed to fetch pipeline", zap.Error(err))
