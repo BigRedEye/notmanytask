@@ -47,7 +47,7 @@ func (p *PipelinesFetcher) Run(ctx context.Context) {
 }
 
 func (p *PipelinesFetcher) RunFresh(ctx context.Context) {
-	tick := time.Tick(time.Millisecond * 100)
+	tick := time.Tick(time.Second)
 
 	for {
 		select {
