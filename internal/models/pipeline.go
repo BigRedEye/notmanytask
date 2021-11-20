@@ -5,10 +5,11 @@ import (
 )
 
 const (
-	PipelineStatusFailed  = "failed"
-	PipelineStatusPending = "pending"
-	PipelineStatusRunning = "running"
-	PipelineStatusSuccess = "success"
+	PipelineStatusFailed   = "failed"
+	PipelineStatusPending  = "pending"
+	PipelineStatusRunning  = "running"
+	PipelineStatusSuccess  = "success"
+	PipelineStatusCanceled = "canceled"
 )
 
 type PipelineStatus = string

@@ -76,7 +76,10 @@ func Run() error {
 
 	scorer := scorer.NewScorer(db, deadlines, git)
 
-	wg.Add(3)
+	freshPipelinesCtx, freshPipelinesCancel := context.WithCancel(ctx)
+	defer freshPipelinesCancel()
+
+	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		deadlines.Run(deadlinesCtx)
@@ -88,6 +91,10 @@ func Run() error {
 	go func() {
 		defer wg.Done()
 		pipelines.Run(pipelinesCtx)
+	}()
+	go func() {
+		defer wg.Done()
+		pipelines.RunFresh(freshPipelinesCtx)
 	}()
 
 	s, err := newServer(config, logger.Named("server"), db, deadlines, projects, pipelines, scorer, git)

@@ -69,7 +69,7 @@ func (s apiService) report(c *gin.Context) {
 		return
 	}
 
-	err = s.server.pipelines.Fetch(id, req.ProjectName)
+	err = s.server.pipelines.AddFresh(id, req.ProjectName)
 	if err != nil {
 		onError(http.StatusInternalServerError, err)
 		return

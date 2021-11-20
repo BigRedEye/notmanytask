@@ -18,6 +18,8 @@ func ClassifyPipelineStatus(status models.PipelineStatus) TaskStatus {
 	switch status {
 	case models.PipelineStatusFailed:
 		return TaskStatusFailed
+	case models.PipelineStatusCanceled:
+		return TaskStatusFailed
 	case models.PipelineStatusPending:
 		return TaskStatusChecking
 	case models.PipelineStatusRunning:
