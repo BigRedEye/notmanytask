@@ -131,9 +131,9 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 }
 
 func reverseScoreboardGroups(standings *scorer.Standings) {
-	deadlines := *standings.Deadlines
-	for i, j := 0, len(deadlines)-1; i < j; i, j = i+1, j-1 {
-		deadlines[i], deadlines[j] = deadlines[j], deadlines[i]
+	assignments := *&standings.Deadlines.Assignments
+	for i, j := 0, len(assignments)-1; i < j; i, j = i+1, j-1 {
+		assignments[i], assignments[j] = assignments[j], assignments[i]
 	}
 	for i := range standings.Users {
 		reverseScores(standings.Users[i])

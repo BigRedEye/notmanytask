@@ -71,6 +71,7 @@ type Task struct {
 }
 
 type TaskGroup struct {
+	Title string
 	Group string
 
 	Deadline Date
@@ -79,4 +80,67 @@ type TaskGroup struct {
 	Tasks []Task
 }
 
-type Deadlines = []TaskGroup
+type Deadlines struct {
+	Assignments []TaskGroup
+	Scoring     Scoring
+
+	policies map[string]ScoringPolicy `yaml:"-"`
+	groups   map[string]*ScoringGroup `yaml:"-"`
+}
+
+func (d *Deadlines) buildScoringGroups() error {
+	d.policies = make(map[string]ScoringPolicy)
+	for i := range d.Scoring.Policies {
+		policy := &d.Scoring.Policies[i]
+		d.policies[policy.Name] = policy.Policy
+	}
+	d.groups = make(map[string]*ScoringGroup)
+	for i := range d.Scoring.Groups {
+		group := &d.Scoring.Groups[i]
+		d.groups[group.Name] = group
+	}
+
+	maxScores := make(map[string]int)
+	for i := range d.Assignments {
+		group := d.GetScoringGroup(&d.Assignments[i])
+		if group != nil && group.MaxScore == 0 {
+			totalScore := 0
+			for j := range d.Assignments[i].Tasks {
+				totalScore += d.Assignments[i].Tasks[j].Score
+			}
+			maxScores[group.Name] += totalScore
+		}
+	}
+
+	for k, v := range maxScores {
+		d.groups[k].MaxScore = v
+	}
+
+	return nil
+}
+
+func (d *Deadlines) GetScoringGroup(group *TaskGroup) *ScoringGroup {
+	scoringGroupName := group.Group
+	if len(scoringGroupName) == 0 {
+		scoringGroupName = d.Scoring.DefaultGroup
+	}
+
+	g, found := d.groups[scoringGroupName]
+	if !found {
+		return nil
+	}
+	return g
+}
+
+func (d *Deadlines) GetScoringPolicy(group *TaskGroup) ScoringPolicy {
+	scoringGroup := d.GetScoringGroup(group)
+	if scoringGroup == nil {
+		return nil
+	}
+
+	policy, found := d.policies[scoringGroup.Policy]
+	if !found {
+		return nil
+	}
+	return policy
+}

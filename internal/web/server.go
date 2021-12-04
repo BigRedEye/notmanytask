@@ -129,7 +129,8 @@ func (s *server) run() error {
 
 	r.GET(s.config.Endpoints.Home, s.validateSession, s.RenderHomePage)
 	r.GET(s.config.Endpoints.Flag, s.validateSession, s.RenderSubmitFlagPage)
-	r.GET(s.config.Endpoints.Standings, s.validateSession, s.RenderStandingsPage)
+	// r.GET(s.config.Endpoints.Standings, s.validateSession, s.RenderStandingsPage)
+	r.GET(s.config.Endpoints.Standings, s.RenderStandingsCheaterPage)
 	r.POST(s.config.Endpoints.Flag, s.validateSession, s.handleFlagSubmit)
 	r.GET("/private/solutions/:task", s.handleChuckNorris)
 

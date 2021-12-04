@@ -2,12 +2,10 @@ package scorer
 
 import (
 	"fmt"
-	"math"
 	"path"
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
@@ -111,8 +109,8 @@ func (s Scorer) loadUserFlags(user *models.User, provider flagsProvider) (flagsM
 }
 
 func copyDeadlines(src *deadlines.Deadlines) *deadlines.Deadlines {
-	dst := make(deadlines.Deadlines, len(*src))
-	copy(dst, *src)
+	dst := *src
+	copy(dst.Assignments, src.Assignments)
 	return &dst
 }
 
@@ -148,8 +146,8 @@ func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
 	}
 
 	sort.Slice(scores, func(i, j int) bool {
-		if scores[i].Score != scores[j].Score {
-			return scores[i].Score > scores[j].Score
+		if scores[i].FinalMark != scores[j].FinalMark {
+			return scores[i].FinalMark > scores[j].FinalMark
 		}
 		return scores[i].User.FullName() < scores[j].User.FullName()
 	})
@@ -220,9 +218,10 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 	}
 
 	scores := &UserScores{
-		Groups:   make([]ScoredTaskGroup, 0),
-		Score:    0,
-		MaxScore: 0,
+		Groups:    make([]ScoredTaskGroup, 0),
+		Score:     0,
+		MaxScore:  0,
+		FinalMark: 0.0,
 		User: User{
 			FirstName:     user.FirstName,
 			LastName:      user.LastName,
@@ -231,10 +230,13 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 		},
 	}
 
-	for _, group := range *currentDeadlines {
+	for _, group := range currentDeadlines.Assignments {
 		tasks := make([]ScoredTask, len(group.Tasks))
 		totalScore := 0
 		maxTotalScore := 0
+
+		scoringGroup := currentDeadlines.GetScoringGroup(&group)
+		policy := currentDeadlines.GetScoringPolicy(&group)
 
 		for i, task := range group.Tasks {
 			tasks[i] = ScoredTask{
@@ -250,7 +252,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 			pipeline, found := pipelinesMap[task.Task]
 			if found {
 				tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
-				tasks[i].Score = s.scorePipeline(&task, &group, pipeline)
+				tasks[i].Score = s.scorePipeline(policy, &task, &group, pipeline)
 				tasks[i].PipelineUrl = s.projects.MakePipelineUrl(user, pipeline)
 				tasks[i].BranchUrl = s.projects.MakeBranchUrl(user, pipeline)
 			} else {
@@ -260,7 +262,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 
 					// FIXME(BigRedEye): I just want to sleep
 					// Do not try to mimic pipelines
-					tasks[i].Score = s.scorePipeline(&task, &group, &models.Pipeline{
+					tasks[i].Score = s.scorePipeline(policy, &task, &group, &models.Pipeline{
 						StartedAt: flag.CreatedAt,
 						Status:    models.PipelineStatusSuccess,
 					})
@@ -270,8 +272,8 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 		}
 
 		scores.Groups = append(scores.Groups, ScoredTaskGroup{
-			Title:       group.Group,
-			PrettyTitle: prettifyTitle(group.Group),
+			Title:       group.Title,
+			PrettyTitle: prettifyTitle(group.Title),
 			Deadline:    group.Deadline,
 			Score:       totalScore,
 			MaxScore:    maxTotalScore,
@@ -279,6 +281,9 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 		})
 		scores.Score += totalScore
 		scores.MaxScore += maxTotalScore
+		if scoringGroup != nil && scoringGroup.MaxScore > 0 {
+			scores.FinalMark += scoringGroup.Weight * float64(totalScore) / float64(scoringGroup.MaxScore)
+		}
 	}
 
 	return scores, nil
@@ -307,63 +312,12 @@ func makeShortTaskName(name string) string {
 	return path.Base(name)
 }
 
-const (
-	week = time.Hour * 24 * 7
-)
-
-// TODO(BigRedEye): Do not hardcode scoring logic
-// Maybe read scoring model from deadlines?
-type scoringFunc = func(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int
-
-func linearScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
+func (s Scorer) scorePipeline(policy deadlines.ScoringPolicy, task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
 	if pipeline.Status != models.PipelineStatusSuccess {
 		return 0
 	}
-
-	deadline := group.Deadline.Time
-
-	if pipeline.StartedAt.Before(deadline) {
-		return task.Score
+	if policy == nil {
+		return -1
 	}
-
-	weekAfter := group.Deadline.Time.Add(week)
-	if pipeline.StartedAt.After(weekAfter) {
-		return task.Score / 2
-	}
-
-	mult := 1.0 - 0.5*pipeline.StartedAt.Sub(deadline).Seconds()/(weekAfter.Sub(deadline)).Seconds()
-
-	return int(float64(task.Score) * mult)
-}
-
-// TODO(BigRedEye): Do not hardcode
-var hardDeadlinesPrefixes = []string{
-	"smart-ptrs/",
-	"scheme/",
-}
-
-func exponentialScore(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
-	if pipeline.Status != models.PipelineStatusSuccess {
-		return 0
-	}
-
-	deadline := group.Deadline.Time
-	if pipeline.StartedAt.Before(deadline) {
-		return task.Score
-	}
-
-	for _, prefix := range hardDeadlinesPrefixes {
-		if strings.HasPrefix(task.Task, prefix) {
-			return 0
-		}
-	}
-
-	deltaDays := pipeline.StartedAt.Sub(deadline).Hours() / 24.0
-
-	return int(math.Max(0.3, 1.0/math.Exp(deltaDays/5.0)) * float64(task.Score))
-}
-
-func (s Scorer) scorePipeline(task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
-	// return s.linearScore(task, group, pipeline)
-	return exponentialScore(task, group, pipeline)
+	return policy.Score(task.Score, group.Deadline.Time, pipeline.StartedAt)
 }

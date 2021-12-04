@@ -66,9 +66,10 @@ func (u User) FullName() string {
 }
 
 type UserScores struct {
-	Groups   []ScoredTaskGroup
-	Score    int
-	MaxScore int
+	Groups    []ScoredTaskGroup
+	Score     int
+	MaxScore  int
+	FinalMark float64
 
 	User User
 }

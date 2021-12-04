@@ -64,17 +64,18 @@ type TestingConfig struct {
 }
 
 type GroupConfig struct {
-	Name         string
-	Secret       string
-	DeadlinesURL string
+	Name            string
+	Secret          string
+	DeadlinesURL    string
+	DeadlinesFormat string
 }
 
 type GroupsConfig = []GroupConfig
 
 type PullIntervalsConfig struct {
-	Projects  time.Duration
 	Deadlines time.Duration
-	Pipelines time.Duration
+	Projects  *time.Duration
+	Pipelines *time.Duration
 }
 
 type Config struct {
