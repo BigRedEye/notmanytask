@@ -128,8 +128,9 @@
                         <tr>
                             <th scope="col" class="num sticky-header sticky-col first-col corner">#</th>
                             <th scope="col" class="name sticky-header sticky-col second-col corner">Student</th>
+                            <th scope="col" class="sticky-header">Mark</th>
                             <th scope="col" class="sticky-header">Score</th>
-                            {{ range .Standings.Deadlines }}
+                            {{ range .Standings.Deadlines.Assignments }}
                                 {{ range .Tasks }}
                                     <th scope="col" class="task sticky-header"><span class="task-name">{{ .Task | prettifyTaskName }}</span></th>
                                 {{ end }}
@@ -141,6 +142,7 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">0</th>
                                 <th scope="row" class="name sticky-col second-col">Chuck Norris</th>
+                                <td>13.37</td>
                                 <td>{{ .MaxScore }}</td>
                                 {{ range .Groups }}
                                     {{ range .Tasks }}
@@ -153,6 +155,7 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">{{ inc $index }}</th>
                                 <th scope="row" class="name sticky-col second-col">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
+                                <td>{{printf "%.2f" $user.FinalMark}}</td>
                                 <td>{{ $user.Score }}</td>
                                 {{ range $user.Groups }}
                                     {{ range .Tasks }}
