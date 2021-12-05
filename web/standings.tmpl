@@ -160,14 +160,18 @@
                                 {{ range $user.Groups }}
                                     {{ range .Tasks }}
                                         {{ if eq .Status "success"}}
-                                            <td class="task table-success">
+                                            <td class="task table-success"
                                         {{ else if eq .Status "failed"}}
-                                            <td class="task table-danger">
+                                            <td class="task table-danger"
                                         {{ else if eq .Status "checking"}}
-                                            <td class="task table-info">
+                                            <td class="task table-info"
                                         {{ else }}
-                                            <td class="task">
+                                            <td class="task"
                                         {{ end }}
+                                        {{ if .Overridden }}
+                                            title="Score has been changed by the teacher"
+                                        {{ end }}
+                                        >
                                         {{ if .BranchUrl }}
                                             <a href="{{ .BranchUrl }}" class="text-decoration-none text-dark">
                                         {{ end }}

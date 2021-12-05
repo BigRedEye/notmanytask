@@ -110,6 +110,7 @@ func (s Scorer) loadUserFlags(user *models.User, provider flagsProvider) (flagsM
 
 func copyDeadlines(src *deadlines.Deadlines) *deadlines.Deadlines {
 	dst := *src
+	dst.Assignments = make([]deadlines.TaskGroup, len(src.Assignments))
 	copy(dst.Assignments, src.Assignments)
 	return &dst
 }
@@ -135,9 +136,14 @@ func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
 		return nil, err
 	}
 
+	overrides, err := s.db.ListOverrides()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list all overrides: %w", err)
+	}
+
 	scores := make([]*UserScores, len(users))
 	for i, user := range users {
-		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags)
+		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags, overrides)
 		if err != nil {
 			return nil, err
 		}
@@ -203,10 +209,31 @@ func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 		return nil, fmt.Errorf("No deadlines found")
 	}
 
-	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags)
+	overrides, err := s.db.ListUserOverrides(*user.GitlabLogin)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list user overrides: %w", err)
+	}
+
+	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, overrides)
 }
 
-func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *models.User, pipelinesP pipelinesProvider, flagsP flagsProvider) (*UserScores, error) {
+type overrideKey struct {
+	login string
+	task  string
+}
+
+func parseOverrides(overrides []models.OverriddenScore) (result map[overrideKey]*models.OverriddenScore) {
+	result = make(map[overrideKey]*models.OverriddenScore)
+	for i := range overrides {
+		result[overrideKey{
+			login: overrides[i].GitlabLogin,
+			task:  overrides[i].Task,
+		}] = &overrides[i]
+	}
+	return
+}
+
+func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *models.User, pipelinesP pipelinesProvider, flagsP flagsProvider, rawOverrides []models.OverriddenScore) (*UserScores, error) {
 	pipelinesMap, err := s.loadUserPipelines(user, pipelinesP)
 	if err != nil {
 		return nil, err
@@ -216,6 +243,8 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 	if err != nil {
 		return nil, err
 	}
+
+	overrides := parseOverrides(rawOverrides)
 
 	scores := &UserScores{
 		Groups:    make([]ScoredTaskGroup, 0),
@@ -268,6 +297,14 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 					})
 				}
 			}
+
+			override, found := overrides[overrideKey{login: *user.GitlabLogin, task: task.Task}]
+			if found {
+				tasks[i].Score = override.Score
+				tasks[i].Status = ClassifyPipelineStatus(override.Status)
+				tasks[i].Overridden = true
+			}
+
 			totalScore += tasks[i].Score
 		}
 

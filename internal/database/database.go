@@ -58,7 +58,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{})
 	if err != nil {
 		return nil, err
 	}
@@ -259,4 +259,36 @@ func (db *DataBase) ListSubmittedFlags() (flags []models.Flag, err error) {
 		flags = nil
 	}
 	return
+}
+
+func (db *DataBase) ListUserOverrides(login string) (overrides []models.OverriddenScore, err error) {
+	overrides = make([]models.OverriddenScore, 0)
+	err = db.Find(&overrides, "gitlab_login = ?", login).Error
+	if err != nil {
+		overrides = nil
+	}
+	return
+}
+
+func (db *DataBase) ListOverrides() (overrides []models.OverriddenScore, err error) {
+	overrides = make([]models.OverriddenScore, 0)
+	err = db.Find(&overrides).Error
+	if err != nil {
+		overrides = nil
+	}
+	return
+}
+
+func (db *DataBase) AddOverride(score *models.OverriddenScore) error {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "gitlab_login"}, {Name: "task"}},
+		DoUpdates: clause.AssignmentColumns([]string{"score"}),
+	}).Create(score).Error
+}
+
+func (db *DataBase) RemoveOverride(gitlab_login, task string) error {
+	return db.
+		Where("gitlab_login = ? AND task = ?", gitlab_login, task).
+		Delete(models.OverriddenScore{}).
+		Error
 }
