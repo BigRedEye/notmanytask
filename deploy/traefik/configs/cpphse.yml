@@ -3,10 +3,10 @@ http:
     cpphse-router:
       rule: "Host(`cpp-hse.org`)"
       entryPoints:
-        - websecure
+      - websecure
       service: cpphse
-      #middlewares:
-      #  - authelia-auth
+      middlewares:
+      - gzip-compress
 
 tcp:
   routers:
@@ -16,7 +16,8 @@ tcp:
 
 
   middlewares:
-
+    gzip-compress:
+      compress: {}
 
   services:
     cpphse:
