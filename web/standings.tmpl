@@ -175,7 +175,7 @@
                                         {{ if .BranchUrl }}
                                             <a href="{{ .BranchUrl }}" class="text-decoration-none text-dark">
                                         {{ end }}
-                                        {{ .Score }}
+                                        {{ .Score }}{{ if .Overridden }}*{{ end }}
                                         {{ if .BranchUrl }}
                                             </a>
                                         {{ end }}
