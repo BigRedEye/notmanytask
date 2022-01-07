@@ -1,3 +1,10 @@
+log:
+  level: info
+  filename: /var/log/notmanytask/notmanytask.log
+  maxSize: 50MB
+  maxBackups: 10
+  compress: true
+
 gitlab:
   baseURL: https://gitlab.com
   taskURLPrefix: https://gitlab.com/{USER}/{REPO}/-/tree/main/tasks
@@ -27,6 +34,7 @@ endpoints:
   api:
     report: /api/report
     flag: /api/flag
+    standings: /api/standings
 
 server:
   listenAddress: ":18080"
@@ -50,9 +58,11 @@ groups:
 - name: hse
   secret: ihatecpp
   deadlinesUrl: https://gitlab.com/{USER}/{REPO}/-/raw/main/deadlines/hse.yml
+  deadlinesFormat: v2
 - name: test
   secret: ilovecpp
   deadlinesUrl: https://gitlab.com/{USER}/{REPO}/-/raw/main/deadlines/test.yml
+  deadlinesFormat: v2
 
 pullIntervals:
   projects: 10s
