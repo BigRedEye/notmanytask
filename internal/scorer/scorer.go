@@ -360,13 +360,13 @@ func (s Scorer) scorePipeline(
 	if pipeline.Status != models.PipelineStatusSuccess {
 		return 0
 	}
+	// TODO(sskvor): Support different retake policies
+	if user.HasRetake {
+		return int(float64(task.Score) * deadlines.Scoring.RetakePenalty)
+	}
 	if deadline := deadlines.Scoring.FinalDeadline; deadline != nil {
 		if pipeline.StartedAt.After(deadline.Time) {
-			if user.HasRetake {
-				return int(float64(task.Score) * deadlines.Scoring.RetakePenalty)
-			} else {
-				return 0
-			}
+			return 0
 		}
 	}
 	if policy == nil {
