@@ -140,9 +140,9 @@ func reverseScoreboardGroups(standings *scorer.Standings) {
 	}
 }
 
-func (s *server) RenderStandingsPage(c *gin.Context) {
+func (s *server) doRenderStandingsPage(c *gin.Context, filter scorer.UserFilter) {
 	user := c.MustGet("user").(*models.User)
-	scores, err := s.scorer.CalcScoreboard("hse")
+	scores, err := s.scorer.CalcScoreboardWithFilter("hse", filter)
 	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
@@ -151,6 +151,16 @@ func (s *server) RenderStandingsPage(c *gin.Context) {
 		"Standings":  scores,
 		"Error":      err,
 		"Links":      s.makeLinks(user),
+	})
+}
+
+func (s *server) RenderStandingsPage(c *gin.Context) {
+	s.doRenderStandingsPage(c, nil)
+}
+
+func (s *server) RenderRetakesPage(c *gin.Context) {
+	s.doRenderStandingsPage(c, func(user *models.User) bool {
+		return user.HasRetake
 	})
 }
 

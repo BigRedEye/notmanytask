@@ -115,7 +115,13 @@ func copyDeadlines(src *deadlines.Deadlines) *deadlines.Deadlines {
 	return &dst
 }
 
+type UserFilter = func(user *models.User) bool
+
 func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
+	return s.CalcScoreboardWithFilter(groupName, nil)
+}
+
+func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*Standings, error) {
 	currentDeadlines := s.deadlines.GroupDeadlines(groupName)
 	if currentDeadlines == nil {
 		return nil, fmt.Errorf("No deadlines found")
@@ -124,6 +130,16 @@ func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
 	users, err := s.db.ListGroupUsers(groupName)
 	if err != nil {
 		return nil, err
+	}
+
+	if filter != nil {
+		allUsers := users
+		users = make([]*models.User, 0, len(allUsers))
+		for _, user := range allUsers {
+			if filter(user) {
+				users = append(users, user)
+			}
+		}
 	}
 
 	pipelines, err := s.makeCachedPipelinesProvider()

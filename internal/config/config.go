@@ -34,6 +34,7 @@ type EndpointsConfig struct {
 	Logout        string
 	Signup        string
 	Standings     string
+	Retakes       string
 	OauthCallback string
 
 	Api struct {
