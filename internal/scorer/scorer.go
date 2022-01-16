@@ -376,17 +376,26 @@ func (s Scorer) scorePipeline(
 	if pipeline.Status != models.PipelineStatusSuccess {
 		return 0
 	}
-	// TODO(sskvor): Support different retake policies
-	if user.HasRetake {
-		return int(float64(task.Score) * deadlines.Scoring.RetakePenalty)
-	}
-	if deadline := deadlines.Scoring.FinalDeadline; deadline != nil {
-		if pipeline.StartedAt.After(deadline.Time) {
-			return 0
-		}
-	}
 	if policy == nil {
 		return -1
 	}
-	return policy.Score(task.Score, group.Deadline.Time, pipeline.StartedAt)
+
+	score := func() int {
+		if deadline := deadlines.Scoring.FinalDeadline; deadline != nil {
+			if pipeline.StartedAt.After(deadline.Time) {
+				return 0
+			}
+		}
+		return policy.Score(task.Score, group.Deadline.Time, pipeline.StartedAt)
+	}()
+
+	// TODO(sskvor): Support different retake policies
+	if user.HasRetake {
+		minScore := int(float64(task.Score) * deadlines.Scoring.RetakePenalty)
+		if minScore > score {
+			score = minScore
+		}
+	}
+
+	return score
 }
