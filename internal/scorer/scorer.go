@@ -281,7 +281,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 			pipeline, found := pipelinesMap[task.Task]
 			if found {
 				tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
-				tasks[i].Score = s.scorePipeline(policy, &task, &group, pipeline)
+				tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, pipeline)
 				tasks[i].PipelineUrl = s.projects.MakePipelineUrl(user, pipeline)
 				tasks[i].BranchUrl = s.projects.MakeBranchUrl(user, pipeline)
 			} else {
@@ -291,7 +291,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 
 					// FIXME(BigRedEye): I just want to sleep
 					// Do not try to mimic pipelines
-					tasks[i].Score = s.scorePipeline(policy, &task, &group, &models.Pipeline{
+					tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, &models.Pipeline{
 						StartedAt: flag.CreatedAt,
 						Status:    models.PipelineStatusSuccess,
 					})
@@ -349,9 +349,25 @@ func makeShortTaskName(name string) string {
 	return path.Base(name)
 }
 
-func (s Scorer) scorePipeline(policy deadlines.ScoringPolicy, task *deadlines.Task, group *deadlines.TaskGroup, pipeline *models.Pipeline) int {
+func (s Scorer) scorePipeline(
+	policy deadlines.ScoringPolicy,
+	deadlines *deadlines.Deadlines,
+	user *models.User,
+	task *deadlines.Task,
+	group *deadlines.TaskGroup,
+	pipeline *models.Pipeline,
+) int {
 	if pipeline.Status != models.PipelineStatusSuccess {
 		return 0
+	}
+	if deadline := deadlines.Scoring.FinalDeadline; deadline != nil {
+		if pipeline.StartedAt.After(deadline.Time) {
+			if user.HasRetake {
+				return int(float64(task.Score) * deadlines.Scoring.RetakePenalty)
+			} else {
+				return 0
+			}
+		}
 	}
 	if policy == nil {
 		return -1

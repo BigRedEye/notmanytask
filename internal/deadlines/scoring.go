@@ -24,9 +24,11 @@ type ScoringGroup struct {
 }
 
 type Scoring struct {
-	Policies     []ScoringPolicySpec
-	Groups       []ScoringGroup
-	DefaultGroup string `yaml:"defaultGroup"`
+	Policies      []ScoringPolicySpec
+	Groups        []ScoringGroup
+	DefaultGroup  string `yaml:"defaultGroup"`
+	FinalDeadline *Date
+	RetakePenalty float64
 }
 
 ////////////////////////////////////////////////////////////////////////////////
