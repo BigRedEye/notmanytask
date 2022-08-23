@@ -15,5 +15,7 @@ variable "yandex-folder-id" {
 }
 
 variable "image-id" {
-  default = "fd8cqj9qiedndmmi3vq6" # ubuntu 20.04
+  # Ubuntu 20.04 LTS
+  # https://cloud.yandex.ru/marketplace/products/f2eanb2gaki4us67hn9q
+  default = "fd8kdq6d0p8sij7h5qe3" 
 }

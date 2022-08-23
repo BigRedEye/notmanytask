@@ -12,7 +12,9 @@ resource "yandex_compute_instance" "nat-instance" {
     auto_delete = true
 
     initialize_params {
-      image_id = "fd80mrhj8fl2oe87o4e1"
+      # NAT Instance
+      # https://cloud.yandex.ru/marketplace/products/yc/nat-instance-ubuntu-18-04-lts
+      image_id = "fd8q9r5va9p64uhch83k"
       size = 10
     }
   }
