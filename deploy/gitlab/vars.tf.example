@@ -1,0 +1,19 @@
+variable "zone" {
+  default = "ru-central1-b"
+}
+
+variable "yandex-token" {
+  default = "$YC_OAUTH"
+}
+
+variable "yandex-cloud-id" {
+  default = "$YC_CLOUD_ID"
+}
+
+variable "yandex-folder-id" {
+  default = "$YC_FOLDER_ID"
+}
+
+variable "image-id" {
+  default = "fd8cqj9qiedndmmi3vq6" # ubuntu 20.04
+}

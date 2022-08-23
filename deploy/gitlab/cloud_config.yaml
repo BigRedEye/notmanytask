@@ -1,0 +1,10 @@
+#cloud-config
+ssh_pwauth: no
+users:
+  - name: hse
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ssh-rsa ...
+      - ssh-rsa ...
