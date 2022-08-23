@@ -42,3 +42,24 @@ docker build -f build.docker -t cr.yandex/$YC_REGISTRY_ID/hse-cxx-build:latest .
 docker push cr.yandex/$YC_REGISTRY_ID/hse-cxx-build:latest
 ```
 7) Закоммитить `$YC_REGISTRY_ID` в репозиторий курса (в `.gitlab-ci.yml`, `.grader-ci.yml`, `testenv.docker`). CI должен пройти. Сдача задач студентами также должна работать, им для этого нужно сделать pull изменений.
+
+8) Настроить автоматическое удаление образов.
+```
+echo '[{"description": "Delete stale images", "tag_regexp": ".*", "retained_top": 2}]' > rules.json
+
+yc container repository lifecycle-policy create \
+    --repository-name $YC_REGISTRY_ID/hse-cxx-build  \
+    --name auto_cleanup \
+    --description "" \
+    --rules rules.json \
+    --active
+
+yc container repository lifecycle-policy create \
+    --repository-name $YC_REGISTRY_ID/hse-cxx-testenv  \
+    --name auto_cleanup \
+    --description "" \
+    --rules rules.json \
+    --active
+```
+
+То есть будут удаляться все образы, кроме двух последних.
