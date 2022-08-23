@@ -1,0 +1,21 @@
+variable "zone" {
+  default = "ru-central1-b"
+}
+
+variable "yandex-token" {
+  default = "$YC_OAUTH"
+}
+
+variable "yandex-cloud-id" {
+  default = "$YC_CLOUD_ID"
+}
+
+variable "yandex-folder-id" {
+  default = "$YC_FOLDER_ID"
+}
+
+variable "image-id" {
+  # Ubuntu 20.04 LTS
+  # https://cloud.yandex.ru/marketplace/products/f2eanb2gaki4us67hn9q
+  default = "fd8kdq6d0p8sij7h5qe3" 
+}
