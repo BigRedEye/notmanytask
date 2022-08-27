@@ -10,6 +10,7 @@ import (
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/bigredeye/notmanytask/internal/scorer"
+	"github.com/bigredeye/notmanytask/pkg/generic"
 )
 
 func (s *server) RenderSignupPage(c *gin.Context, err string) {
@@ -66,10 +67,7 @@ func (s *server) handleChuckNorris(c *gin.Context) {
 }
 
 func reverseScores(scores *scorer.UserScores) {
-	groups := scores.Groups
-	for i, j := 0, len(groups)-1; i < j; i, j = i+1, j-1 {
-		groups[i], groups[j] = groups[j], groups[i]
-	}
+	generic.ReverseSlice(scores.Groups)
 }
 
 type Links struct {
@@ -129,10 +127,7 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 }
 
 func reverseScoreboardGroups(standings *scorer.Standings) {
-	assignments := standings.Deadlines.Assignments
-	for i, j := 0, len(assignments)-1; i < j; i, j = i+1, j-1 {
-		assignments[i], assignments[j] = assignments[j], assignments[i]
-	}
+	generic.ReverseSlice(standings.Deadlines.Assignments)
 	for i := range standings.Users {
 		reverseScores(standings.Users[i])
 	}
