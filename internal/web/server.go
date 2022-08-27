@@ -3,7 +3,6 @@ package web
 import (
 	"fmt"
 	"html/template"
-	"io/fs"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -11,7 +10,6 @@ import (
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	statik "github.com/rakyll/statik/fs"
 	"go.uber.org/zap"
 
 	"github.com/bigredeye/notmanytask/internal/config"
@@ -19,7 +17,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
 	"github.com/bigredeye/notmanytask/internal/scorer"
-	_ "github.com/bigredeye/notmanytask/pkg/statik"
+	"github.com/bigredeye/notmanytask/web"
 )
 
 type server struct {
@@ -58,36 +56,12 @@ func newServer(
 	}, nil
 }
 
-func buildHTMLTemplates(hfs http.FileSystem, funcMap template.FuncMap) (*template.Template, error) {
+func buildHTMLTemplates(funcMap template.FuncMap) (*template.Template, error) {
 	tmpl := template.New("").Funcs(funcMap)
-	err := statik.Walk(hfs, "/", func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() {
-			bytes, err := statik.ReadFile(hfs, path)
-			if err != nil {
-				return err
-			}
-
-			template.Must(tmpl.New(path).Parse(string(bytes)))
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to collect html templates")
-	}
-
-	return tmpl, nil
+	return tmpl.ParseFS(web.StaticTemplates, "*.tmpl")
 }
 
 func (s *server) run() error {
-	statikFS, err := statik.New()
-	if err != nil {
-		return errors.Wrap(err, "Failed to open statik fs")
-	}
 	funcs := template.FuncMap{
 		"inc": func(i int) int {
 			return i + 1
@@ -96,7 +70,7 @@ func (s *server) run() error {
 			return filepath.Base(name)
 		},
 	}
-	tmpl, err := buildHTMLTemplates(statikFS, funcs)
+	tmpl, err := buildHTMLTemplates(funcs)
 	if err != nil {
 		return errors.Wrap(err, "Failed to build html templates")
 	}
@@ -134,7 +108,7 @@ func (s *server) run() error {
 	r.POST(s.config.Endpoints.Flag, s.validateSession, s.handleFlagSubmit)
 	r.GET("/private/solutions/:task", s.handleChuckNorris)
 
-	r.StaticFS("/static", statikFS)
+	r.StaticFS("/static", http.FS(web.StaticContent))
 
 	s.logger.Info("Starting server", zap.String("bind_address", s.config.Server.ListenAddress))
 	return r.Run(s.config.Server.ListenAddress)

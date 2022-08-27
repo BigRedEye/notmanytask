@@ -59,12 +59,10 @@ func (s *server) handleFlagSubmit(c *gin.Context) {
 	}
 
 	s.RenderSubmitFlagPageDetails(c, "", "The matrix has you...")
-	return
 }
 
 func (s *server) handleChuckNorris(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, "https://youtu.be/dQw4w9WgXcQ")
-	return
 }
 
 func reverseScores(scores *scorer.UserScores) {
@@ -131,7 +129,7 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 }
 
 func reverseScoreboardGroups(standings *scorer.Standings) {
-	assignments := *&standings.Deadlines.Assignments
+	assignments := standings.Deadlines.Assignments
 	for i, j := 0, len(assignments)-1; i < j; i, j = i+1, j-1 {
 		assignments[i], assignments[j] = assignments[j], assignments[i]
 	}
@@ -165,7 +163,7 @@ func (s *server) RenderRetakesPage(c *gin.Context) {
 }
 
 func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
-	user, err := s.db.FindUserByGitlabLogin(c.Query("login"))
+	user, _ := s.db.FindUserByGitlabLogin(c.Query("login"))
 	scores, err := s.scorer.CalcScoreboard("hse")
 	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{

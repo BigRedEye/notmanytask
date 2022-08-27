@@ -1,4 +1,4 @@
-all: web
+all: web crashme
 
 protos:
 	true
@@ -6,19 +6,11 @@ protos:
 make_build:
 	mkdir -p build
 
-get_statik:
-	go get -u github.com/rakyll/statik
-
-statik: get_statik protos
-	statik -f -Z -src web -dest pkg
-
-web: make_build statik
+web: make_build
 	go build -o build ./cmd/web
 
 crashme: make_build
 	go build -o build ./cmd/crashme
-
-all: web crashme
 
 run_web: web
 	./build/web

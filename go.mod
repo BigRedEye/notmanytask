@@ -13,7 +13,6 @@ require (
 	github.com/jackc/pgconn v1.8.1
 	github.com/joho/godotenv v1.3.0
 	github.com/pkg/errors v0.8.1
-	github.com/rakyll/statik v0.1.7
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/viper v1.8.1
 	github.com/xanzy/go-gitlab v0.50.3
