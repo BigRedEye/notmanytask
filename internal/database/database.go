@@ -155,6 +155,17 @@ func (db *DataBase) SetUserRepository(user *models.User) error {
 	return nil
 }
 
+func (db *DataBase) SetUserTelegramID(user *models.User) error {
+	res := db.Model(user).Update("telegram_id", user.TelegramID)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected < 1 {
+		return errors.Errorf("unknown user %d", user.ID)
+	}
+	return nil
+}
+
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},

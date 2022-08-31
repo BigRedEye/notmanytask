@@ -28,15 +28,17 @@ type GitLabConfig struct {
 }
 
 type EndpointsConfig struct {
-	HostName      string
-	Home          string
-	Flag          string
-	Login         string
-	Logout        string
-	Signup        string
-	Standings     string
-	Retakes       string
-	OauthCallback string
+	HostName         string
+	Home             string
+	Flag             string
+	Login            string
+	Logout           string
+	Signup           string
+	Standings        string
+	Retakes          string
+	OauthCallback    string
+	TelegramLogin    string
+	TelegramCallback string
 
 	Api struct {
 		Report    string
@@ -80,6 +82,10 @@ type PullIntervalsConfig struct {
 	Pipelines *time.Duration
 }
 
+type TelegramBotConfig struct {
+	BotToken string
+}
+
 type Config struct {
 	Log           log.Config
 	GitLab        GitLabConfig
@@ -89,6 +95,7 @@ type Config struct {
 	Testing       TestingConfig
 	Groups        GroupsConfig
 	PullIntervals PullIntervalsConfig
+	Telegram      TelegramBotConfig
 }
 
 func ParseConfig() (*Config, error) {

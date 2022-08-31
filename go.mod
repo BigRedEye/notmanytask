@@ -3,12 +3,13 @@ module github.com/bigredeye/notmanytask
 go 1.18
 
 require (
+	github.com/alexsergivan/transliterator v1.0.0
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/docker/go-units v0.4.0
 	github.com/gin-contrib/sessions v0.0.3
 	github.com/gin-contrib/zap v0.0.1
 	github.com/gin-gonic/gin v1.7.4
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.1.2
 	github.com/jackc/pgconn v1.8.1
 	github.com/joho/godotenv v1.3.0
@@ -16,6 +17,7 @@ require (
 	github.com/spf13/viper v1.8.1
 	github.com/xanzy/go-gitlab v0.50.3
 	go.uber.org/zap v1.19.0
+	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -66,7 +68,7 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
-	golang.org/x/sys v0.0.0-20210510120138-977fb7262007 // indirect
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 	golang.org/x/text v0.3.5 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

@@ -21,6 +21,14 @@ func (s *server) RenderSignupPage(c *gin.Context, err string) {
 	})
 }
 
+func (s *server) RenderTelegramLogin(c *gin.Context, err string) {
+	c.HTML(http.StatusOK, "telegram.tmpl", gin.H{
+		"CourseName":   "HSE Advanced C++",
+		"Config":       s.config,
+		"ErrorMessage": err,
+	})
+}
+
 func (s *server) RenderSubmitFlagPage(c *gin.Context) {
 	s.RenderSubmitFlagPageDetails(c, "", "")
 }

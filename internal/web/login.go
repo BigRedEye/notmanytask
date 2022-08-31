@@ -2,9 +2,12 @@ package web
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +17,8 @@ import (
 	"github.com/google/uuid"
 	perrors "github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
@@ -37,6 +42,8 @@ func setupLoginService(server *server, r *gin.Engine) error {
 	r.GET(server.config.Endpoints.Logout, s.logout)
 	r.GET(server.config.Endpoints.Signup, s.signup)
 	r.POST(server.config.Endpoints.Signup, s.signupForm)
+	r.GET(server.config.Endpoints.TelegramLogin, server.validateSession, s.telegramLogin)
+	r.GET(server.config.Endpoints.TelegramCallback, server.validateSession, s.telegramCallback)
 	r.GET(server.config.Endpoints.OauthCallback, s.oauth)
 
 	return nil
@@ -125,6 +132,70 @@ func (s loginService) signupForm(c *gin.Context) {
 	}
 
 	c.Redirect(http.StatusFound, s.config.Endpoints.Login)
+}
+
+func (s loginService) telegramLogin(c *gin.Context) {
+	s.server.RenderTelegramLogin(c, "Please, link your Telegram account to use notmanytask")
+}
+
+// Specification of the dance is described here:
+// https://core.telegram.org/widgets/login
+func (s loginService) telegramCallback(c *gin.Context) {
+	user := s.server.getUser(c)
+	log := s.log.With(lf.UserID(user.ID))
+
+	query := maps.Copy(c.QueryMap)
+
+	hash := query["hash"]
+	delete(query, "hash")
+
+	queryArguments := make([]string, 0, len(query))
+	for k, v := range query {
+		queryArguments = append(queryArguments, k+"="+v)
+	}
+	slices.Sort(queryArguments)
+	dataCheckString := strings.Join(queryArguments, "\n")
+
+	secretKey := sha256.Sum256([]byte(s.config.Telegram.BotToken))
+	mac := hmac.New(sha256.New, secretKey[:])
+	mac.Write([]byte(dataCheckString))
+	expectedHash := hex.EncodeToString(mac.Sum(nil))
+
+	if expectedHash != hash {
+		log.Warn("Failed to validate telegram auth", zap.String("expectedHash", expectedHash), zap.String("hash", hash))
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.TelegramLogin)
+		return
+	}
+
+	telegramID := query["id"]
+	firstName := query["first_name"]
+	lastName := query["last_name"]
+	log.Info("Verified telegram auth",
+		zap.String("user_name", firstName+" "+lastName),
+		zap.String("telegram_id", telegramID),
+	)
+
+	id, err := strconv.ParseInt(telegramID, 10, 64)
+	if err != nil {
+		log.Error("Malformed telegram id", zap.String("telegram_id", telegramID), zap.Error(err))
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.TelegramLogin)
+		return
+	}
+
+	user.TelegramID = &id
+	err = s.server.db.SetUserTelegramID(user)
+	if err != nil {
+		log.Error("Failed to set user telegram id", zap.Error(err))
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.TelegramLogin)
+		return
+	}
+
+	log.Info("Succesfully set user telegram id")
+	c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Home)
+}
+
+func (s loginService) RedirectToTelegramLogin(c *gin.Context, msg string) {
+	s.server.RenderTelegramLogin(c, msg)
 }
 
 func (s loginService) login(c *gin.Context) {
@@ -286,6 +357,13 @@ func (s *server) validateSession(c *gin.Context) {
 	if err != nil || session == nil {
 		s.logger.Warn("Failed to find user session", zap.Error(err))
 		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+		c.Abort()
+		return
+	}
+
+	if user.TelegramID == nil {
+		s.logger.Info("Found user without telegram login", lf.UserID(user.ID))
+		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.TelegramLogin)
 		c.Abort()
 		return
 	}
