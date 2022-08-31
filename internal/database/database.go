@@ -139,7 +139,7 @@ func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) erro
 	}
 
 	if res.RowsAffected < 1 {
-		return errors.Errorf("Unknown user %d", uid)
+		return errors.Errorf("unknown user %d", uid)
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func (db *DataBase) SetUserRepository(user *models.User) error {
 		return res.Error
 	}
 	if res.RowsAffected < 1 {
-		return errors.Errorf("Unknown user %d", user.ID)
+		return errors.Errorf("unknown user %d", user.ID)
 	}
 	return nil
 }
@@ -229,7 +229,7 @@ func (db *DataBase) CreateFlag(task string) (*models.Flag, error) {
 	return flag, nil
 }
 
-func (db *DataBase) SubmitFlag(id string, gitlabLogin string) error {
+func (db *DataBase) SubmitFlag(id, gitlabLogin string) error {
 	result := db.Model(&models.Flag{}).Where("id = ? AND gitlab_login IS NULL", id).Update("gitlab_login", gitlabLogin)
 	if goerrors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return errors.New("Unknown flag")
@@ -286,9 +286,9 @@ func (db *DataBase) AddOverride(score *models.OverriddenScore) error {
 	}).Create(score).Error
 }
 
-func (db *DataBase) RemoveOverride(gitlab_login, task string) error {
+func (db *DataBase) RemoveOverride(gitlabLogin, task string) error {
 	return db.
-		Where("gitlab_login = ? AND task = ?", gitlab_login, task).
+		Where("gitlab_login = ? AND task = ?", gitlabLogin, task).
 		Delete(models.OverriddenScore{}).
 		Error
 }

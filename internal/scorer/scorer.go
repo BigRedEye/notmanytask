@@ -14,11 +14,11 @@ import (
 )
 
 type ProjectNameFactory interface {
-	MakeProjectUrl(user *models.User) string
+	MakeProjectURL(user *models.User) string
 	MakeProjectName(user *models.User) string
-	MakePipelineUrl(user *models.User, pipeline *models.Pipeline) string
-	MakeBranchUrl(user *models.User, pipeline *models.Pipeline) string
-	MakeTaskUrl(task string) string
+	MakePipelineURL(user *models.User, pipeline *models.Pipeline) string
+	MakeBranchURL(user *models.User, pipeline *models.Pipeline) string
+	MakeTaskURL(task string) string
 }
 
 type Scorer struct {
@@ -124,7 +124,7 @@ func (s Scorer) CalcScoreboard(groupName string) (*Standings, error) {
 func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*Standings, error) {
 	currentDeadlines := s.deadlines.GroupDeadlines(groupName)
 	if currentDeadlines == nil {
-		return nil, fmt.Errorf("No deadlines found")
+		return nil, fmt.Errorf("no deadlines found")
 	}
 
 	users, err := s.db.ListGroupUsers(groupName)
@@ -154,7 +154,7 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 
 	overrides, err := s.db.ListOverrides()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list all overrides: %w", err)
+		return nil, fmt.Errorf("failed to list all overrides: %w", err)
 	}
 
 	scores := make([]*UserScores, len(users))
@@ -222,12 +222,12 @@ func (s Scorer) makeCachedFlagsProvider() (flagsProvider, error) {
 func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 	currentDeadlines := s.deadlines.GroupDeadlines(user.GroupName)
 	if currentDeadlines == nil {
-		return nil, fmt.Errorf("No deadlines found")
+		return nil, fmt.Errorf("no deadlines found")
 	}
 
 	overrides, err := s.db.ListUserOverrides(*user.GitlabLogin)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list user overrides: %w", err)
+		return nil, fmt.Errorf("failed to list user overrides: %w", err)
 	}
 
 	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, overrides)
@@ -290,7 +290,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 				Status:    TaskStatusAssigned,
 				Score:     0,
 				MaxScore:  task.Score,
-				TaskUrl:   s.projects.MakeTaskUrl(task.Task),
+				TaskUrl:   s.projects.MakeTaskURL(task.Task),
 			}
 			maxTotalScore += tasks[i].MaxScore
 
@@ -298,8 +298,8 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 			if found {
 				tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
 				tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, pipeline)
-				tasks[i].PipelineUrl = s.projects.MakePipelineUrl(user, pipeline)
-				tasks[i].BranchUrl = s.projects.MakeBranchUrl(user, pipeline)
+				tasks[i].PipelineUrl = s.projects.MakePipelineURL(user, pipeline)
+				tasks[i].BranchUrl = s.projects.MakeBranchURL(user, pipeline)
 			} else {
 				flag, found := flagsMap[task.Task]
 				if found {

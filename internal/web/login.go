@@ -259,7 +259,7 @@ func tryGetToken(c *gin.Context) *string {
 		return nil
 	}
 	res, _ := v.(string)
-	if len(res) == 0 {
+	if res == "" {
 		return nil
 	}
 	return &res
@@ -346,9 +346,9 @@ func (s *server) getSession(c *gin.Context) *models.Session {
 	return c.MustGet("session").(*models.Session)
 }
 
-func (s loginService) RedirectToSignup(c *gin.Context, error string) {
+func (s loginService) RedirectToSignup(c *gin.Context, err string) {
 	s.clearSession(c)
-	s.server.RenderSignupPage(c, error)
+	s.server.RenderSignupPage(c, err)
 }
 
 func (s loginService) clearSession(c *gin.Context) {

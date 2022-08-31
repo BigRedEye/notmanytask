@@ -38,11 +38,11 @@ func (p *PipelinesFetcher) Run(ctx context.Context) {
 		return
 	}
 
-	tick := time.Tick(*interval)
+	tick := time.NewTicker(*interval)
 
 	for {
 		select {
-		case <-tick:
+		case <-tick.C:
 			p.fetchAllPipelines()
 		case <-ctx.Done():
 			p.logger.Info("Stopping pipelines fetcher")
@@ -52,11 +52,11 @@ func (p *PipelinesFetcher) Run(ctx context.Context) {
 }
 
 func (p *PipelinesFetcher) RunFresh(ctx context.Context) {
-	tick := time.Tick(time.Second)
+	tick := time.NewTicker(time.Second)
 
 	for {
 		select {
-		case <-tick:
+		case <-tick.C:
 			p.fetchFreshPipelines()
 		case <-ctx.Done():
 			p.logger.Info("Stopping fresh pipelines fetcher")
@@ -65,14 +65,14 @@ func (p *PipelinesFetcher) RunFresh(ctx context.Context) {
 	}
 }
 
-type qualifiedPipelineId struct {
+type qualifiedPipelineID struct {
 	project string
 	id      int
 }
 
 func (p *PipelinesFetcher) AddFresh(id int, project string) error {
 	p.logger.Info("Added fresh pipeline", lf.ProjectName(project), lf.PipelineID(id))
-	p.fresh.Store(&qualifiedPipelineId{project, id}, true)
+	p.fresh.Store(&qualifiedPipelineID{project, id}, true)
 	return nil
 }
 
@@ -141,7 +141,7 @@ func (p *PipelinesFetcher) fetchAllPipelines() {
 	})
 
 	if err == nil {
-		p.logger.Debug("Sucessfully fetched pipelines")
+		p.logger.Debug("Successfully fetched pipelines")
 	} else {
 		p.logger.Error("Failed to fetch pipelines", zap.Error(err))
 	}
@@ -176,7 +176,7 @@ func (p *PipelinesFetcher) forEachProject(callback func(project *gitlab.Project)
 func (p *PipelinesFetcher) fetchFreshPipelines() {
 	removed := make([]interface{}, 0)
 	p.fresh.Range(func(key, value interface{}) bool {
-		id := key.(*qualifiedPipelineId)
+		id := key.(*qualifiedPipelineID)
 		info, err := p.fetch(id.id, id.project)
 		if err != nil {
 			p.logger.Error("Failed to fetch pipeline", zap.Error(err))

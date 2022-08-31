@@ -17,12 +17,12 @@ func Token(token string) zap.Field {
 	return zap.String(FieldToken, token)
 }
 
-func UserID(ID uint) zap.Field {
-	return zap.Uint(FieldUserID, ID)
+func UserID(id uint) zap.Field {
+	return zap.Uint(FieldUserID, id)
 }
 
-func GitlabID(ID int) zap.Field {
-	return zap.Int(FieldGitlabID, ID)
+func GitlabID(id int) zap.Field {
+	return zap.Int(FieldGitlabID, id)
 }
 
 func GitlabLogin(login string) zap.Field {

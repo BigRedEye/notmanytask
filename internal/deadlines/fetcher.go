@@ -2,7 +2,7 @@ package deadlines
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"sync/atomic"
@@ -72,10 +72,10 @@ func fetch(url, format string) (*Deadlines, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("Failed to fetch deadlines: %s", resp.Status)
+		return nil, errors.Errorf("failed to fetch deadlines: %s", resp.Status)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to read response")
 	}
@@ -97,9 +97,9 @@ type Fetcher struct {
 	logger *zap.Logger
 }
 
-func NewFetcher(config *config.Config, logger *zap.Logger) (*Fetcher, error) {
+func NewFetcher(conf *config.Config, logger *zap.Logger) (*Fetcher, error) {
 	fetcher := &Fetcher{
-		config: config,
+		config: conf,
 		logger: logger,
 	}
 
@@ -116,14 +116,14 @@ func NewFetcher(config *config.Config, logger *zap.Logger) (*Fetcher, error) {
 }
 
 func (f *Fetcher) Run(ctx context.Context) {
-	tick := time.Tick(f.config.PullIntervals.Deadlines)
+	tick := time.NewTicker(f.config.PullIntervals.Deadlines)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick:
-			f.reload()
+		case <-tick.C:
+			_ = f.reload()
 		}
 	}
 }
@@ -142,12 +142,12 @@ func (f *Fetcher) reload() error {
 			return errors.Wrap(err, "Failed to reload deadlines")
 		}
 		groupDeadlines[group.Name] = deadlines
-		f.logger.Debug("Sucessfully fetched deadlines",
+		f.logger.Debug("Successfully fetched deadlines",
 			zap.Int("num_task_groups", len(deadlines.Assignments)),
 			zap.String("group", group.Name),
 		)
 	}
-	f.logger.Debug("Sucessfully fetched all deadlines")
+	f.logger.Debug("Successfully fetched all deadlines")
 
 	prev := f.current.Swap(groupDeadlines)
 	if !reflect.DeepEqual(prev, groupDeadlines) {

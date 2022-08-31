@@ -37,7 +37,7 @@ func Init(config Config) (*zap.Logger, error) {
 	level := zapcore.InfoLevel
 	err = level.UnmarshalText([]byte(config.Level))
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse log level: %w", err)
+		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
 
 	encoderConfig := zapcore.EncoderConfig{
@@ -73,7 +73,7 @@ func Init(config Config) (*zap.Logger, error) {
 	go func() {
 		for {
 			<-sighupChan
-			lj.Rotate()
+			_ = lj.Rotate()
 		}
 	}()
 

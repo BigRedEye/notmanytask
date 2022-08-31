@@ -25,7 +25,7 @@ func (s *server) RenderSubmitFlagPage(c *gin.Context) {
 	s.RenderSubmitFlagPageDetails(c, "", "")
 }
 
-func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, err string, success string) {
+func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, err, success string) {
 	user := c.MustGet("user").(*models.User)
 	c.HTML(http.StatusOK, "/flag.tmpl", gin.H{
 		"CourseName":     "HSE Advanced C++",
@@ -85,8 +85,8 @@ func (s *server) makeLinks(user *models.User) Links {
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
 		TasksRepository: s.config.GitLab.TaskUrlPrefix,
-		Repository:      s.gitlab.MakeProjectUrl(user),
-		Submits:         s.gitlab.MakeProjectSubmitsUrl(user),
+		Repository:      s.gitlab.MakeProjectURL(user),
+		Submits:         s.gitlab.MakeProjectSubmitsURL(user),
 		Logout:          s.config.Endpoints.Logout,
 		SubmitFlag:      s.config.Endpoints.Flag,
 	}

@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -66,8 +65,9 @@ func (f flagFetcher) doFetchFlag(task string) (string, error) {
 		log.Printf("Failed to send flag request: %+v\n", err)
 		return "", err
 	}
+	defer func() { _ = res.Body.Close() }()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Printf("Failed to read response body: %+v\n", err)
 		return "", err
@@ -117,11 +117,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	acceptErrorsBudget := 10
 	currentAcceptErrorsBudget := acceptErrorsBudget
-	connId := 0
+	connID := 0
 
 	for {
 		conn, err := listener.Accept()
@@ -135,14 +135,14 @@ func main() {
 			currentAcceptErrorsBudget++
 		}
 
-		go checker.handleConnection(context.Background(), conn, connId)
-		connId++
+		go checker.handleConnection(context.Background(), conn, connID)
+		connID++
 	}
 }
 
 // FIXME(BigRedEye): Read from config
-const MAX_INPUT_SIZE = 10 * 1024 * 1024 // 10MiB
-const MAX_FIRST_LINE_SIZE = 100
+const MaxInputSize = 10 * 1024 * 1024 // 10MiB
+const MaxFirstLineSizeE = 100
 
 type checker struct {
 	binariesDirectory string
@@ -152,7 +152,7 @@ type checker struct {
 }
 
 func newChecker(binariesDirectory, submitsDirectory string, concurrencyLevel int64, url, token string) (*checker, error) {
-	err := os.MkdirAll(submitsDirectory, 0755)
+	err := os.MkdirAll(submitsDirectory, 0750)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mkdir submits directory: %w", err)
 	}
@@ -174,7 +174,7 @@ func newChecker(binariesDirectory, submitsDirectory string, concurrencyLevel int
 
 func (c *checker) handleConnection(ctx context.Context, conn net.Conn, connID int) {
 	defer func() {
-		conn.Close()
+		_ = conn.Close()
 		log.Printf("Closed connection #%d from %s\n", connID, conn.RemoteAddr())
 	}()
 	log.Printf("New connection from #%d from %s\n", connID, conn.RemoteAddr())
@@ -182,7 +182,7 @@ func (c *checker) handleConnection(ctx context.Context, conn net.Conn, connID in
 	err := c.doHandleConnection(ctx, conn)
 	if err != nil {
 		log.Printf("Failed to handle connection: %+v", err)
-		io.WriteString(conn, fmt.Sprintf("Error: %s\n", err.Error()))
+		fmt.Fprintf(conn, "Error: %s\n", err.Error())
 	}
 }
 
@@ -193,10 +193,10 @@ func slowReadFirstLine(reader io.Reader) (string, error) {
 		n, err := reader.Read(buf)
 
 		if err == io.EOF || (err == nil && n != 1) {
-			if str.Len() == MAX_FIRST_LINE_SIZE {
+			if str.Len() == MaxFirstLineSizeE {
 				return "", fmt.Errorf("too long first line")
 			}
-			return "", fmt.Errorf("EOF before new line")
+			return "", fmt.Errorf("got EOF before new line")
 		}
 		if err != nil {
 			return "", err
@@ -207,12 +207,16 @@ func slowReadFirstLine(reader io.Reader) (string, error) {
 	return strings.TrimSpace(str.String()), nil
 }
 
+func writeStringOrIgnore(w io.Writer, s string) {
+	_, _ = io.WriteString(w, s)
+}
+
 func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute) // FIXME(BigRedEye): Timeout from config
 	defer cancel()
 
 	if !c.sema.TryAcquire(1) {
-		io.WriteString(conn, "Waiting for an available runner...\n")
+		writeStringOrIgnore(conn, "Waiting for an available runner...\n")
 		err := c.sema.Acquire(ctx, 1)
 		if err != nil {
 			return fmt.Errorf("failed to acquire semaphore: %w", err)
@@ -220,10 +224,10 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 	}
 	defer c.sema.Release(1)
 
-	io.WriteString(conn, "Enter task name: ")
-	reader := io.LimitReader(conn, MAX_INPUT_SIZE)
+	writeStringOrIgnore(conn, "Enter task name: ")
+	reader := io.LimitReader(conn, MaxInputSize)
 	// User should pass task name in the first line
-	task, err := slowReadFirstLine(io.LimitReader(reader, MAX_FIRST_LINE_SIZE))
+	task, err := slowReadFirstLine(io.LimitReader(reader, MaxFirstLineSizeE))
 	if err != nil {
 		return fmt.Errorf("failed to read first line: %w", err)
 	}
@@ -254,7 +258,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 		return fmt.Errorf("failed to prepare command: %w", err)
 	}
 
-	io.WriteString(conn, fmt.Sprintf("Running task %s\n", task))
+	fmt.Fprintf(conn, "Running task %s\n", task)
 	err = proxy.run()
 
 	if err != nil {
@@ -267,7 +271,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 				return fmt.Errorf("got EOF before command exit")
 			}
 
-			_, err = io.WriteString(conn, fmt.Sprintf("Command failed: %s\nTrying to fetch flag...\n", exitError.ProcessState))
+			_, err = fmt.Fprintf(conn, "Command failed: %s\nTrying to fetch flag...\n", exitError.ProcessState)
 			if err != nil {
 				return fmt.Errorf("failed to write to the connection: %w", err)
 			}
@@ -278,7 +282,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 				return fmt.Errorf("failed to fetch flag, try again a few minutes later")
 			}
 
-			io.WriteString(conn, flag+"\n")
+			writeStringOrIgnore(conn, flag+"\n")
 			return nil
 		} else {
 			log.Printf("Failed to run command %s: %s", executablePath, stderrBuffer)
@@ -286,7 +290,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 		}
 	}
 
-	io.WriteString(conn, "Command finished normally\n")
+	writeStringOrIgnore(conn, "Command finished normally\n")
 	return nil
 }
 
@@ -302,7 +306,7 @@ type commandProxy struct {
 	wg         *sync.WaitGroup
 }
 
-func newCommandProxy(stdin io.Reader, stdout io.Writer, stderr io.Writer, cmd *exec.Cmd) (*commandProxy, error) {
+func newCommandProxy(stdin io.Reader, stdout, stderr io.Writer, cmd *exec.Cmd) (*commandProxy, error) {
 	proxy := &commandProxy{
 		stdin:  stdin,
 		stdout: stdout,
@@ -345,11 +349,11 @@ func (c *commandProxy) run() error {
 }
 
 func (c *commandProxy) handleStdin() {
-	io.Copy(c.stdinPipe, c.stdin)
+	_, _ = io.Copy(c.stdinPipe, c.stdin)
 
 	// in case of closed connection
 	// we should try stop other io goroutines
-	c.stdinPipe.Close()
+	_ = c.stdinPipe.Close()
 
 	log.Printf("Done stdin")
 }
@@ -365,7 +369,7 @@ func (c *commandProxy) handleStderr() {
 }
 
 func copyAndDone(dst io.Writer, src io.ReadCloser, wg *sync.WaitGroup) {
-	io.Copy(dst, src)
-	src.Close()
+	_, _ = io.Copy(dst, src)
+	_ = src.Close()
 	wg.Done()
 }

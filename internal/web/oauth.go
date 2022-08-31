@@ -15,14 +15,14 @@ type AuthClient struct {
 	conf *oauth2.Config
 }
 
-func NewAuthClient(config *config.Config) *AuthClient {
+func NewAuthClient(conf *config.Config) *AuthClient {
 	return &AuthClient{
 		conf: &oauth2.Config{
-			ClientID:     config.GitLab.Application.ClientID,
-			ClientSecret: config.GitLab.Application.Secret,
+			ClientID:     conf.GitLab.Application.ClientID,
+			ClientSecret: conf.GitLab.Application.Secret,
 			Scopes:       []string{"read_user"},
 			Endpoint:     gitlab.Endpoint,
-			RedirectURL:  config.Endpoints.HostName + config.Endpoints.OauthCallback,
+			RedirectURL:  conf.Endpoints.HostName + conf.Endpoints.OauthCallback,
 		},
 	}
 }

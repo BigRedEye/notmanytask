@@ -39,19 +39,19 @@ func (s apiService) report(c *gin.Context) {
 
 	req := api.ReportRequest{}
 	if err := c.Bind(&req); err != nil {
-		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse request body: %w", err))
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err))
 		return
 	}
 
 	id, err := strconv.Atoi(req.PipelineID)
 	if err != nil {
-		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse pipeline_id: %w", err))
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse pipeline_id: %w", err))
 		return
 	}
 
 	userID, err := strconv.Atoi(req.UserID)
 	if err != nil {
-		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse user_id: %w", err))
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse user_id: %w", err))
 		return
 	}
 
@@ -65,7 +65,7 @@ func (s apiService) report(c *gin.Context) {
 
 	if !s.isTokenValid(req.Token) {
 		s.log.Warn("Unknown token", lf.Token(req.Token))
-		onError(http.StatusUnauthorized, fmt.Errorf("Invalid or expired token"))
+		onError(http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))
 		return
 	}
 
@@ -96,7 +96,7 @@ func (s apiService) createFlag(c *gin.Context) {
 
 	req := api.FlagRequest{}
 	if err := c.Bind(&req); err != nil {
-		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse request body: %w", err))
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err))
 		return
 	}
 
@@ -107,7 +107,7 @@ func (s apiService) createFlag(c *gin.Context) {
 
 	if !s.isTokenValid(req.Token) {
 		s.log.Warn("Unknown token", lf.Token(req.Token))
-		onError(http.StatusUnauthorized, fmt.Errorf("Invalid or expired token"))
+		onError(http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))
 		return
 	}
 
@@ -141,21 +141,21 @@ func (s apiService) userScores(c *gin.Context) {
 
 	req := api.UserScoresRequest{}
 	if err := c.Bind(&req); err != nil {
-		onError(http.StatusBadRequest, fmt.Errorf("Failed to parse request: %w", err))
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse request: %w", err))
 		return
 	}
 
 	user, err := s.server.db.FindUserByGitlabLogin(req.Login)
 	if err != nil {
 		s.log.Error("Failed to get user by login", lf.GitlabLogin(req.Login))
-		onError(http.StatusNotFound, fmt.Errorf("Not found user"))
+		onError(http.StatusNotFound, fmt.Errorf("not found user"))
 		return
 	}
 
 	scores, err := s.server.scorer.CalcUserScores(user)
 	if err != nil {
 		s.log.Error("Failed to calc scores", lf.GitlabLogin(req.Login), zap.Error(err))
-		onError(http.StatusInternalServerError, fmt.Errorf("Failed to calc scores"))
+		onError(http.StatusInternalServerError, fmt.Errorf("failed to calc scores"))
 		return
 	}
 
@@ -181,7 +181,7 @@ func (s apiService) standings(c *gin.Context) {
 
 	standings, err := s.server.scorer.CalcScoreboard("hse")
 	if err != nil {
-		onError(http.StatusInternalServerError, fmt.Errorf("Failed to list scores: %w", err))
+		onError(http.StatusInternalServerError, fmt.Errorf("failed to list scores: %w", err))
 		return
 	}
 

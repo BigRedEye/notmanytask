@@ -61,7 +61,7 @@ func Extract(input io.Reader, visitor Visitor) error {
 					return err
 				}
 				if written < count {
-					return fmt.Errorf("Failed to write %d bytes", count)
+					return fmt.Errorf("failed to write %d bytes", count)
 				}
 			}
 

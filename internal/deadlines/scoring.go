@@ -38,7 +38,7 @@ type ExponentialScore struct {
 	Threshold  float64
 }
 
-func (s *ExponentialScore) Score(maxScore int, deadline time.Time, submitTime time.Time) int {
+func (s *ExponentialScore) Score(maxScore int, deadline, submitTime time.Time) int {
 	if submitTime.Before(deadline) {
 		return maxScore
 	}
@@ -54,7 +54,7 @@ type LinearScore struct {
 	Multiplier float64
 }
 
-func (s *LinearScore) Score(maxScore int, deadline time.Time, submitTime time.Time) int {
+func (s *LinearScore) Score(maxScore int, deadline, submitTime time.Time) int {
 	if submitTime.Before(deadline) {
 		return maxScore
 	}
@@ -99,7 +99,7 @@ func (s *ScoringPolicySpec) UnmarshalYAML(unmarshal func(interface{}) error) err
 	case "linear":
 		s.Policy = new(LinearScore)
 	default:
-		return fmt.Errorf("Unknown policy %s", s.Kind)
+		return fmt.Errorf("unknown policy %s", s.Kind)
 	}
 	return obj.Spec.unmarshal(s.Policy)
 }

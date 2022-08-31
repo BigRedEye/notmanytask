@@ -92,7 +92,7 @@ func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
 		return false
 	}
 
-	project := p.MakeProjectUrl(user)
+	project := p.MakeProjectURL(user)
 	log = log.With(zap.String("project", project))
 
 	user.Repository = &project
@@ -102,6 +102,6 @@ func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
 		return false
 	}
 
-	log.Info("Sucessfully set user repo")
+	log.Info("Successfully set user repo")
 	return true
 }

@@ -121,7 +121,7 @@ func (d *Deadlines) buildScoringGroups() error {
 
 func (d *Deadlines) GetScoringGroup(group *TaskGroup) *ScoringGroup {
 	scoringGroupName := group.Group
-	if len(scoringGroupName) == 0 {
+	if scoringGroupName == "" {
 		scoringGroupName = d.Scoring.DefaultGroup
 	}
 

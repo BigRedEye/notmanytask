@@ -25,13 +25,13 @@ type Client struct {
 	logger *zap.Logger
 }
 
-func NewClient(config *config.Config, logger *zap.Logger) (*Client, error) {
-	client, err := gitlab.NewClient(config.GitLab.Api.Token, gitlab.WithBaseURL(config.GitLab.BaseURL))
+func NewClient(conf *config.Config, logger *zap.Logger) (*Client, error) {
+	client, err := gitlab.NewClient(conf.GitLab.Api.Token, gitlab.WithBaseURL(conf.GitLab.BaseURL))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create gitlab client")
 	}
 	return &Client{
-		config: config,
+		config: conf,
 		gitlab: client,
 		logger: logger,
 	}, nil
@@ -83,7 +83,7 @@ func (c Client) InitializeProject(user *models.User) error {
 	}
 
 	// Prepare README.md with basic info
-	_, resp, err = c.gitlab.Commits.CreateCommit(project.ID, &gitlab.CreateCommitOptions{
+	_, _, err = c.gitlab.Commits.CreateCommit(project.ID, &gitlab.CreateCommitOptions{
 		Branch:        gitlab.String(master),
 		CommitMessage: gitlab.String("Initialize repo"),
 		AuthorName:    gitlab.String("notmanytask"),
@@ -172,13 +172,13 @@ func (c Client) MakeProjectName(user *models.User) string {
 	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, cleanupName(user.FirstName), cleanupName(user.LastName), *user.GitlabLogin)
 }
 
-func (c Client) MakeProjectUrl(user *models.User) string {
+func (c Client) MakeProjectURL(user *models.User) string {
 	name := c.MakeProjectName(user)
 	return fmt.Sprintf("%s/%s/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name)
 }
 
-func (c Client) MakeProjectSubmitsUrl(user *models.User) string {
-	url := c.MakeProjectUrl(user)
+func (c Client) MakeProjectSubmitsURL(user *models.User) string {
+	url := c.MakeProjectURL(user)
 	return fmt.Sprintf("%s/-/jobs", url)
 }
 
@@ -186,16 +186,16 @@ func (c Client) MakeProjectWithNamespace(project string) string {
 	return fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, project)
 }
 
-func (c Client) MakePipelineUrl(user *models.User, pipeline *models.Pipeline) string {
+func (c Client) MakePipelineURL(user *models.User, pipeline *models.Pipeline) string {
 	name := c.MakeProjectName(user)
 	return fmt.Sprintf("%s/%s/%s/-/pipelines/%d", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.ID)
 }
 
-func (c Client) MakeBranchUrl(user *models.User, pipeline *models.Pipeline) string {
+func (c Client) MakeBranchURL(user *models.User, pipeline *models.Pipeline) string {
 	name := c.MakeProjectName(user)
 	return fmt.Sprintf("%s/%s/%s/-/tree/submits/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.Task)
 }
 
-func (c Client) MakeTaskUrl(task string) string {
+func (c Client) MakeTaskURL(task string) string {
 	return fmt.Sprintf("%s/%s", c.config.GitLab.TaskUrlPrefix, task)
 }

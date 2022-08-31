@@ -66,9 +66,7 @@ func (s *server) run() error {
 		"inc": func(i int) int {
 			return i + 1
 		},
-		"prettifyTaskName": func(name string) string {
-			return filepath.Base(name)
-		},
+		"prettifyTaskName": filepath.Base,
 	}
 	tmpl, err := buildHTMLTemplates(funcs)
 	if err != nil {
