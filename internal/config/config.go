@@ -24,6 +24,7 @@ type GitLabConfig struct {
 	Api struct {
 		Token string
 	}
+	CIConfigPath string
 }
 
 type EndpointsConfig struct {

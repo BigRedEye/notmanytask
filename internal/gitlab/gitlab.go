@@ -67,6 +67,7 @@ func (c Client) InitializeProject(user *models.User) error {
 			DefaultBranch:        gitlab.String(master),
 			Visibility:           gitlab.Visibility(gitlab.PrivateVisibility),
 			SharedRunnersEnabled: gitlab.Bool(false),
+			CIConfigPath:         &c.config.GitLab.CIConfigPath,
 		})
 		if err != nil {
 			log.Error("Failed to create project", zap.Error(err))
