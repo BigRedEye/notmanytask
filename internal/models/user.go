@@ -18,7 +18,7 @@ type User struct {
 	FirstName     string `gorm:"uniqueIndex:idx_name"`
 	LastName      string `gorm:"uniqueIndex:idx_name"`
 	GroupName     string `gorm:"uniqueIndex:idx_name"`
-	TelegramLogin string `gorm:"uniqueIndex:telegram"`
+	TelegramLogin *string
 	HasRetake     bool
 }
 

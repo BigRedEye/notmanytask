@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/alexsergivan/transliterator"
 	"github.com/pkg/errors"
 	"github.com/xanzy/go-gitlab"
 	"go.uber.org/zap"
@@ -20,9 +21,10 @@ func Main() {
 }
 
 type Client struct {
-	config *config.Config
-	gitlab *gitlab.Client
-	logger *zap.Logger
+	config   *config.Config
+	gitlab   *gitlab.Client
+	logger   *zap.Logger
+	translit *transliterator.Transliterator
 }
 
 func NewClient(conf *config.Config, logger *zap.Logger) (*Client, error) {
@@ -31,9 +33,10 @@ func NewClient(conf *config.Config, logger *zap.Logger) (*Client, error) {
 		return nil, errors.Wrap(err, "Failed to create gitlab client")
 	}
 	return &Client{
-		config: conf,
-		gitlab: client,
-		logger: logger,
+		config:   conf,
+		gitlab:   client,
+		logger:   logger,
+		translit: transliterator.NewTransliterator(nil),
 	}, nil
 }
 
@@ -165,12 +168,13 @@ func (c Client) InitializeProject(user *models.User) error {
 	return nil
 }
 
-func cleanupName(name string) string {
-	return strings.ReplaceAll(name, "-", "")
+func (c Client) cleanupName(name string) string {
+	transliteratedName := c.translit.Transliterate(name, "en")
+	return strings.ReplaceAll(transliteratedName, "-", "")
 }
 
 func (c Client) MakeProjectName(user *models.User) string {
-	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, cleanupName(user.FirstName), cleanupName(user.LastName), *user.GitlabLogin)
+	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, c.cleanupName(user.FirstName), c.cleanupName(user.LastName), *user.GitlabLogin)
 }
 
 func (c Client) MakeProjectURL(user *models.User) string {
