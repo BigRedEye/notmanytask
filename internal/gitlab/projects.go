@@ -32,7 +32,7 @@ func (p ProjectsMaker) Run(ctx context.Context) {
 
 	p.initializeMissingProjects()
 
-	tick := time.Tick(*p.config.PullIntervals.Projects)
+	tick := time.NewTimer(*p.config.PullIntervals.Projects)
 	for {
 		select {
 		case user := <-p.users:
@@ -43,7 +43,7 @@ func (p ProjectsMaker) Run(ctx context.Context) {
 			if !p.maybeInitializeProject(user) {
 				p.users <- user
 			}
-		case <-tick:
+		case <-tick.C:
 			p.initializeMissingProjects()
 		case <-ctx.Done():
 			p.logger.Info("Stopping projects maker")
