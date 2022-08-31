@@ -42,8 +42,8 @@ func setupLoginService(server *server, r *gin.Engine) error {
 	r.GET(server.config.Endpoints.Logout, s.logout)
 	r.GET(server.config.Endpoints.Signup, s.signup)
 	r.POST(server.config.Endpoints.Signup, s.signupForm)
-	r.GET(server.config.Endpoints.TelegramLogin, server.validateSession, s.telegramLogin)
-	r.GET(server.config.Endpoints.TelegramCallback, server.validateSession, s.telegramCallback)
+	r.GET(server.config.Endpoints.TelegramLogin, server.validateSession(false), s.telegramLogin)
+	r.GET(server.config.Endpoints.TelegramCallback, server.validateSession(false), s.telegramCallback)
 	r.GET(server.config.Endpoints.OauthCallback, s.oauth)
 
 	return nil
@@ -144,14 +144,15 @@ func (s loginService) telegramCallback(c *gin.Context) {
 	user := s.server.getUser(c)
 	log := s.log.With(lf.UserID(user.ID))
 
-	query := maps.Copy(c.QueryMap)
-
-	hash := query["hash"]
+	query := maps.Clone(c.Request.URL.Query())
+	hash := query.Get("hash")
 	delete(query, "hash")
 
 	queryArguments := make([]string, 0, len(query))
 	for k, v := range query {
-		queryArguments = append(queryArguments, k+"="+v)
+		for _, value := range v {
+			queryArguments = append(queryArguments, k+"="+value)
+		}
 	}
 	slices.Sort(queryArguments)
 	dataCheckString := strings.Join(queryArguments, "\n")
@@ -167,9 +168,9 @@ func (s loginService) telegramCallback(c *gin.Context) {
 		return
 	}
 
-	telegramID := query["id"]
-	firstName := query["first_name"]
-	lastName := query["last_name"]
+	telegramID := query.Get("id")
+	firstName := query.Get("first_name")
+	lastName := query.Get("last_name")
 	log.Info("Verified telegram auth",
 		zap.String("user_name", firstName+" "+lastName),
 		zap.String("telegram_id", telegramID),
@@ -352,43 +353,45 @@ func (s *server) tryFindUserByToken(c *gin.Context) (*models.User, *models.Sessi
 	return user, session, nil
 }
 
-func (s *server) validateSession(c *gin.Context) {
-	user, session, err := s.tryFindUserByToken(c)
-	if err != nil || session == nil {
-		s.logger.Warn("Failed to find user session", zap.Error(err))
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
-		c.Abort()
-		return
-	}
+func (s *server) validateSession(verifyTelegram bool) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		user, session, err := s.tryFindUserByToken(c)
+		if err != nil || session == nil {
+			s.logger.Warn("Failed to find user session", zap.Error(err))
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)
+			c.Abort()
+			return
+		}
 
-	if user.TelegramID == nil {
-		s.logger.Info("Found user without telegram login", lf.UserID(user.ID))
-		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.TelegramLogin)
-		c.Abort()
-		return
-	}
+		if verifyTelegram && user.TelegramID == nil {
+			s.logger.Info("Found user without telegram login", lf.UserID(user.ID))
+			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.TelegramLogin)
+			c.Abort()
+			return
+		}
 
-	c.Set("user", user)
-	c.Set("session", session)
+		c.Set("user", user)
+		c.Set("session", session)
 
-	s.logger.Info("Valid session",
-		zap.Uint("session_id", session.ID),
-		zap.Uint("user_id", user.ID),
-		zap.Stringp("gitlab_login", user.GitlabLogin),
-		zap.Intp("gitlab_id", user.GitlabID),
-	)
-
-	if user.GitlabID == nil || user.GitlabLogin == nil {
-		s.logger.Warn("Found user without gitlab account, redirecting to /login",
-			zap.String("token", session.Token),
+		s.logger.Info("Valid session",
+			zap.Uint("session_id", session.ID),
 			zap.Uint("user_id", user.ID),
+			zap.Stringp("gitlab_login", user.GitlabLogin),
+			zap.Intp("gitlab_id", user.GitlabID),
 		)
-		c.Redirect(http.StatusFound, s.config.Endpoints.Login)
-		c.Abort()
-		return
-	}
 
-	c.Next()
+		if user.GitlabID == nil || user.GitlabLogin == nil {
+			s.logger.Warn("Found user without gitlab account, redirecting to /login",
+				zap.String("token", session.Token),
+				zap.Uint("user_id", user.ID),
+			)
+			c.Redirect(http.StatusFound, s.config.Endpoints.Login)
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 func (s *server) fillUserFromQuery(c *gin.Context) {

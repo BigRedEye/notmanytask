@@ -83,6 +83,7 @@ type PullIntervalsConfig struct {
 }
 
 type TelegramBotConfig struct {
+	BotLogin string
 	BotToken string
 }
 
