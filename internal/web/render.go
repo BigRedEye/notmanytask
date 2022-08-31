@@ -14,7 +14,7 @@ import (
 )
 
 func (s *server) RenderSignupPage(c *gin.Context, err string) {
-	c.HTML(http.StatusOK, "/signup.tmpl", gin.H{
+	c.HTML(http.StatusOK, "signup.tmpl", gin.H{
 		"CourseName":   "HSE Advanced C++",
 		"Config":       s.config,
 		"ErrorMessage": err,
@@ -27,7 +27,7 @@ func (s *server) RenderSubmitFlagPage(c *gin.Context) {
 
 func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, err, success string) {
 	user := c.MustGet("user").(*models.User)
-	c.HTML(http.StatusOK, "/flag.tmpl", gin.H{
+	c.HTML(http.StatusOK, "flag.tmpl", gin.H{
 		"CourseName":     "HSE Advanced C++",
 		"Config":         s.config,
 		"ErrorMessage":   err,
@@ -97,7 +97,7 @@ func (s *server) RenderHomePage(c *gin.Context) {
 	scores, err := s.scorer.CalcUserScores(user)
 	reverseScores(scores)
 
-	c.HTML(http.StatusOK, "/home.tmpl", gin.H{
+	c.HTML(http.StatusOK, "home.tmpl", gin.H{
 		// FIXME(BigRedEye): Do not hardcode title
 		"CourseName": "HSE Advanced C++",
 		"Title":      "HSE Advanced C++",
@@ -116,7 +116,7 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 	}
 	reverseScores(scores)
 
-	c.HTML(http.StatusOK, "/home.tmpl", gin.H{
+	c.HTML(http.StatusOK, "home.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
 		"Title":      "HSE Advanced C++",
 		"Config":     s.config,
@@ -137,7 +137,7 @@ func (s *server) doRenderStandingsPage(c *gin.Context, filter scorer.UserFilter)
 	user := c.MustGet("user").(*models.User)
 	scores, err := s.scorer.CalcScoreboardWithFilter("hse", filter)
 	reverseScoreboardGroups(scores)
-	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{
+	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
 		"Title":      "HSE Advanced C++",
 		"Config":     s.config,
@@ -161,7 +161,7 @@ func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 	user, _ := s.db.FindUserByGitlabLogin(c.Query("login"))
 	scores, err := s.scorer.CalcScoreboard("hse")
 	reverseScoreboardGroups(scores)
-	c.HTML(http.StatusOK, "/standings.tmpl", gin.H{
+	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
 		"Title":      "HSE Advanced C++",
 		"Config":     s.config,

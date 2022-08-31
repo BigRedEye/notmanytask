@@ -79,6 +79,7 @@ func (s *server) run() error {
 	r.Use(ginzap.Ginzap(s.logger, time.RFC3339, true))
 	r.Use(ginzap.RecoveryWithZap(s.logger, true))
 
+	s.logger.Info("Defined templates are: ", zap.String("tmpl", tmpl.DefinedTemplates()))
 	r.SetHTMLTemplate(tmpl)
 
 	// TODO(BigRedEye): Move cookies to the separate file

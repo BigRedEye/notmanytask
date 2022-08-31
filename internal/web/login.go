@@ -43,7 +43,7 @@ func setupLoginService(server *server, r *gin.Engine) error {
 }
 
 func (s loginService) signup(c *gin.Context) {
-	c.HTML(http.StatusOK, "/signup.tmpl", gin.H{
+	c.HTML(http.StatusOK, "signup.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
 		"Config":     s.config,
 	})
