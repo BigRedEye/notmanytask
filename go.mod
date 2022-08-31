@@ -9,6 +9,7 @@ require (
 	github.com/gin-contrib/sessions v0.0.3
 	github.com/gin-contrib/zap v0.0.1
 	github.com/gin-gonic/gin v1.7.4
+	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.1.2
 	github.com/jackc/pgconn v1.8.1

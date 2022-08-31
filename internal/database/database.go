@@ -1,13 +1,12 @@
 package database
 
 import (
-	goerrors "errors"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -35,7 +34,7 @@ func (e *DuplicateKey) Unwrap() error {
 
 func IsDuplicateKey(err error) bool {
 	duplicateKey := &DuplicateKey{}
-	return goerrors.As(err, &duplicateKey)
+	return errors.As(err, &duplicateKey)
 }
 
 // gorm sucks huge balls:(
@@ -105,6 +104,18 @@ func (db *DataBase) FindUserByGitlabID(id int) (*models.User, error) {
 	return &user, nil
 }
 
+func (db *DataBase) FindUserByTelegramID(id int64) (*models.User, error) {
+	var user models.User
+	err := db.First(&user, "telegram_id = ?", id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
 	var users []*models.User
 	err := db.Find(&users, "repository IS NULL AND gitlab_id IS NOT NULL AND gitlab_login IS NOT NULL").Error
@@ -139,7 +150,7 @@ func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) erro
 	}
 
 	if res.RowsAffected < 1 {
-		return errors.Errorf("unknown user %d", uid)
+		return fmt.Errorf("unknown user %d", uid)
 	}
 	return nil
 }
@@ -150,7 +161,7 @@ func (db *DataBase) SetUserRepository(user *models.User) error {
 		return res.Error
 	}
 	if res.RowsAffected < 1 {
-		return errors.Errorf("unknown user %d", user.ID)
+		return fmt.Errorf("unknown user %d", user.ID)
 	}
 	return nil
 }
@@ -161,7 +172,7 @@ func (db *DataBase) SetUserTelegramID(user *models.User) error {
 		return res.Error
 	}
 	if res.RowsAffected < 1 {
-		return errors.Errorf("unknown user %d", user.ID)
+		return fmt.Errorf("unknown user %d", user.ID)
 	}
 	return nil
 }
@@ -196,7 +207,7 @@ func (db *DataBase) CreateSession(user uint) (*models.Session, error) {
 		Token:  uuid.Must(uuid.NewUUID()).String(),
 		UserID: user,
 	}
-	res := db.DB.Create(session)
+	res := db.Create(session)
 	if res.Error != nil {
 		return nil, res.Error
 	}
@@ -210,7 +221,7 @@ func (db *DataBase) FindSession(token string) (*models.Session, error) {
 		return nil, res.Error
 	}
 	if res.RowsAffected < 1 {
-		return nil, errors.New("Unknown session")
+		return nil, fmt.Errorf("unknown session")
 	}
 	return &session, nil
 }
@@ -242,14 +253,14 @@ func (db *DataBase) CreateFlag(task string) (*models.Flag, error) {
 
 func (db *DataBase) SubmitFlag(id, gitlabLogin string) error {
 	result := db.Model(&models.Flag{}).Where("id = ? AND gitlab_login IS NULL", id).Update("gitlab_login", gitlabLogin)
-	if goerrors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return errors.New("Unknown flag")
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("unknown flag")
 	}
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("Unknown flag")
+		return fmt.Errorf("unknown flag")
 	}
 	return nil
 }

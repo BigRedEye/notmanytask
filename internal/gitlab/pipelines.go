@@ -175,7 +175,7 @@ func (p *PipelinesFetcher) forEachProject(callback func(project *gitlab.Project)
 
 func (p *PipelinesFetcher) fetchFreshPipelines() {
 	removed := make([]interface{}, 0)
-	p.fresh.Range(func(key, value interface{}) bool {
+	p.fresh.Range(func(key, _ interface{}) bool {
 		id := key.(*qualifiedPipelineID)
 		info, err := p.fetch(id.id, id.project)
 		if err != nil {

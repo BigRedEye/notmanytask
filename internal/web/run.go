@@ -12,6 +12,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
 	"github.com/bigredeye/notmanytask/internal/scorer"
+	"github.com/bigredeye/notmanytask/internal/tgbot"
 	zlog "github.com/bigredeye/notmanytask/pkg/log"
 	"github.com/pkg/errors"
 )
@@ -48,8 +49,11 @@ func Run() error {
 		return errors.Wrap(err, "Failed to open database")
 	}
 
-	deadlinesCtx, deadlinesCancel := context.WithCancel(ctx)
-	defer deadlinesCancel()
+	bot, err := tgbot.NewBot(config, logger.Named("tgbot"), db)
+	if err != nil {
+		return errors.Wrap(err, "failed to create telegram bot")
+	}
+
 	deadlines, err := deadlines.NewFetcher(config, logger.Named("deadlines.fetcher"))
 	if err != nil {
 		return errors.Wrap(err, "Failed to create deadlines fetcher")
@@ -60,15 +64,11 @@ func Run() error {
 		return errors.Wrap(err, "Failed to create gitlab client")
 	}
 
-	projectsCtx, projectsCancel := context.WithCancel(ctx)
-	defer projectsCancel()
 	projects, err := gitlab.NewProjectsMaker(git, db)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}
 
-	pipelinesCtx, pipelinesCancel := context.WithCancel(ctx)
-	defer pipelinesCancel()
 	pipelines, err := gitlab.NewPipelinesFetcher(git, db)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create projects maker")
@@ -76,25 +76,26 @@ func Run() error {
 
 	scorer := scorer.NewScorer(db, deadlines, git)
 
-	freshPipelinesCtx, freshPipelinesCancel := context.WithCancel(ctx)
-	defer freshPipelinesCancel()
-
-	wg.Add(4)
+	wg.Add(5)
 	go func() {
 		defer wg.Done()
-		deadlines.Run(deadlinesCtx)
+		deadlines.Run(ctx)
 	}()
 	go func() {
 		defer wg.Done()
-		projects.Run(projectsCtx)
+		projects.Run(ctx)
 	}()
 	go func() {
 		defer wg.Done()
-		pipelines.Run(pipelinesCtx)
+		pipelines.Run(ctx)
 	}()
 	go func() {
 		defer wg.Done()
-		pipelines.RunFresh(freshPipelinesCtx)
+		pipelines.RunFresh(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		bot.Run(ctx)
 	}()
 
 	s, err := newServer(config, logger.Named("server"), db, deadlines, projects, pipelines, scorer, git)
