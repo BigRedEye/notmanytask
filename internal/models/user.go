@@ -15,10 +15,11 @@ type User struct {
 
 	GitlabUser
 
-	FirstName string `gorm:"uniqueIndex:idx_name"`
-	LastName  string `gorm:"uniqueIndex:idx_name"`
-	GroupName string `gorm:"uniqueIndex:idx_name"`
-	HasRetake bool
+	FirstName     string `gorm:"uniqueIndex:idx_name"`
+	LastName      string `gorm:"uniqueIndex:idx_name"`
+	GroupName     string `gorm:"uniqueIndex:idx_name"`
+	TelegramLogin string `gorm:"uniqueIndex:telegram"`
+	HasRetake     bool
 }
 
 type Session struct {
