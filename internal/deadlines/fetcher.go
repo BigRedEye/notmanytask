@@ -165,3 +165,17 @@ func (f *Fetcher) GroupDeadlines(group string) *Deadlines {
 	groupDeadlines := cur.(deadlinesMap)
 	return groupDeadlines[group]
 }
+
+func (f *Fetcher) AnyGroupHasTask(task string) bool {
+	cur := f.current.Load()
+	if cur == nil {
+		return false
+	}
+	groupDeadlines := cur.(deadlinesMap)
+	for _, deadlines := range groupDeadlines {
+		if deadlines.HasTask(task) {
+			return true
+		}
+	}
+	return false
+}

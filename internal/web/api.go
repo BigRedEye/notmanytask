@@ -111,6 +111,11 @@ func (s apiService) createFlag(c *gin.Context) {
 		return
 	}
 
+	if !s.server.deadlines.AnyGroupHasTask(req.Task) {
+		onError(http.StatusBadRequest, fmt.Errorf("unknown task %s", req.Task))
+		return
+	}
+
 	flag, err := s.server.db.CreateFlag(req.Task)
 	if err != nil {
 		s.log.Error("Failed to create flag", zap.String("task", req.Task), zap.Error(err))

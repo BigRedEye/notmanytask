@@ -144,3 +144,14 @@ func (d *Deadlines) GetScoringPolicy(group *TaskGroup) ScoringPolicy {
 	}
 	return policy
 }
+
+func (d *Deadlines) HasTask(name string) bool {
+	for _, assignment := range d.Assignments {
+		for _, task := range assignment.Tasks {
+			if task.Task == name {
+				return true
+			}
+		}
+	}
+	return false
+}
