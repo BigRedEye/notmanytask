@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -232,13 +233,14 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 		return fmt.Errorf("failed to read first line: %w", err)
 	}
 
-	task = strings.ReplaceAll(task, "_", "-")
-	executablePath := path.Join(c.binariesDirectory, "ctf_"+strings.ReplaceAll(task, "-", "_"))
+	fullTaskName := strings.ReplaceAll(task, "_", "-")
+	lastTaskName := filepath.Base(fullTaskName)
+	executablePath := path.Join(c.binariesDirectory, "ctf_"+strings.ReplaceAll(lastTaskName, "-", "_"))
 	if !isRegularFile(executablePath) {
 		return fmt.Errorf("unknown task %s", task)
 	}
 
-	inputPath := path.Join(c.submitsDirectory, task+"_"+time.Now().Format("2006-01-02T15:04:05.000"))
+	inputPath := path.Join(c.submitsDirectory, lastTaskName+"_"+time.Now().Format("2006-01-02T15:04:05.000"))
 	submitFile, err := os.Create(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create input file: %w", err)
@@ -264,7 +266,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 	if err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
-			log.Printf("Command %s failed with code %d, status: %s", task, exitError.ExitCode(), exitError.String())
+			log.Printf("Command %s failed with code %d, status: %s", executablePath, exitError.ExitCode(), exitError.String())
 			status := exitError.Sys().(syscall.WaitStatus)
 			if status.Signal() == os.Interrupt {
 				log.Printf("Command was interrupted")

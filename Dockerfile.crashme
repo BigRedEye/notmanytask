@@ -1,3 +1,27 @@
+FROM golang:1.19-alpine AS build
+
+WORKDIR /usr/src/app
+
+RUN apk add --update \
+        curl \
+        gcc \
+        git \
+        make \
+        musl-dev \
+        file
+
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+COPY . .
+RUN make crashme
+RUN cp build/crashme /crashme
+RUN ldd /crashme || true
+RUN file /crashme
+
+
+
 FROM ubuntu:20.04 AS base
 
 RUN echo "Don't use cache #3" > /.force_full_rebuild
@@ -15,7 +39,9 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y \
     clang-tools-11 \
     g++-10
 
+RUN apt-get update
 RUN apt-get install -y \
+    jq \
     python3 \
     python3-pip \
     git
@@ -32,27 +58,12 @@ RUN apt-get install -y \
     libpoco-dev \
     libjsoncpp-dev \
     libboost-dev \
+    libboost-context-dev \
     libpng-dev \
     libre2-dev
 
 RUN apt-get install -y clang-format-11 clang-tidy-11
-RUN apt-get install -y libjpeg-dev
-
-
-
-FROM base AS build
-
-WORKDIR /usr/src/app
-
-RUN apt install -y golang
-
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
-
-COPY . .
-RUN make crashme
-RUN cp build/crashme /crashme
+RUN apt-get install -y libjpeg-dev libfftw3-dev
 
 
 

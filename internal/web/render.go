@@ -44,7 +44,7 @@ func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, err, success string
 	})
 }
 
-var flagRe = regexp.MustCompile(`^\{FLAG(-[a-z0-9_]+)+(-[0-9a-f]+)+\}$`)
+var flagRe = regexp.MustCompile(`^\{FLAG(-[a-z0-9_/]+)+(-[0-9a-f]+)+\}$`)
 
 func (s *server) handleFlagSubmit(c *gin.Context) {
 	user := c.MustGet("user").(*models.User)

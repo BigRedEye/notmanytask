@@ -52,10 +52,10 @@
             <div class="card-body">
               <form method="post" action="{{ .Links.SubmitFlag }}" class="needs-validation was-validated">
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingFlag" placeholder="Flag" name="flag" required pattern="\{FLAG(-[a-z0-9_]+)+(-[0-9a-f]+)+\}">
+                  <input type="text" class="form-control" id="floatingFlag" placeholder="Flag" name="flag" required pattern="\{FLAG(-[a-z0-9_/]+)+(-[0-9a-f]+)+\}">
                   <label for="floatingFlag">Flag value</label>
                   <div class="invalid-feedback">
-                    Flag should be in form <code>{FLAG-crashme-d18736e-9287-ffaa-8bqe-4e6d891516ef}</code>
+                    Flag should be in form <code>{FLAG-intro/crashme-d18736e-9287-ffaa-8bqe-4e6d891516ef}</code>
                   </div>
                 </div>
 
