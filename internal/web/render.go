@@ -143,7 +143,11 @@ func reverseScoreboardGroups(standings *scorer.Standings) {
 
 func (s *server) doRenderStandingsPage(c *gin.Context, filter scorer.UserFilter) {
 	user := c.MustGet("user").(*models.User)
-	scores, err := s.scorer.CalcScoreboardWithFilter("hse", filter)
+	group := c.Query("group")
+	if group == "" {
+		group = "hse"
+	}
+	scores, err := s.scorer.CalcScoreboardWithFilter(group, filter)
 	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
 		"CourseName": "HSE Advanced C++",
