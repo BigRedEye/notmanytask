@@ -170,7 +170,15 @@ func (c Client) InitializeProject(user *models.User) error {
 
 func (c Client) cleanupName(name string) string {
 	transliteratedName := c.translit.Transliterate(name, "en")
-	return strings.ReplaceAll(transliteratedName, "-", "")
+	return strings.Map(func(ch rune) rune {
+		switch ch {
+		case '-':
+			return -1
+		case '\'':
+			return -1
+		}
+		return ch
+	}, transliteratedName)
 }
 
 func (c Client) MakeProjectName(user *models.User) string {
