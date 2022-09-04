@@ -82,7 +82,7 @@ func (f flagFetcher) doFetchFlag(task string) (string, error) {
 	}
 	if !response.Ok {
 		log.Printf("Flag request failed: %s\n", response.Error)
-		return "", fmt.Errorf("server error: %s", response.Error)
+		return "", backoff.Permanent(fmt.Errorf("server error: %s", response.Error))
 	}
 	return response.Flag, nil
 }
@@ -91,7 +91,7 @@ func (f flagFetcher) fetchFlag(task string) (string, error) {
 	flag := ""
 
 	backoffPolicy := backoff.NewExponentialBackOff()
-	backoffPolicy.MaxElapsedTime = time.Second * 15
+	backoffPolicy.MaxElapsedTime = time.Second * 10
 	err := backoff.Retry(func() error {
 		var err error
 		flag, err = f.doFetchFlag(task)
@@ -281,7 +281,7 @@ func (c *checker) doHandleConnection(ctx context.Context, conn net.Conn) error {
 			flag, err := c.flagFetcher.fetchFlag(task)
 			if err != nil {
 				log.Printf("Failed to fetch flag for failed task: %+v\n", err)
-				return fmt.Errorf("failed to fetch flag, try again a few minutes later")
+				return fmt.Errorf("failed to fetch flag: %+v", err)
 			}
 
 			writeStringOrIgnore(conn, flag+"\n")
