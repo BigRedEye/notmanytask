@@ -294,23 +294,23 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 			}
 			maxTotalScore += tasks[i].MaxScore
 
-			pipeline, found := pipelinesMap[task.Task]
+			flag, found := flagsMap[task.Task]
 			if found {
-				tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
-				tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, pipeline)
-				tasks[i].PipelineUrl = s.projects.MakePipelineURL(user, pipeline)
-				tasks[i].BranchUrl = s.projects.MakeBranchURL(user, pipeline)
-			} else {
-				flag, found := flagsMap[task.Task]
-				if found {
-					tasks[i].Status = TaskStatusSuccess
+				tasks[i].Status = TaskStatusSuccess
 
-					// FIXME(BigRedEye): I just want to sleep
-					// Do not try to mimic pipelines
-					tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, &models.Pipeline{
-						StartedAt: flag.CreatedAt,
-						Status:    models.PipelineStatusSuccess,
-					})
+				// FIXME(BigRedEye): I just want to sleep
+				// Do not try to mimic pipelines
+				tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, &models.Pipeline{
+					StartedAt: flag.CreatedAt,
+					Status:    models.PipelineStatusSuccess,
+				})
+			} else {
+				pipeline, found := pipelinesMap[task.Task]
+				if found {
+					tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
+					tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, pipeline)
+					tasks[i].PipelineUrl = s.projects.MakePipelineURL(user, pipeline)
+					tasks[i].BranchUrl = s.projects.MakeBranchURL(user, pipeline)
 				}
 			}
 
