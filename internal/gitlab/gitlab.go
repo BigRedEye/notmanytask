@@ -181,8 +181,12 @@ func (c Client) cleanupName(name string) string {
 	}, transliteratedName)
 }
 
+func (c Client) cleanupLogin(login string) string {
+	return strings.ReplaceAll(login, "__", "")
+}
+
 func (c Client) MakeProjectName(user *models.User) string {
-	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, c.cleanupName(user.FirstName), c.cleanupName(user.LastName), *user.GitlabLogin)
+	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, c.cleanupName(user.FirstName), c.cleanupName(user.LastName), c.cleanupLogin(*user.GitlabLogin))
 }
 
 func (c Client) MakeProjectURL(user *models.User) string {
