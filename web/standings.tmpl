@@ -128,7 +128,7 @@
                         <tr>
                             <th scope="col" class="num sticky-header sticky-col first-col corner">#</th>
                             <th scope="col" class="name sticky-header sticky-col second-col corner">Student</th>
-                            {{ if .GroupConfig.ShowMarks }}<th scope="col" class="sticky-header">Mark</th> {{ endif }}
+                            {{ if .GroupConfig.ShowMarks }}<th scope="col" class="sticky-header">Mark</th> {{ end }}
                             <th scope="col" class="sticky-header">Score</th>
                             {{ range .Standings.Deadlines.Assignments }}
                                 {{ range .Tasks }}
@@ -142,7 +142,7 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">0</th>
                                 <th scope="row" class="name sticky-col second-col">Chuck Norris</th>
-                                {{ if .GroupConfig.ShowMarks }}<th scope="col" class="sticky-header">13.37</th> {{ endif }}
+                                {{ if .GroupConfig.ShowMarks }}<th scope="col" class="sticky-header">13.37</th> {{ end }}
                                 <td>{{ .MaxScore }}</td>
                                 {{ range .Groups }}
                                     {{ range .Tasks }}
@@ -155,7 +155,7 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">{{ inc $index }}</th>
                                 <th scope="row" class="name sticky-col second-col">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
-                                {{ if .GroupConfig.ShowMarks }}<td>{{printf "%.3f" $user.FinalMark}}</td>{{ endif }}
+                                {{ if .GroupConfig.ShowMarks }}<td>{{printf "%.3f" $user.FinalMark}}</td>{{ end }}
                                 <td>{{ $user.Score }}</td>
                                 {{ range $user.Groups }}
                                     {{ range .Tasks }}
