@@ -150,12 +150,13 @@ func (s *server) doRenderStandingsPage(c *gin.Context, filter scorer.UserFilter)
 	scores, err := s.scorer.CalcScoreboardWithFilter(group, filter)
 	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
-		"CourseName": "HSE Advanced C++",
-		"Title":      "HSE Advanced C++",
-		"Config":     s.config,
-		"Standings":  scores,
-		"Error":      err,
-		"Links":      s.makeLinks(user),
+		"CourseName":  "HSE Advanced C++",
+		"Title":       "HSE Advanced C++",
+		"Config":      s.config,
+		"GroupConfig": s.config.Groups.FindGroup(group),
+		"Standings":   scores,
+		"Error":       err,
+		"Links":       s.makeLinks(user),
 	})
 }
 
@@ -170,15 +171,17 @@ func (s *server) RenderRetakesPage(c *gin.Context) {
 }
 
 func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
+	group := "hse"
 	user, _ := s.db.FindUserByGitlabLogin(c.Query("login"))
-	scores, err := s.scorer.CalcScoreboard("hse")
+	scores, err := s.scorer.CalcScoreboard(group)
 	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
-		"CourseName": "HSE Advanced C++",
-		"Title":      "HSE Advanced C++",
-		"Config":     s.config,
-		"Standings":  scores,
-		"Error":      err,
-		"Links":      s.makeLinks(user),
+		"CourseName":  "HSE Advanced C++",
+		"Title":       "HSE Advanced C++",
+		"Config":      s.config,
+		"GroupConfig": s.config.Groups.FindGroup(group),
+		"Standings":   scores,
+		"Error":       err,
+		"Links":       s.makeLinks(user),
 	})
 }

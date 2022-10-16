@@ -72,9 +72,19 @@ type GroupConfig struct {
 	Secret          string
 	DeadlinesURL    string
 	DeadlinesFormat string
+	ShowMarks       bool
 }
 
-type GroupsConfig = []GroupConfig
+type GroupsConfig []GroupConfig
+
+func (g GroupsConfig) FindGroup(name string) *GroupConfig {
+	for i := range g {
+		if g[i].Name == name {
+			return &g[i]
+		}
+	}
+	return nil
+}
 
 type PullIntervalsConfig struct {
 	Deadlines time.Duration
