@@ -1,8 +1,10 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -141,31 +143,34 @@ func reverseScoreboardGroups(standings *scorer.Standings) {
 	}
 }
 
-func (s *server) doRenderStandingsPage(c *gin.Context, filter scorer.UserFilter) {
+func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter scorer.UserFilter) {
 	user := c.MustGet("user").(*models.User)
 	group := c.Query("group")
 	if group == "" {
 		group = "hse"
 	}
-	scores, err := s.scorer.CalcScoreboardWithFilter(group, filter)
-	reverseScoreboardGroups(scores)
+	scores, err := s.cache.Fetch(fmt.Sprintf("scores/%s/%s", group, name), time.Second*10, func() (interface{}, error) {
+		scores, err := s.scorer.CalcScoreboardWithFilter(group, filter)
+		reverseScoreboardGroups(scores)
+		return scores, err
+	})
 	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
 		"CourseName":  "HSE Advanced C++",
 		"Title":       "HSE Advanced C++",
 		"Config":      s.config,
 		"GroupConfig": s.config.Groups.FindGroup(group),
-		"Standings":   scores,
+		"Standings":   scores.Value().(*scorer.Standings),
 		"Error":       err,
 		"Links":       s.makeLinks(user),
 	})
 }
 
 func (s *server) RenderStandingsPage(c *gin.Context) {
-	s.doRenderStandingsPage(c, nil)
+	s.doRenderStandingsPage(c, "standings", nil)
 }
 
 func (s *server) RenderRetakesPage(c *gin.Context) {
-	s.doRenderStandingsPage(c, func(user *models.User) bool {
+	s.doRenderStandingsPage(c, "retakes", func(user *models.User) bool {
 		return user.HasRetake
 	})
 }

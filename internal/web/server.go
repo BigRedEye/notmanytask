@@ -9,6 +9,7 @@ import (
 
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
+	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -31,6 +32,8 @@ type server struct {
 	pipelines *gitlab.PipelinesFetcher
 	scorer    *scorer.Scorer
 	gitlab    *gitlab.Client
+
+	cache *ccache.Cache
 }
 
 func newServer(
@@ -53,6 +56,7 @@ func newServer(
 		pipelines: pipelines,
 		scorer:    scorer,
 		gitlab:    gitlab,
+		cache:     ccache.New(ccache.Configure()),
 	}, nil
 }
 
@@ -105,7 +109,7 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.Standings, s.validateSession(true), s.RenderStandingsPage)
 	r.GET(s.config.Endpoints.Retakes, s.validateSession(true), s.RenderRetakesPage)
 	r.POST(s.config.Endpoints.Flag, s.validateSession(true), s.handleFlagSubmit)
-	r.GET("/private/solutions/:task", s.handleChuckNorris)
+	r.GET("/private/solutions/:group/:task", s.handleChuckNorris)
 
 	r.StaticFS("/static", http.FS(web.StaticContent))
 

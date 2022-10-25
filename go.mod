@@ -14,6 +14,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/jackc/pgconn v1.8.1
 	github.com/joho/godotenv v1.3.0
+	github.com/karlseguin/ccache/v2 v2.0.8
 	github.com/pkg/errors v0.8.1
 	github.com/spf13/viper v1.8.1
 	github.com/xanzy/go-gitlab v0.50.3
