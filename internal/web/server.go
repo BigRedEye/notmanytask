@@ -106,9 +106,9 @@ func (s *server) run() error {
 
 	r.GET(s.config.Endpoints.Home, s.validateSession(true), s.RenderHomePage)
 	r.GET(s.config.Endpoints.Flag, s.validateSession(true), s.RenderSubmitFlagPage)
-	r.GET(s.config.Endpoints.Standings, s.validateSession(true), s.RenderStandingsPage)
 	r.GET(s.config.Endpoints.Retakes, s.validateSession(true), s.RenderRetakesPage)
 	r.POST(s.config.Endpoints.Flag, s.validateSession(true), s.handleFlagSubmit)
+	r.GET(s.config.Endpoints.Standings /* no need to validate session */, s.RenderStandingsPage)
 	r.GET("/private/solutions/:group/:task", s.handleChuckNorris)
 
 	r.StaticFS("/static", http.FS(web.StaticContent))

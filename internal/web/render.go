@@ -90,8 +90,8 @@ type Links struct {
 	SubmitFlag      string
 }
 
-func (s *server) makeLinks(user *models.User) Links {
-	return Links{
+func (s *server) makeLinks(user *models.User) *Links {
+	return &Links{
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
 		TasksRepository: s.config.GitLab.TaskUrlPrefix,
@@ -144,11 +144,15 @@ func reverseScoreboardGroups(standings *scorer.Standings) {
 }
 
 func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter scorer.UserFilter) {
-	user := c.MustGet("user").(*models.User)
 	group := c.Query("group")
 	if group == "" {
 		group = "hse"
 	}
+	var links *Links
+	if user, session, err := s.tryFindUserByToken(c); err == nil && session != nil {
+		links = s.makeLinks(user)
+	}
+
 	scores, err := s.cache.Fetch(fmt.Sprintf("scores/%s/%s", group, name), time.Second*10, func() (interface{}, error) {
 		scores, err := s.scorer.CalcScoreboardWithFilter(group, filter)
 		reverseScoreboardGroups(scores)
@@ -161,7 +165,7 @@ func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter score
 		"GroupConfig": s.config.Groups.FindGroup(group),
 		"Standings":   scores.Value().(*scorer.Standings),
 		"Error":       err,
-		"Links":       s.makeLinks(user),
+		"Links":       links,
 	})
 }
 
