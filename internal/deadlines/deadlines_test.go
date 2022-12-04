@@ -337,6 +337,7 @@ assignments:
   tasks:
     - task: bad-hash
       score: 100
+      crashme: true
     - task: solve_or_die
       score: 100
     - task: brainfuck

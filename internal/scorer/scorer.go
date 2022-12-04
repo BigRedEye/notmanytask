@@ -304,7 +304,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 					StartedAt: flag.CreatedAt,
 					Status:    models.PipelineStatusSuccess,
 				})
-			} else {
+			} else if !task.Crashme {
 				pipeline, found := pipelinesMap[task.Task]
 				if found {
 					tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
