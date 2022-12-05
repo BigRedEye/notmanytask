@@ -301,11 +301,17 @@ func (db *DataBase) ListOverrides() (overrides []models.OverriddenScore, err err
 	return
 }
 
-func (db *DataBase) AddOverride(score *models.OverriddenScore) error {
+func (db *DataBase) AddOverride(gitlabLogin, task string, score int, status models.PipelineStatus) error {
+	overridenScore := &models.OverriddenScore{
+		GitlabLogin: gitlabLogin,
+		Task:        task,
+		Score:       score,
+		Status:      status,
+	}
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "gitlab_login"}, {Name: "task"}},
-		DoUpdates: clause.AssignmentColumns([]string{"score"}),
-	}).Create(score).Error
+		DoUpdates: clause.AssignmentColumns([]string{"score", "status"}),
+	}).Create(overridenScore).Error
 }
 
 func (db *DataBase) RemoveOverride(gitlabLogin, task string) error {

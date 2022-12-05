@@ -32,7 +32,8 @@ func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher, projects Pro
 }
 
 const (
-	taskStatusAssigned = iota
+	taskStatusBanned = iota
+	taskStatusAssigned
 	taskStatusFailed
 	taskStatusChecking
 	taskStatusSuccess
@@ -42,6 +43,8 @@ type taskStatus = int
 
 func classifyPipelineStatus(status models.PipelineStatus) taskStatus {
 	switch status {
+	case models.PipelineStatusBanned:
+		return taskStatusBanned
 	case models.PipelineStatusFailed:
 		return taskStatusFailed
 	case models.PipelineStatusCanceled:

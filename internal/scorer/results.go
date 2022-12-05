@@ -7,6 +7,7 @@ import (
 
 const (
 	TaskStatusAssigned = "assigned"
+	TaskStatusBanned   = "banned"
 	TaskStatusFailed   = "failed"
 	TaskStatusChecking = "checking"
 	TaskStatusSuccess  = "success"
@@ -16,6 +17,8 @@ type TaskStatus = string
 
 func ClassifyPipelineStatus(status models.PipelineStatus) TaskStatus {
 	switch status {
+	case models.PipelineStatusBanned:
+		return TaskStatusBanned
 	case models.PipelineStatusFailed:
 		return TaskStatusFailed
 	case models.PipelineStatusCanceled:
