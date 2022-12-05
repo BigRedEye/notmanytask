@@ -66,8 +66,9 @@ func (t Date) MarshalJSON() ([]byte, error) {
 }
 
 type Task struct {
-	Task  string
-	Score int
+	Task    string
+	Score   int
+	Crashme bool
 }
 
 type TaskGroup struct {
