@@ -5,6 +5,7 @@ import (
 )
 
 const (
+	PipelineStatusBanned   = "banned"
 	PipelineStatusFailed   = "failed"
 	PipelineStatusPending  = "pending"
 	PipelineStatusRunning  = "running"

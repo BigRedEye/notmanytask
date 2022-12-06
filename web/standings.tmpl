@@ -171,11 +171,17 @@
                                             <td class="task table-danger"
                                         {{ else if eq .Status "checking"}}
                                             <td class="task table-info"
+                                        {{ else if eq .Status "banned"}}
+                                            <td class="task bg-danger"
                                         {{ else }}
                                             <td class="task"
                                         {{ end }}
                                         {{ if .Overridden }}
-                                            title="Score has been changed by the teacher"
+                                            {{ if eq .Status "banned"}}
+                                                title="Solution has been banned"
+                                            {{ else }}
+                                                title="Score has been changed by the teacher"
+                                            {{ end }}
                                         {{ end }}
                                         >
                                         {{ if .BranchUrl }}

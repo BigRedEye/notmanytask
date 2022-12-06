@@ -20,6 +20,7 @@ func setupApiService(server *server, r *gin.Engine) error {
 
 	r.POST(server.config.Endpoints.Api.Report, s.report)
 	r.POST(server.config.Endpoints.Api.Flag, s.createFlag)
+	r.POST(server.config.Endpoints.Api.Override, s.override)
 	r.GET(server.config.Endpoints.Api.Standings, s.validateToken, s.standings)
 
 	return nil
@@ -129,6 +130,65 @@ func (s apiService) createFlag(c *gin.Context) {
 			Ok: true,
 		},
 		Flag: flag.ID,
+	})
+}
+
+func (s apiService) override(c *gin.Context) {
+	s.log.Info("Handling score override request")
+	onError := func(code int, err error) {
+		s.log.Warn("Failed to override score", zap.Error(err))
+		c.JSON(code, &api.OverrideResponse{
+			Status: api.Status{
+				Ok:    false,
+				Error: err.Error(),
+			}},
+		)
+	}
+
+	req := api.OverrideRequest{}
+	if err := c.Bind(&req); err != nil {
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err))
+		return
+	}
+
+	s.log.Info("Parsed override score request json",
+		lf.Token(req.Token),
+		zap.String("task", req.Task),
+		zap.String("login", req.Login),
+		zap.Int("score", req.Score),
+		zap.String("status", req.Status),
+	)
+
+	if !s.isTokenValid(req.Token) {
+		s.log.Warn("Unknown token", lf.Token(req.Token))
+		onError(http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))
+		return
+	}
+
+	_, err := s.server.db.FindUserByGitlabLogin(req.Login)
+	if err != nil {
+		s.log.Error("Failed to get user by login", lf.GitlabLogin(req.Login))
+		onError(http.StatusNotFound, fmt.Errorf("not found user"))
+		return
+	}
+
+	if !s.server.deadlines.AnyGroupHasTask(req.Task) {
+		onError(http.StatusBadRequest, fmt.Errorf("unknown task %s", req.Task))
+		return
+	}
+
+	err = s.server.db.AddOverride(req.Login, req.Task, req.Score, req.Status)
+	if err != nil {
+		s.log.Error("Failed to override score", zap.String("task", req.Task), lf.GitlabLogin(req.Login), zap.Int("score", req.Score), zap.String("status", req.Status), zap.Error(err))
+		onError(http.StatusInternalServerError, err)
+		return
+	}
+	s.log.Info("Score was overriden", zap.String("task", req.Task), lf.GitlabLogin(req.Login), zap.Int("score", req.Score), zap.String("status", req.Status))
+
+	c.JSON(http.StatusOK, &api.OverrideResponse{
+		Status: api.Status{
+			Ok: true,
+		},
 	})
 }
 

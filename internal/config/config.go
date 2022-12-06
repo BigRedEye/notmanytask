@@ -43,6 +43,7 @@ type EndpointsConfig struct {
 	Api struct {
 		Report    string
 		Flag      string
+		Override  string
 		Standings string
 	}
 }
