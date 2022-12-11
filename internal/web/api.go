@@ -21,6 +21,7 @@ func setupApiService(server *server, r *gin.Engine) error {
 	r.POST(server.config.Endpoints.Api.Report, s.report)
 	r.POST(server.config.Endpoints.Api.Flag, s.createFlag)
 	r.POST(server.config.Endpoints.Api.Override, s.override)
+	r.POST(server.config.Endpoints.Api.ChangeGroup, s.changeGroup)
 	r.GET(server.config.Endpoints.Api.Standings, s.validateToken, s.standings)
 
 	return nil
@@ -186,6 +187,71 @@ func (s apiService) override(c *gin.Context) {
 	s.log.Info("Score was overriden", zap.String("task", req.Task), lf.GitlabLogin(req.Login), zap.Int("score", req.Score), zap.String("status", req.Status))
 
 	c.JSON(http.StatusOK, &api.OverrideResponse{
+		Status: api.Status{
+			Ok: true,
+		},
+	})
+}
+
+func (s apiService) changeGroup(c *gin.Context) {
+	s.log.Info("Handling change group request")
+	onError := func(code int, err error) {
+		s.log.Warn("Failed to change group", zap.Error(err))
+		c.JSON(code, &api.ChangeGroupResponse{
+			Status: api.Status{
+				Ok:    false,
+				Error: err.Error(),
+			}},
+		)
+	}
+
+	req := api.ChangeGroupRequest{}
+	if err := c.Bind(&req); err != nil {
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err))
+		return
+	}
+
+	s.log.Info("Parsed change group request json",
+		lf.Token(req.Token),
+		zap.String("login", req.Login),
+		zap.String("group_name", req.GroupName),
+	)
+
+	if !s.isTokenValid(req.Token) {
+		s.log.Warn("Unknown token", lf.Token(req.Token))
+		onError(http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))
+		return
+	}
+
+	user, err := s.server.db.FindUserByGitlabLogin(req.Login)
+	if err != nil {
+		s.log.Error("Failed to get user by login", lf.GitlabLogin(req.Login))
+		onError(http.StatusNotFound, fmt.Errorf("not found user"))
+		return
+	}
+
+	groupExists := false
+	for _, group := range s.config.Groups {
+		if group.Name == req.GroupName {
+			groupExists = true
+		}
+	}
+	if !groupExists {
+		s.log.Error("Failed to find group with name", zap.String("group_name", req.GroupName))
+		onError(http.StatusNotFound, fmt.Errorf("not found group"))
+		return
+	}
+	user.GroupName = req.GroupName
+
+	err = s.server.db.SetUserGroupName(user)
+	if err != nil {
+		s.log.Error("Failed to change group", lf.GitlabLogin(req.Login), zap.String("group_name", req.GroupName), zap.Error(err))
+		onError(http.StatusInternalServerError, err)
+		return
+	}
+	s.log.Info("Group was changed", lf.GitlabLogin(req.Login), zap.String("group_name", req.GroupName))
+
+	c.JSON(http.StatusOK, &api.ChangeGroupResponse{
 		Status: api.Status{
 			Ok: true,
 		},
