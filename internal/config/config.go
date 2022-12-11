@@ -41,10 +41,11 @@ type EndpointsConfig struct {
 	TelegramCallback string
 
 	Api struct {
-		Report    string
-		Flag      string
-		Override  string
-		Standings string
+		Report      string
+		Flag        string
+		Override    string
+		ChangeGroup string
+		Standings   string
 	}
 }
 

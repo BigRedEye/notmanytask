@@ -177,6 +177,17 @@ func (db *DataBase) SetUserTelegramID(user *models.User) error {
 	return nil
 }
 
+func (db *DataBase) SetUserGroupName(user *models.User) error {
+	res := db.Model(user).Update("group_name", user.GroupName)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected < 1 {
+		return fmt.Errorf("unknown user %d", user.ID)
+	}
+	return nil
+}
+
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
