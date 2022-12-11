@@ -23,6 +23,7 @@ func setupApiService(server *server, r *gin.Engine) error {
 	r.POST(server.config.Endpoints.Api.Override, s.override)
 	r.POST(server.config.Endpoints.Api.ChangeGroup, s.changeGroup)
 	r.GET(server.config.Endpoints.Api.Standings, s.validateToken, s.standings)
+	r.GET(server.config.Endpoints.Api.ListGroupMembers, s.validateToken, s.listGroupMembers)
 
 	return nil
 }
@@ -295,6 +296,33 @@ func (s apiService) userScores(c *gin.Context) {
 			Ok: true,
 		},
 		Scores: scores,
+	})
+}
+
+func (s apiService) listGroupMembers(c *gin.Context) {
+	onError := func(code int, err error) {
+		s.log.Warn("Failed to list group members", zap.Error(err))
+		c.JSON(code, &api.GroupMembers{
+			Status: api.Status{
+				Ok:    false,
+				Error: err.Error(),
+			}},
+		)
+	}
+
+	group := c.Param("group")
+	users, err := s.server.db.ListGroupUsers(group)
+	if err != nil {
+		s.log.Error("Failed to list group members")
+		onError(http.StatusNotFound, fmt.Errorf("unknown group"))
+		return
+	}
+
+	c.JSON(http.StatusOK, &api.GroupMembers{
+		Status: api.Status{
+			Ok: true,
+		},
+		Users: users,
 	})
 }
 
