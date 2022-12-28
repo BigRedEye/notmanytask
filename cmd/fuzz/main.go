@@ -235,7 +235,7 @@ func BuildSubmits(args *Args) (map[string]string, error) {
 			MustRun("rsync -a %s/ %s", solution, build)
 			MustRun("rm -rf build", WithDir(build))
 			MustRun("cmake -B build -DCMAKE_BUILD_TYPE=ASAN", WithDir(build))
-			MustRun("cmake --build build --target %s --parallel=4", args.TaskTarget, WithDir(build))
+			MustRun("cmake --build build --target %s --parallel 4", args.TaskTarget, WithDir(build))
 			MustRun("mkdir -p bins/%s", solution)
 			MustRun("cp %s/build/%s %s", build, args.TaskTarget, bin)
 
