@@ -153,11 +153,29 @@ func fetch(url, branch, output string) error {
 	return err
 }
 
-func FetchSubmit(group, project, task, dest string) error {
+func Exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func FetchSubmit(group, project, task, dest string, nocache bool) error {
+	output := fmt.Sprintf("%s/%s/%s", dest, project, task)
+
+	exists, err := Exists(output)
+	if !nocache && exists && err == nil {
+		return nil
+	}
+
 	return fetch(
 		fmt.Sprintf("git@gitlab.com:%s/%s.git", group, project),
 		fmt.Sprintf("submits/%s", task),
-		fmt.Sprintf("%s/%s/%s", dest, project, task),
+		output,
 	)
 }
 
@@ -192,7 +210,7 @@ func FetchSubmits(args *Args) ([]string, error) {
 				name := task.Task
 				branches = append(branches, fmt.Sprintf("%s/%s/%s", "solutions", prj, name))
 				g.Go(func() error {
-					return FetchSubmit(args.GitlabGroup, prj, name, "solutions")
+					return FetchSubmit(args.GitlabGroup, prj, name, "solutions", args.NoCache)
 				})
 				count += 1
 			}
@@ -303,6 +321,7 @@ func RunFuzzing(args *Args) error {
 }
 
 type Args struct {
+	NoCache     bool
 	GitlabGroup string
 	Endpoint    string
 	TaskName    string
@@ -360,6 +379,7 @@ func initLogging() {
 }
 
 func initCommands() {
+	RootCmd.PersistentFlags().BoolVar(&args.NoCache, "no-cache", false, "Do not cache submits / repos")
 	RootCmd.PersistentFlags().StringVar(&args.Endpoint, "endpoint", "https://cpp-hse.net", "Scoring system endpoint")
 	RootCmd.PersistentFlags().StringVar(&args.GitlabGroup, "gitlab-group", "cpp-advanced-hse-2022", "Gitlab group name")
 	RootCmd.PersistentFlags().StringVar(&args.TaskName, "task", "", "Task name")
