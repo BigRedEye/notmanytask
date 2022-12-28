@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -277,43 +278,82 @@ func RunFuzzing(args *Args) error {
 		return err
 	}
 
+	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"))
+	if err != nil {
+		return err
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(len(bins))
 
 	stats := make(map[string]*bool)
+	running := atomic.NewInt32(0)
+	failed := atomic.NewInt32(0)
+	succeeded := atomic.NewInt32(0)
+	done := make(chan any)
+
+    bot.Notify(170494590, fmt.Sprintf("Start fuzzing task %s", args.TaskName))
 
 	for k, v := range bins {
 		finished := false
 		stats[k] = &finished
 
 		go func(solution string, bin string) {
+			running.Add(1)
+			defer running.Sub(1)
+			defer wg.Done()
+
 			start := time.Now()
 			l := log.With(zap.String("solution", solution))
 			l.Info("Start fuzzing solution")
 			_, err := Run(
-				"%s %s -fork=%d -timeout=600 -max_total_time=%d -reload", bin, args.Corpus, args.Jobs, int(args.Timeout.Seconds()),
+				"%s %s -fork=%d -timeout=600 -max_total_time=%d -reload=1", bin, args.Corpus, args.Jobs, int(args.Timeout.Seconds()),
 				WithStderr(fmt.Sprintf("logs/%s.err", solution)),
 				WithStdout(fmt.Sprintf("logs/%s.out", solution)),
 			)
+
+			delta := time.Since(start)
+
 			if err != nil {
-				l.Error("Solution failed", zap.Error(err), zap.Duration("duration", time.Since(start)))
+				l.Error("Solution failed", zap.Error(err), zap.Duration("duration", delta))
+				failed.Add(1)
+				bot.Notify(170494590, fmt.Sprintf("❌ Solution %s failed in %s", solution, delta))
 			} else {
 				finished = true
 				l.Info("Solution finished")
+				succeeded.Add(1)
+				bot.Notify(170494590, fmt.Sprintf("✅ Solution %s passed in %s", solution, delta))
 			}
-			wg.Done()
 		}(k, v)
 	}
+
+	go func() {
+		tick := time.Tick(time.Second * 10)
+		for {
+			select {
+			case <-done:
+				return
+			case <-tick:
+			}
+
+			log.Info("Still running",
+				zap.Int32("running", running.Load()),
+				zap.Int32("failed", failed.Load()),
+				zap.Int32("succeeded", succeeded.Load()),
+			)
+		}
+	}()
 
 	log.Info("Started fuzzing workers", zap.Int("count", len(bins)))
 
 	wg.Wait()
+	close(done)
 
 	for solution, ok := range stats {
 		if *ok {
 			fmt.Printf("Solution %s completed successfully!\n", solution)
 		} else {
-			fmt.Printf("Solution %s failed:(\n", solution)
+			fmt.Printf("Solution %s failed\n", solution)
 		}
 	}
 
