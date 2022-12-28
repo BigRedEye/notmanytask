@@ -33,7 +33,7 @@ func getDefaultLocation() *time.Location {
 }
 
 func (t *Date) String() string {
-	return t.Time.Format(dateFormat)
+	return t.Format(dateFormat)
 }
 
 func (t *Date) UnmarshalText(buf []byte) error {
@@ -50,7 +50,7 @@ func (t Date) MarshalText() ([]byte, error) {
 }
 
 func (t *Date) UnmarshalJSON(buf []byte) error {
-	return t.UnmarshalText(buf[1 : len(buf)-2])
+	return t.UnmarshalText(buf[1 : len(buf)-1])
 }
 
 func (t Date) MarshalJSON() ([]byte, error) {
