@@ -239,7 +239,7 @@ func BuildSubmits(args *Args) (map[string]string, error) {
 	}
 
 	g := errgroup.Group{}
-	g.SetLimit(10)
+	g.SetLimit(50)
 
 	bins := make(map[string]string)
 
@@ -317,12 +317,12 @@ func RunFuzzing(args *Args) error {
 			if err != nil {
 				l.Error("Solution failed", zap.Error(err), zap.Duration("duration", delta))
 				failed.Add(1)
-				bot.Notify(170494590, fmt.Sprintf("❌ Solution %s failed in %s", solution, delta))
+				bot.Notify(170494590, fmt.Sprintf("❌ Solution %s failed in %s, running %d/%d", solution, delta, running.Load() - 1, len(bins)))
 			} else {
 				finished = true
 				l.Info("Solution finished")
 				succeeded.Add(1)
-				bot.Notify(170494590, fmt.Sprintf("✅ Solution %s passed in %s", solution, delta))
+				bot.Notify(170494590, fmt.Sprintf("✅ Solution %s passed in %s, running %d/%d", solution, delta, running.Load() - 1, len(bins)))
 			}
 		}(k, v)
 	}
