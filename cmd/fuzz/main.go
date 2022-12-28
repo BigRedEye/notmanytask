@@ -232,7 +232,7 @@ func BuildSubmits(args *Args) (map[string]string, error) {
 			build := fmt.Sprintf("build/%s", solution)
 			MustRun("mkdir -p %s", build)
 			MustRun("rsync -a repo/ %s", build)
-			MustRun("rsync -a %s/ %s", solution, build)
+			MustRun("rsync -a %s/ %s/tasks", solution, build)
 			MustRun("rm -rf build", WithDir(build))
 			MustRun("cmake -B build -DCMAKE_BUILD_TYPE=ASAN", WithDir(build))
 			MustRun("cmake --build build --target %s --parallel 4", args.TaskTarget, WithDir(build))
