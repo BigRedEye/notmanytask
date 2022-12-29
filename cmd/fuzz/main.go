@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -73,6 +74,7 @@ func LoadUsers(endpoint string) (*api.GroupMembers, error) {
 type runOption func(*exec.Cmd)
 
 func WithDir(dir string) runOption {
+	_ = os.MkdirAll(dir, 0755)
 	return func(c *exec.Cmd) {
 		c.Dir = dir
 	}
@@ -340,10 +342,17 @@ func RunFuzzing(args *Args) error {
 			start := time.Now()
 			l := log.With(zap.String("solution", solution))
 			l.Info("Start fuzzing solution")
+
 			_, err := Run(
-				"%s %s -fork=%d -timeout=600 -max_total_time=%d -reload=1", info.binary, args.Corpus, args.Jobs, int(args.Timeout.Seconds()),
+				"%s %s -fork=%d -timeout=600 -max_total_time=%d -reload=1",
+				unwrap(filepath.Abs(info.binary)),
+				unwrap(filepath.Abs(args.Corpus)),
+				args.Jobs,
+				int(args.Timeout.Seconds()),
+
 				WithStderr(fmt.Sprintf("logs/%s.err", solution)),
 				WithStdout(fmt.Sprintf("logs/%s.out", solution)),
+				WithDir(fmt.Sprintf("fuzzcwd/%s", solution)),
 			)
 
 			delta := time.Since(start)
