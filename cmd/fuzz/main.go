@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/bigredeye/notmanytask/api"
+	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/bigredeye/notmanytask/internal/scorer"
 )
 
@@ -48,6 +49,22 @@ func LoadStandings(endpoint string) (*api.StandingsResponse, error) {
 
 	if !parsed.Ok {
 		return nil, fmt.Errorf("failed to fetch standings: %s", parsed.Error)
+	}
+
+	return &parsed, nil
+}
+
+func LoadUsers(endpoint string) (*api.GroupMembers, error) {
+	req := unwrap(http.NewRequest("GET", fmt.Sprintf("%s/group/hse/members", endpoint), nil))
+	req.Header.Add("Token", os.Getenv("NOTMANYTASK_TOKEN"))
+	res := unwrap(http.DefaultClient.Do(req))
+	body := unwrap(io.ReadAll(res.Body))
+
+	var parsed api.GroupMembers
+	check(json.Unmarshal(body, &parsed))
+
+	if !parsed.Ok {
+		return nil, fmt.Errorf("failed to fetch group members: %s", parsed.Error)
 	}
 
 	return &parsed, nil
@@ -180,7 +197,18 @@ func FetchSubmit(group, project, task, dest string, nocache bool) error {
 	)
 }
 
-func FetchSubmits(args *Args) ([]string, error) {
+func FetchSubmits(args *Args) (map[string]*models.User, error) {
+	users, err := LoadUsers(args.Endpoint)
+	if err != nil {
+		return nil, err
+	}
+	userByGitlabLogin := make(map[string]*models.User)
+	for i := range users.Users {
+		if login := users.Users[i].GitlabLogin; login != nil {
+			userByGitlabLogin[*users.Users[i].GitlabLogin] = users.Users[i]
+		}
+	}
+
 	standings, err := LoadStandings(args.Endpoint)
 	if err != nil {
 		return nil, err
@@ -190,7 +218,7 @@ func FetchSubmits(args *Args) ([]string, error) {
 	g.SetLimit(100)
 	count := 0
 
-	branches := []string{}
+	res := make(map[string]*models.User)
 	for _, user := range standings.Standings.Users {
 		for _, grp := range user.Groups {
 			for _, task := range grp.Tasks {
@@ -209,7 +237,8 @@ func FetchSubmits(args *Args) ([]string, error) {
 
 				prj := user.User.GitlabProject
 				name := task.Task
-				branches = append(branches, fmt.Sprintf("%s/%s/%s", "solutions", prj, name))
+				path := fmt.Sprintf("%s/%s/%s", "solutions", prj, name)
+				res[path] = userByGitlabLogin[user.User.GitlabLogin]
 				g.Go(func() error {
 					return FetchSubmit(args.GitlabGroup, prj, name, "solutions", args.NoCache)
 				})
@@ -224,10 +253,15 @@ func FetchSubmits(args *Args) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return branches, nil
+	return res, nil
 }
 
-func BuildSubmits(args *Args) (map[string]string, error) {
+type solutionInfo struct {
+	binary string
+	user   *models.User
+}
+
+func BuildSubmits(args *Args) (map[string]solutionInfo, error) {
 	solutions, err := FetchSubmits(args)
 	if err != nil {
 		return nil, err
@@ -241,12 +275,12 @@ func BuildSubmits(args *Args) (map[string]string, error) {
 	g := errgroup.Group{}
 	g.SetLimit(50)
 
-	bins := make(map[string]string)
+	bins := make(map[string]solutionInfo)
 
-	for _, s := range solutions {
+	for s, u := range solutions {
 		solution := s
 		bin := fmt.Sprintf("bins/%s/%s", solution, args.TaskTarget)
-		bins[solution] = bin
+		bins[solution] = solutionInfo{bin, u}
 		g.Go(func() error {
 			build := fmt.Sprintf("build/%s", solution)
 			MustRun("mkdir -p %s", build)
@@ -292,13 +326,13 @@ func RunFuzzing(args *Args) error {
 	succeeded := atomic.NewInt32(0)
 	done := make(chan any)
 
-    bot.Notify(170494590, fmt.Sprintf("Start fuzzing task %s", args.TaskName))
+	bot.Notify(170494590, fmt.Sprintf("Start fuzzing task %s", args.TaskName))
 
 	for k, v := range bins {
 		finished := false
 		stats[k] = &finished
 
-		go func(solution string, bin string) {
+		go func(solution string, info solutionInfo) {
 			running.Add(1)
 			defer running.Sub(1)
 			defer wg.Done()
@@ -307,22 +341,27 @@ func RunFuzzing(args *Args) error {
 			l := log.With(zap.String("solution", solution))
 			l.Info("Start fuzzing solution")
 			_, err := Run(
-				"%s %s -fork=%d -timeout=600 -max_total_time=%d -reload=1", bin, args.Corpus, args.Jobs, int(args.Timeout.Seconds()),
+				"%s %s -fork=%d -timeout=600 -max_total_time=%d -reload=1", info.binary, args.Corpus, args.Jobs, int(args.Timeout.Seconds()),
 				WithStderr(fmt.Sprintf("logs/%s.err", solution)),
 				WithStdout(fmt.Sprintf("logs/%s.out", solution)),
 			)
 
 			delta := time.Since(start)
 
+			userLink := "<unknown user>"
+			if info.user != nil {
+				userLink = fmt.Sprintf("%s ([%s %s](tg://user?id=%d))", *info.user.GitlabLogin, info.user.FirstName, info.user.LastName, *info.user.TelegramID)
+			}
+
 			if err != nil {
 				l.Error("Solution failed", zap.Error(err), zap.Duration("duration", delta))
 				failed.Add(1)
-				bot.Notify(170494590, fmt.Sprintf("❌ Solution %s failed in %s, running %d/%d", solution, delta, running.Load() - 1, len(bins)))
+				bot.Notify(170494590, fmt.Sprintf("❌ Solution of task %s from user %s failed in %s, running %d/%d", args.TaskName, userLink, delta, running.Load()-1, len(bins)))
 			} else {
 				finished = true
 				l.Info("Solution finished")
 				succeeded.Add(1)
-				bot.Notify(170494590, fmt.Sprintf("✅ Solution %s passed in %s, running %d/%d", solution, delta, running.Load() - 1, len(bins)))
+				bot.Notify(170494590, fmt.Sprintf("✅ Solution of task %s from user %s passed in %s, running %d/%d", args.TaskName, userLink, delta, running.Load()-1, len(bins)))
 			}
 		}(k, v)
 	}
