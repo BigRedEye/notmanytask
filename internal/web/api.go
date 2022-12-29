@@ -20,7 +20,7 @@ func setupApiService(server *server, r *gin.Engine) error {
 
 	r.POST(server.config.Endpoints.Api.Report, s.report)
 	r.POST(server.config.Endpoints.Api.Flag, s.createFlag)
-	r.POST(server.config.Endpoints.Api.Override, s.override)
+	r.POST(server.config.Endpoints.Api.Override, s.validateToken, s.override)
 	r.POST(server.config.Endpoints.Api.ChangeGroup, s.changeGroup)
 	r.GET(server.config.Endpoints.Api.Standings, s.validateToken, s.standings)
 	r.GET(server.config.Endpoints.Api.ListGroupMembers, s.validateToken, s.listGroupMembers)
@@ -154,18 +154,11 @@ func (s apiService) override(c *gin.Context) {
 	}
 
 	s.log.Info("Parsed override score request json",
-		lf.Token(req.Token),
 		zap.String("task", req.Task),
 		zap.String("login", req.Login),
 		zap.Int("score", req.Score),
 		zap.String("status", req.Status),
 	)
-
-	if !s.isTokenValid(req.Token) {
-		s.log.Warn("Unknown token", lf.Token(req.Token))
-		onError(http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))
-		return
-	}
 
 	_, err := s.server.db.FindUserByGitlabLogin(req.Login)
 	if err != nil {
