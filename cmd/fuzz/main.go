@@ -316,7 +316,7 @@ func RunFuzzing(args *Args) error {
 	if err != nil {
 		return err
 	}
-	bot.Notify(170494590, fmt.Sprintf("Building submits for task %s", args.TaskName))
+	bot.NewMessage(170494590).Escaped("Building submits for task %s: ", args.TaskName).Raw("[Sergey Skvortsov](tg://user?id=170494590)").Send()
 
 	bins, err := BuildSubmits(args)
 	if err != nil {
@@ -333,7 +333,7 @@ func RunFuzzing(args *Args) error {
 	succeeded := atomic.NewInt32(0)
 	done := make(chan any)
 
-	bot.Notify(170494590, fmt.Sprintf("Start fuzzing task %s (%d submits)", args.TaskName, len(bins)))
+	bot.NewMessage(170494590).Escaped("Start fuzzing task %s (%d submits)", args.TaskName, len(bins)).Send()
 
 	for k, v := range bins {
 		finished := false
@@ -364,18 +364,28 @@ func RunFuzzing(args *Args) error {
 
 			userLink := "<unknown user>"
 			if info.user != nil {
-				userLink = fmt.Sprintf("%s ([%s %s](tg://user?id=%d))", *info.user.GitlabLogin, info.user.FirstName, info.user.LastName, *info.user.TelegramID)
+				userLink = fmt.Sprintf("[%s %s](tg://user?id=%d)", info.user.FirstName, info.user.LastName, *info.user.TelegramID)
 			}
 
 			if err != nil {
 				l.Error("Solution failed", zap.Error(err), zap.Duration("duration", delta))
 				failed.Add(1)
-				bot.Notify(170494590, fmt.Sprintf("❌ Solution of task %s from user %s failed in %s, running %d/%d", args.TaskName, userLink, delta, running.Load()-1, len(bins)))
+				bot.
+					NewMessage(170494590).
+					Escaped("❌ Solution of task %s from user %s (", args.TaskName, *info.user.GitlabLogin).
+					Raw(userLink).
+					Escaped(") failed in %s, running %d/%d", delta, running.Load()-1, len(bins)).
+					Send()
 			} else {
 				finished = true
 				l.Info("Solution finished")
 				succeeded.Add(1)
-				bot.Notify(170494590, fmt.Sprintf("✅ Solution of task %s from user %s passed in %s, running %d/%d", args.TaskName, userLink, delta, running.Load()-1, len(bins)))
+				bot.
+					NewMessage(170494590).
+					Escaped("✅ Solution of task %s from user %s (", args.TaskName, *info.user.GitlabLogin).
+					Raw(userLink).
+					Escaped(") passed in %s, running %d/%d", delta, running.Load()-1, len(bins)).
+					Send()
 			}
 		}(k, v)
 	}
