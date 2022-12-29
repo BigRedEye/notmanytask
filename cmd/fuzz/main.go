@@ -42,6 +42,8 @@ func unwrap[T any](value T, err error) T {
 func LoadStandings(endpoint string) (*api.StandingsResponse, error) {
 	req := unwrap(http.NewRequest("GET", fmt.Sprintf("%s/api/standings", endpoint), nil))
 	req.Header.Add("Token", os.Getenv("NOTMANYTASK_TOKEN"))
+
+	log.Info("Making request", zap.String("method", req.Method), zap.Stringer("url", req.URL))
 	res := unwrap(http.DefaultClient.Do(req))
 	body := unwrap(io.ReadAll(res.Body))
 
@@ -58,6 +60,8 @@ func LoadStandings(endpoint string) (*api.StandingsResponse, error) {
 func LoadUsers(endpoint string) (*api.GroupMembers, error) {
 	req := unwrap(http.NewRequest("GET", fmt.Sprintf("%s/group/hse/members", endpoint), nil))
 	req.Header.Add("Token", os.Getenv("NOTMANYTASK_TOKEN"))
+
+	log.Info("Making request", zap.String("method", req.Method), zap.Stringer("url", req.URL))
 	res := unwrap(http.DefaultClient.Do(req))
 	body := unwrap(io.ReadAll(res.Body))
 
