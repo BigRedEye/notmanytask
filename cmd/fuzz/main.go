@@ -312,14 +312,15 @@ func BuildSubmits(args *Args) (map[string]solutionInfo, error) {
 }
 
 func RunFuzzing(args *Args) error {
+	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"), log.Named("tgbot"))
+	if err != nil {
+		return err
+	}
+	bot.Notify(170494590, fmt.Sprintf("Building submits for task %s", args.TaskName))
+
 	bins, err := BuildSubmits(args)
 	if err != nil {
 		log.Error("Failed to build submits", zap.Error(err))
-		return err
-	}
-
-	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"), log.Named("tgbot"))
-	if err != nil {
 		return err
 	}
 
@@ -332,7 +333,7 @@ func RunFuzzing(args *Args) error {
 	succeeded := atomic.NewInt32(0)
 	done := make(chan any)
 
-	bot.Notify(170494590, fmt.Sprintf("Start fuzzing task %s", args.TaskName))
+	bot.Notify(170494590, fmt.Sprintf("Start fuzzing task %s (%d submits)", args.TaskName, len(bins)))
 
 	for k, v := range bins {
 		finished := false
