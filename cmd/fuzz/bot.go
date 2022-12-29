@@ -28,12 +28,15 @@ func (b *Bot) Notify(chat int64, text string) error {
 		return nil
 	}
 
+	mode := tgbotapi.ModeMarkdownV2
+	text = tgbotapi.EscapeText(mode, text)
+
 	b.log.Info("Sending telegram message", zap.Int64("chat", chat), zap.String("text", text))
 	msg := tgbotapi.NewMessage(chat, text)
-	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	msg.ParseMode = mode
 	_, err := b.api.Send(msg)
-    if err != nil {
-        b.log.Error("Failed to send telegram message", zap.Error(err))
-    }
+	if err != nil {
+		b.log.Error("Failed to send telegram message", zap.Error(err))
+	}
 	return err
 }
