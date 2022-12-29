@@ -381,7 +381,7 @@ func RunFuzzing(args *Args) error {
 	}
 
 	go func() {
-		tick := time.Tick(time.Second * 10)
+		tick := time.Tick(time.Minute)
 		for {
 			select {
 			case <-done:
