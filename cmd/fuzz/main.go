@@ -58,7 +58,7 @@ func LoadStandings(endpoint string) (*api.StandingsResponse, error) {
 }
 
 func LoadUsers(endpoint string) (*api.GroupMembers, error) {
-	req := unwrap(http.NewRequest("GET", fmt.Sprintf("%s/group/hse/members", endpoint), nil))
+	req := unwrap(http.NewRequest("GET", fmt.Sprintf("%s/api/group/hse/members", endpoint), nil))
 	req.Header.Add("Token", os.Getenv("NOTMANYTASK_TOKEN"))
 
 	log.Info("Making request", zap.String("method", req.Method), zap.Stringer("url", req.URL))
