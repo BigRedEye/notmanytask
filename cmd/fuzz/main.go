@@ -2,10 +2,8 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -21,7 +19,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/bigredeye/notmanytask/api"
 	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/bigredeye/notmanytask/internal/scorer"
 )
@@ -37,42 +34,6 @@ func check(err error) {
 func unwrap[T any](value T, err error) T {
 	check(err)
 	return value
-}
-
-func LoadStandings(endpoint string) (*api.StandingsResponse, error) {
-	req := unwrap(http.NewRequest("GET", fmt.Sprintf("%s/api/standings", endpoint), nil))
-	req.Header.Add("Token", os.Getenv("NOTMANYTASK_TOKEN"))
-
-	log.Info("Making request", zap.String("method", req.Method), zap.Stringer("url", req.URL))
-	res := unwrap(http.DefaultClient.Do(req))
-	body := unwrap(io.ReadAll(res.Body))
-
-	var parsed api.StandingsResponse
-	check(json.Unmarshal(body, &parsed))
-
-	if !parsed.Ok {
-		return nil, fmt.Errorf("failed to fetch standings: %s", parsed.Error)
-	}
-
-	return &parsed, nil
-}
-
-func LoadUsers(endpoint string) (*api.GroupMembers, error) {
-	req := unwrap(http.NewRequest("GET", fmt.Sprintf("%s/api/group/hse/members", endpoint), nil))
-	req.Header.Add("Token", os.Getenv("NOTMANYTASK_TOKEN"))
-
-	log.Info("Making request", zap.String("method", req.Method), zap.Stringer("url", req.URL))
-	res := unwrap(http.DefaultClient.Do(req))
-	body := unwrap(io.ReadAll(res.Body))
-
-	var parsed api.GroupMembers
-	check(json.Unmarshal(body, &parsed))
-
-	if !parsed.Ok {
-		return nil, fmt.Errorf("failed to fetch group members: %s", parsed.Error)
-	}
-
-	return &parsed, nil
 }
 
 type runOption func(*exec.Cmd)
@@ -204,18 +165,23 @@ func FetchSubmit(group, project, task, dest string, nocache bool) error {
 }
 
 func FetchSubmits(args *Args) (map[string]*models.User, error) {
-	users, err := LoadUsers(args.Endpoint)
+	nmt, err := NewNotmanytaskClient(args.Endpoint, os.Getenv("NOTMANYTASK_TOKEN"))
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := nmt.LoadUsers("hse")
 	if err != nil {
 		return nil, err
 	}
 	userByGitlabLogin := make(map[string]*models.User)
-	for i := range users.Users {
-		if login := users.Users[i].GitlabLogin; login != nil {
-			userByGitlabLogin[*users.Users[i].GitlabLogin] = users.Users[i]
+	for i := range users {
+		if login := users[i].GitlabLogin; login != nil {
+			userByGitlabLogin[*users[i].GitlabLogin] = users[i]
 		}
 	}
 
-	standings, err := LoadStandings(args.Endpoint)
+	standings, err := nmt.LoadStandings(args.Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +191,7 @@ func FetchSubmits(args *Args) (map[string]*models.User, error) {
 	count := 0
 
 	res := make(map[string]*models.User)
-	for _, user := range standings.Standings.Users {
+	for _, user := range standings.Users {
 		for _, grp := range user.Groups {
 			for _, task := range grp.Tasks {
 				if task.Task != args.TaskName {
@@ -311,7 +277,7 @@ func BuildSubmits(args *Args) (map[string]solutionInfo, error) {
 	return bins, nil
 }
 
-const BIGREDEYE = 170494590 
+const BIGREDEYE = 170494590
 
 func RunFuzzing(args *Args) (err error) {
 	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"), log.Named("tgbot"))
@@ -320,15 +286,15 @@ func RunFuzzing(args *Args) (err error) {
 	}
 	bot.NewMessage(BIGREDEYE).Escaped("Building submits for task %s: ", args.TaskName).Send()
 
-    defer func(){
-        if perr := recover(); perr != nil {
-            bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s panicked: %+v", args.TaskName, perr).Send()
-        } else if err != nil {
-            bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s failed: %s", args.TaskName, err.Error()).Send()
-        } else {
-            bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s finished", args.TaskName).Send()
-        }
-    }()
+	defer func() {
+		if perr := recover(); perr != nil {
+			bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s panicked: %+v", args.TaskName, perr).Send()
+		} else if err != nil {
+			bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s failed: %s", args.TaskName, err.Error()).Send()
+		} else {
+			bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s finished", args.TaskName).Send()
+		}
+	}()
 
 	bins, err := BuildSubmits(args)
 	if err != nil {
