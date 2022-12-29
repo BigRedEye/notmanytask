@@ -318,7 +318,7 @@ func RunFuzzing(args *Args) error {
 		return err
 	}
 
-	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"))
+	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"), log.Named("tgbot"))
 	if err != nil {
 		return err
 	}
