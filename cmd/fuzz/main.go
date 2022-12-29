@@ -311,12 +311,24 @@ func BuildSubmits(args *Args) (map[string]solutionInfo, error) {
 	return bins, nil
 }
 
-func RunFuzzing(args *Args) error {
+const BIGREDEYE = 170494590 
+
+func RunFuzzing(args *Args) (err error) {
 	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"), log.Named("tgbot"))
 	if err != nil {
 		return err
 	}
-	bot.NewMessage(170494590).Escaped("Building submits for task %s: ", args.TaskName).Raw("[Sergey Skvortsov](tg://user?id=170494590)").Send()
+	bot.NewMessage(BIGREDEYE).Escaped("Building submits for task %s: ", args.TaskName).Send()
+
+    defer func(){
+        if perr := recover(); perr != nil {
+            bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s panicked: %+v", args.TaskName, perr).Send()
+        } else if err != nil {
+            bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s failed: %s", args.TaskName, err.Error()).Send()
+        } else {
+            bot.NewMessage(BIGREDEYE).Escaped("Fuzzer for task %s finished", args.TaskName).Send()
+        }
+    }()
 
 	bins, err := BuildSubmits(args)
 	if err != nil {
@@ -333,7 +345,7 @@ func RunFuzzing(args *Args) error {
 	succeeded := atomic.NewInt32(0)
 	done := make(chan any)
 
-	bot.NewMessage(170494590).Escaped("Start fuzzing task %s (%d submits)", args.TaskName, len(bins)).Send()
+	bot.NewMessage(BIGREDEYE).Escaped("Start fuzzing task %s (%d submits)", args.TaskName, len(bins)).Send()
 
 	for k, v := range bins {
 		finished := false
@@ -371,7 +383,7 @@ func RunFuzzing(args *Args) error {
 				l.Error("Solution failed", zap.Error(err), zap.Duration("duration", delta))
 				failed.Add(1)
 				bot.
-					NewMessage(170494590).
+					NewMessage(BIGREDEYE).
 					Escaped("❌ Solution of task %s from user %s (", args.TaskName, *info.user.GitlabLogin).
 					Raw(userLink).
 					Escaped(") failed in %s, running %d/%d", delta, running.Load()-1, len(bins)).
@@ -381,7 +393,7 @@ func RunFuzzing(args *Args) error {
 				l.Info("Solution finished")
 				succeeded.Add(1)
 				bot.
-					NewMessage(170494590).
+					NewMessage(BIGREDEYE).
 					Escaped("✅ Solution of task %s from user %s (", args.TaskName, *info.user.GitlabLogin).
 					Raw(userLink).
 					Escaped(") passed in %s, running %d/%d", delta, running.Load()-1, len(bins)).
