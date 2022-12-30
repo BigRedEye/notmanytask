@@ -1,4 +1,4 @@
-package main
+package notmanytask
 
 import (
 	"fmt"
@@ -10,12 +10,12 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-type NotmanytaskClient struct {
+type Client struct {
 	client *resty.Client
 	token  string
 }
 
-func NewNotmanytaskClient(endpoint, token string) (*NotmanytaskClient, error) {
+func NewClient(endpoint, token string) (*Client, error) {
 	client := resty.New().
 		SetBaseURL(endpoint).
 		SetTimeout(time.Second * 10).
@@ -23,10 +23,10 @@ func NewNotmanytaskClient(endpoint, token string) (*NotmanytaskClient, error) {
 
 	client.Header.Add("Token", token)
 
-	return &NotmanytaskClient{client, token}, nil
+	return &Client{client, token}, nil
 }
 
-func (c *NotmanytaskClient) LoadStandings(group string) (*scorer.Standings, error) {
+func (c *Client) LoadStandings(group string) (*scorer.Standings, error) {
 	res := &api.StandingsResponse{}
 	_, err := c.client.R().
 		SetResult(res).
@@ -43,7 +43,7 @@ func (c *NotmanytaskClient) LoadStandings(group string) (*scorer.Standings, erro
 	return res.Standings, nil
 }
 
-func (c *NotmanytaskClient) LoadUsers(group string) ([]*models.User, error) {
+func (c *Client) LoadUsers(group string) ([]*models.User, error) {
 	res := &api.GroupMembers{}
 	_, err := c.client.R().
 		SetResult(res).
@@ -60,7 +60,7 @@ func (c *NotmanytaskClient) LoadUsers(group string) ([]*models.User, error) {
 	return res.Users, nil
 }
 
-func (c *NotmanytaskClient) OverrideScore(user, task, status string, score int) error {
+func (c *Client) OverrideScore(user, task, status string, score int) error {
 	res := &api.GroupMembers{}
 	_, err := c.client.R().
 		SetResult(res).
@@ -81,4 +81,30 @@ func (c *NotmanytaskClient) OverrideScore(user, task, status string, score int) 
 	}
 
 	return nil
+}
+
+func (c *Client) LoadSuccessfulSubmits(group, taskname string) ([]*scorer.User, error) {
+	standings, err := c.LoadStandings(group)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*scorer.User, 0)
+	for _, user := range standings.Users {
+		for _, grp := range user.Groups {
+			for _, task := range grp.Tasks {
+				if task.Task != taskname {
+					continue
+				}
+
+				if task.Status != scorer.TaskStatusSuccess || task.Score <= 0 {
+					continue
+				}
+
+				res = append(res, &user.User)
+			}
+		}
+	}
+
+	return res, nil
 }

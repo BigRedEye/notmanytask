@@ -21,6 +21,7 @@ import (
 
 	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/bigredeye/notmanytask/internal/scorer"
+	"github.com/bigredeye/notmanytask/pkg/client/notmanytask"
 )
 
 var log *zap.Logger
@@ -165,7 +166,7 @@ func FetchSubmit(group, project, task, dest string, nocache bool) error {
 }
 
 func FetchSubmits(args *Args) (map[string]*models.User, error) {
-	nmt, err := NewNotmanytaskClient(args.Endpoint, os.Getenv("NOTMANYTASK_TOKEN"))
+	nmt, err := notmanytask.NewClient(args.Endpoint, os.Getenv("NOTMANYTASK_TOKEN"))
 	if err != nil {
 		return nil, err
 	}
