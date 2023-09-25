@@ -98,10 +98,7 @@ func Run() error {
 		bot.Run(ctx)
 	}()
 
-	s, err := newServer(config, logger.Named("server"), db, deadlines, projects, pipelines, scorer, git)
-	if err != nil {
-		return errors.Wrap(err, "Failed to start server")
-	}
+	s := newServer(config, logger.Named("server"), db, deadlines, projects, pipelines, scorer, git)
 
 	return errors.Wrap(s.run(), "Server failed")
 }

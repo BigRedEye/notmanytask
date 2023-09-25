@@ -45,7 +45,7 @@ func newServer(
 	pipelines *gitlab.PipelinesFetcher,
 	scorer *scorer.Scorer,
 	gitlab *gitlab.Client,
-) (*server, error) {
+) *server {
 	return &server{
 		config:    config,
 		logger:    logger,
@@ -57,7 +57,7 @@ func newServer(
 		scorer:    scorer,
 		gitlab:    gitlab,
 		cache:     ccache.New(ccache.Configure()),
-	}, nil
+	}
 }
 
 func buildHTMLTemplates(funcMap template.FuncMap) (*template.Template, error) {
