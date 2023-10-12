@@ -62,7 +62,7 @@ func classifyPipelineStatus(status models.PipelineStatus) taskStatus {
 
 func pipelineLess(left *models.Pipeline, right *models.Pipeline) bool {
 	if classifyPipelineStatus(left.Status) == classifyPipelineStatus(right.Status) {
-		return left.StartedAt.Before(right.StartedAt)
+		return left.StartedAt.After(right.StartedAt)
 	}
 
 	return classifyPipelineStatus(left.Status) > classifyPipelineStatus(right.Status)
