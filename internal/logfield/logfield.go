@@ -7,6 +7,8 @@ const (
 	FieldUserID         = "user_id"
 	FieldGitlabID       = "gitlab_id"
 	FieldGitlabLogin    = "gitlab_login"
+	FieldGiteaID        = "gitea_id"
+	FieldGiteaLogin     = "gitea_login"
 	FieldProjectName    = "project_name"
 	FieldProjectID      = "project_id"
 	FieldPipelineID     = "pipeline_id"
@@ -27,6 +29,14 @@ func GitlabID(id int) zap.Field {
 
 func GitlabLogin(login string) zap.Field {
 	return zap.String(FieldGitlabLogin, login)
+}
+
+func GiteaID(id int64) zap.Field {
+	return zap.Int64(FieldGiteaID, id)
+}
+
+func GiteaLogin(login string) zap.Field {
+	return zap.String(FieldGiteaLogin, login)
 }
 
 func ProjectName(name string) zap.Field {

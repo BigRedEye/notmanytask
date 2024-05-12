@@ -8,6 +8,7 @@ type OverriddenScore struct {
 	gorm.Model
 
 	GitlabLogin string `gorm:"uniqueIndex:idx_overrides"`
+	GiteaLogin  string `gorm:"uniqueIndex:idx_overrides"`
 	Task        string `gorm:"uniqueIndex:idx_overrides"`
 
 	Score  int

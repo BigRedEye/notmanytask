@@ -19,11 +19,13 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"golang.org/x/oauth2"
 
+	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
-	"github.com/bigredeye/notmanytask/internal/gitlab"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/models"
+	"github.com/bigredeye/notmanytask/internal/platform"
 )
 
 type loginService struct {
@@ -115,14 +117,26 @@ func (s loginService) signupForm(c *gin.Context) {
 		}
 		return
 	}
-	if user.GitlabID != nil || user.GitlabLogin != nil {
-		log.Warn("User is already registered",
-			zap.Error(err),
-			zap.Intp("gitlab_id", user.GitlabID),
-			zap.Stringp("gitlab_login", user.GitlabLogin),
-		)
-		s.RedirectToSignup(c, "User is already registered")
-		return
+	if s.config.Platform.Mode == config.GitlabMode {
+		if user.GitlabID != nil || user.GitlabLogin != nil {
+			log.Warn("User is already registered",
+				zap.Error(err),
+				zap.Intp("gitlab_id", user.GitlabID),
+				zap.Stringp("gitlab_login", user.GitlabLogin),
+			)
+			s.RedirectToSignup(c, "User is already registered")
+			return
+		}
+	} else if s.config.Platform.Mode == config.GiteaMode {
+		if user.GiteaID != nil || user.GiteaLogin != nil {
+			log.Warn("User is already registered",
+				zap.Error(err),
+				zap.Int64p("gitea_id", user.GiteaID),
+				zap.Stringp("gitea_login", user.GiteaLogin),
+			)
+			s.RedirectToSignup(c, "User is already registered")
+			return
+		}
 	}
 
 	if err = s.fillSessionForUser(c, user); err != nil {
@@ -213,6 +227,106 @@ func (s loginService) login(c *gin.Context) {
 	c.Redirect(http.StatusFound, s.server.auth.LoginURL(oauthState))
 }
 
+func (s loginService) giteaOauth(token *oauth2.Token, user *models.User, c *gin.Context) error {
+	giteaUser, err := platform.GetOAuthGiteaUser(s.config, token.AccessToken)
+	if err != nil {
+		s.log.Error("Failed to get gitea user", zap.Error(err))
+		s.RedirectToSignup(c, "Gitea authentication failed, try again")
+		return err
+	}
+	s.log.Info("Fetched gitea user", zap.String("gitea_login", giteaUser.Login), zap.Int64("gitea_id", giteaUser.ID))
+
+	// user == nil if the token was not provided
+	// This may happen after /logout and /login
+	if user == nil {
+		user, err = s.server.db.FindUserByGiteaID(giteaUser.ID)
+		if err != nil {
+			s.log.Error("Unknown user", zap.Error(err), zap.Int64("gitea_id", giteaUser.ID))
+			s.RedirectToSignup(c, "You are not registered, please try to register first")
+			return err
+		}
+	}
+
+	if user.GiteaLogin != nil && user.GiteaID != nil {
+		if err = s.fillSessionForUser(c, user); err != nil {
+			s.log.Error("Failed to create session", zap.Error(err), zap.Int64("gitea_id", giteaUser.ID))
+			s.RedirectToSignup(c, "Internal server error, try again later")
+			return err
+		}
+		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GiteaLogin(giteaUser.Login), lf.GiteaID(giteaUser.ID))
+		c.Redirect(http.StatusFound, s.config.Endpoints.Home)
+		return nil
+	}
+
+	user.GiteaUser = models.GiteaUser{
+		GiteaID:    &giteaUser.ID,
+		GiteaLogin: &giteaUser.Login,
+	}
+
+	err = s.server.db.SetUserGiteaAccount(user.ID, &user.GiteaUser)
+	if err != nil {
+		if database.IsDuplicateKey(err) {
+			s.log.Error("Duplicate gitlab account", zap.Error(err))
+			s.RedirectToSignup(c, "Gitlab account is already registered")
+		} else {
+			s.log.Error("Failed to set user gitlab account", zap.Error(err))
+			s.RedirectToSignup(c, "Internal server error, try again later")
+		}
+		return err
+	}
+	return nil
+}
+
+func (s loginService) gitlabOauth(token *oauth2.Token, user *models.User, c *gin.Context) error {
+	gitlabUser, err := platform.GetOAuthGitLabUser(token.AccessToken)
+	if err != nil {
+		s.log.Error("Failed to get gitlab user", zap.Error(err))
+		s.RedirectToSignup(c, "GitLab authentication failed, try again")
+		return err
+	}
+	s.log.Info("Fetched gitlab user", zap.String("gitlab_login", gitlabUser.Login), zap.Int("gitlab_id", gitlabUser.ID))
+
+	// user == nil if the token was not provided
+	// This may happen after /logout and /login
+	if user == nil {
+		user, err = s.server.db.FindUserByGitlabID(gitlabUser.ID)
+		if err != nil {
+			s.log.Error("Unknown user", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
+			s.RedirectToSignup(c, "You are not registered, please try to register first")
+			return err
+		}
+	}
+
+	if user.GitlabLogin != nil && user.GitlabID != nil {
+		if err = s.fillSessionForUser(c, user); err != nil {
+			s.log.Error("Failed to create session", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
+			s.RedirectToSignup(c, "Internal server error, try again later")
+			return err
+		}
+		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GitlabLogin(gitlabUser.Login), lf.GitlabID(gitlabUser.ID))
+		c.Redirect(http.StatusFound, s.config.Endpoints.Home)
+		return nil
+	}
+
+	user.GitlabUser = models.GitlabUser{
+		GitlabID:    &gitlabUser.ID,
+		GitlabLogin: &gitlabUser.Login,
+	}
+
+	err = s.server.db.SetUserGitlabAccount(user.ID, &user.GitlabUser)
+	if err != nil {
+		if database.IsDuplicateKey(err) {
+			s.log.Error("Duplicate gitlab account", zap.Error(err))
+			s.RedirectToSignup(c, "Gitlab account is already registered")
+		} else {
+			s.log.Error("Failed to set user gitlab account", zap.Error(err))
+			s.RedirectToSignup(c, "Internal server error, try again later")
+		}
+		return err
+	}
+	return nil
+}
+
 func (s loginService) oauth(c *gin.Context) {
 	// Compare oauth state in query and cookie
 	oauthState := c.Query("state")
@@ -223,7 +337,7 @@ func (s loginService) oauth(c *gin.Context) {
 		} else {
 			s.log.Info("Mismatched oauth state", zap.String("query", oauthState), zap.String("cookie", v.(string)))
 		}
-		s.RedirectToSignup(c, "GitLab authentication failed, try again")
+		s.RedirectToSignup(c, "Provider authentication failed, try again")
 		return
 	}
 
@@ -244,50 +358,15 @@ func (s loginService) oauth(c *gin.Context) {
 		s.RedirectToSignup(c, "GitLab authentication failed, try again")
 		return
 	}
-	gitlabUser, err := gitlab.GetOAuthGitLabUser(token.AccessToken)
-	if err != nil {
-		s.log.Error("Failed to get gitlab user", zap.Error(err))
-		s.RedirectToSignup(c, "GitLab authentication failed, try again")
-		return
-	}
-	s.log.Info("Fetched gitlab user", zap.String("gitlab_login", gitlabUser.Login), zap.Int("gitlab_id", gitlabUser.ID))
 
-	// user == nil iff the token was not provided
-	// This may happen after /logout and /login
-	if user == nil {
-		user, err = s.server.db.FindUserByGitlabID(gitlabUser.ID)
-		if err != nil {
-			s.log.Error("Unknown user", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
-			s.RedirectToSignup(c, "You are not registered, please try to register first")
-			return
-		}
-	}
-
-	if user.GitlabLogin != nil && user.GitlabID != nil {
-		if err = s.fillSessionForUser(c, user); err != nil {
-			s.log.Error("Failed to create session", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
-			s.RedirectToSignup(c, "Internal server error, try again later")
-			return
-		}
-		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GitlabLogin(gitlabUser.Login), lf.GitlabID(gitlabUser.ID))
-		c.Redirect(http.StatusFound, s.config.Endpoints.Home)
-		return
-	}
-
-	user.GitlabUser = models.GitlabUser{
-		GitlabID:    &gitlabUser.ID,
-		GitlabLogin: &gitlabUser.Login,
-	}
-
-	err = s.server.db.SetUserGitlabAccount(user.ID, &user.GitlabUser)
-	if err != nil {
-		if database.IsDuplicateKey(err) {
-			s.log.Error("Duplicate gitlab account", zap.Error(err))
-			s.RedirectToSignup(c, "Gitlab account is already registered")
-		} else {
-			s.log.Error("Failed to set user gitlab account", zap.Error(err))
-			s.RedirectToSignup(c, "Internal server error, try again later")
-		}
+	switch s.config.Platform.Mode {
+	case config.GitlabMode:
+		s.gitlabOauth(token, user, c)
+	case config.GiteaMode:
+		s.giteaOauth(token, user, c)
+	default:
+		s.log.Error("Unknown platform mode", zap.String("mode", s.config.Platform.Mode))
+		s.RedirectToSignup(c, "Internal server error, try again later")
 		return
 	}
 

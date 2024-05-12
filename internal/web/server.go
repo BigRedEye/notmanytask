@@ -16,7 +16,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
-	"github.com/bigredeye/notmanytask/internal/gitlab"
+	"github.com/bigredeye/notmanytask/internal/platform/base"
 	"github.com/bigredeye/notmanytask/internal/scorer"
 	"github.com/bigredeye/notmanytask/web"
 )
@@ -26,12 +26,12 @@ type server struct {
 	logger *zap.Logger
 
 	auth      *AuthClient
-	db        *database.DataBase
+	db        *database.DataBaseProxy
 	deadlines *deadlines.Fetcher
-	projects  *gitlab.ProjectsMaker
-	pipelines *gitlab.PipelinesFetcher
+	projects  base.ProjectsMakerInterface
+	pipelines base.PipelinesFetcherInterface
 	scorer    *scorer.Scorer
-	gitlab    *gitlab.Client
+	client    base.ClientInterface
 
 	cache *ccache.Cache
 }
@@ -39,12 +39,12 @@ type server struct {
 func newServer(
 	config *config.Config,
 	logger *zap.Logger,
-	db *database.DataBase,
+	db *database.DataBaseProxy,
 	deadlines *deadlines.Fetcher,
-	projects *gitlab.ProjectsMaker,
-	pipelines *gitlab.PipelinesFetcher,
+	projects base.ProjectsMakerInterface,
+	pipelines base.PipelinesFetcherInterface,
 	scorer *scorer.Scorer,
-	gitlab *gitlab.Client,
+	client base.ClientInterface,
 ) *server {
 	return &server{
 		config:    config,
@@ -55,7 +55,7 @@ func newServer(
 		projects:  projects,
 		pipelines: pipelines,
 		scorer:    scorer,
-		gitlab:    gitlab,
+		client:    client,
 		cache:     ccache.New(ccache.Configure()),
 	}
 }
@@ -104,10 +104,18 @@ func (s *server) run() error {
 		c.String(http.StatusOK, "pong "+fmt.Sprint(time.Now().Unix()))
 	})
 
+	var handleFlagSubmit func(c *gin.Context)
+	switch s.config.Platform.Mode {
+	case config.GitlabMode:
+		handleFlagSubmit = s.handleFlagSubmitGitlab
+	case config.GiteaMode:
+		handleFlagSubmit = s.handleFlagSubmitGitea
+	}
+
 	r.GET(s.config.Endpoints.Home, s.validateSession(true), s.RenderHomePage)
 	r.GET(s.config.Endpoints.Flag, s.validateSession(true), s.RenderSubmitFlagPage)
 	r.GET(s.config.Endpoints.Retakes, s.validateSession(true), s.RenderRetakesPage)
-	r.POST(s.config.Endpoints.Flag, s.validateSession(true), s.handleFlagSubmit)
+	r.POST(s.config.Endpoints.Flag, s.validateSession(true), handleFlagSubmit)
 	r.GET(s.config.Endpoints.Standings /* no need to validate session */, s.RenderStandingsPage)
 	r.GET("/private/solutions/:group/:task", s.handleChuckNorris)
 

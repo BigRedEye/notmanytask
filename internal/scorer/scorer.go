@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/models"
@@ -22,13 +23,14 @@ type ProjectNameFactory interface {
 }
 
 type Scorer struct {
+	conf      *config.Config
 	deadlines *deadlines.Fetcher
-	db        *database.DataBase
+	db        *database.DataBaseProxy
 	projects  ProjectNameFactory
 }
 
-func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher, projects ProjectNameFactory) *Scorer {
-	return &Scorer{deadlines, db, projects}
+func NewScorer(conf *config.Config, db *database.DataBaseProxy, deadlines *deadlines.Fetcher, projects ProjectNameFactory) *Scorer {
+	return &Scorer{conf, deadlines, db, projects}
 }
 
 const (
@@ -228,7 +230,7 @@ func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 		return nil, fmt.Errorf("no deadlines found")
 	}
 
-	overrides, err := s.db.ListUserOverrides(*user.GitlabLogin)
+	overrides, err := s.db.ListUserOverrides(*s.db.UserLogin(user))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list user overrides: %w", err)
 	}

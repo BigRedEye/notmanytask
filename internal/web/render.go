@@ -48,7 +48,7 @@ func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, err, success string
 
 var flagRe = regexp.MustCompile(`^\{FLAG(-[a-z0-9_/]+)+(-[0-9a-f]+)+\}$`)
 
-func (s *server) handleFlagSubmit(c *gin.Context) {
+func (s *server) handleFlagSubmitGitlab(c *gin.Context) {
 	user := c.MustGet("user").(*models.User)
 	if user.GitlabLogin == nil {
 		s.logger.Error("User without gitlab login!", lf.UserID(user.ID))
@@ -63,7 +63,31 @@ func (s *server) handleFlagSubmit(c *gin.Context) {
 		return
 	}
 
-	err := s.db.SubmitFlag(flag, *user.GitlabLogin)
+	err := s.db.SubmitFlagGitlab(flag, *user.GitlabLogin)
+	if err != nil {
+		s.RenderSubmitFlagPageDetails(c, "Unknown flag", "")
+		return
+	}
+
+	s.RenderSubmitFlagPageDetails(c, "", "The matrix has you...")
+}
+
+func (s *server) handleFlagSubmitGitea(c *gin.Context) {
+	user := c.MustGet("user").(*models.User)
+	if user.GiteaLogin == nil {
+		s.logger.Error("User without gitea login!", lf.UserID(user.ID))
+		c.Redirect(http.StatusFound, s.config.Endpoints.Signup)
+		return
+	}
+
+	flag := c.PostForm("flag")
+	if !flagRe.MatchString(flag) {
+		s.logger.Warn("Invalid flag", zap.String("flag", flag), lf.UserID(user.ID), lf.GiteaLogin(*user.GiteaLogin))
+		s.RenderSubmitFlagPageDetails(c, "Invalid flag", "")
+		return
+	}
+
+	err := s.db.SubmitFlagGitea(flag, *user.GiteaLogin)
 	if err != nil {
 		s.RenderSubmitFlagPageDetails(c, "Unknown flag", "")
 		return
@@ -94,9 +118,9 @@ func (s *server) makeLinks(user *models.User) *Links {
 	return &Links{
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
-		TasksRepository: s.config.GitLab.TaskUrlPrefix,
-		Repository:      s.gitlab.MakeProjectURL(user),
-		Submits:         s.gitlab.MakeProjectSubmitsURL(user),
+		TasksRepository: s.config.Platform.GitLab.TaskUrlPrefix,
+		Repository:      s.client.MakeProjectURL(user),
+		Submits:         s.client.MakeProjectSubmitsURL(user),
 		Logout:          s.config.Endpoints.Logout,
 		SubmitFlag:      s.config.Endpoints.Flag,
 	}

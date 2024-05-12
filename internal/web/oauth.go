@@ -4,12 +4,16 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/bigredeye/notmanytask/internal/config"
+	gitlab "github.com/markbates/goth/providers/gitlab"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/gitlab"
-
-	"github.com/bigredeye/notmanytask/internal/config"
 )
+
+var Endpoint = oauth2.Endpoint{
+	AuthURL:  gitlab.AuthURL,
+	TokenURL: gitlab.TokenURL,
+}
 
 type AuthClient struct {
 	conf *oauth2.Config
@@ -18,10 +22,10 @@ type AuthClient struct {
 func NewAuthClient(conf *config.Config) *AuthClient {
 	return &AuthClient{
 		conf: &oauth2.Config{
-			ClientID:     conf.GitLab.Application.ClientID,
-			ClientSecret: conf.GitLab.Application.Secret,
+			ClientID:     conf.Platform.GitLab.Application.ClientID,
+			ClientSecret: conf.Platform.GitLab.Application.Secret,
 			Scopes:       []string{"read_user"},
-			Endpoint:     gitlab.Endpoint,
+			Endpoint:     Endpoint,
 			RedirectURL:  conf.Endpoints.HostName + conf.Endpoints.OauthCallback,
 		},
 	}

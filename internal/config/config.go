@@ -8,9 +8,33 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	GitlabMode = "gitlab"
+	GiteaMode  = "gitea"
+)
+
 type GitLabConfig struct {
 	BaseURL string
 	Group   struct {
+		Name string
+		ID   int
+	}
+	DefaultReadme string
+	TaskUrlPrefix string
+
+	Application struct {
+		ClientID string
+		Secret   string
+	}
+	Api struct {
+		Token string
+	}
+	CIConfigPath string
+}
+
+type GiteaConfig struct {
+	BaseURL      string
+	Organization struct {
 		Name string
 		ID   int
 	}
@@ -100,9 +124,16 @@ type TelegramBotConfig struct {
 	BotToken string
 }
 
+type PlatformConfig struct {
+	GitLab GitLabConfig
+	Gitea  GiteaConfig
+	Mode   string
+}
+
 type Config struct {
-	Log           log.Config
-	GitLab        GitLabConfig
+	Log log.Config
+
+	Platform      PlatformConfig
 	Endpoints     EndpointsConfig
 	Server        ServerConfig
 	DataBase      DataBaseConfig
