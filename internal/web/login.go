@@ -355,7 +355,7 @@ func (s loginService) oauth(c *gin.Context) {
 	token, err := s.server.auth.Exchange(ctx, c.Query("code"))
 	if err != nil {
 		s.log.Error("Failed to exchange tokens", zap.Error(err))
-		s.RedirectToSignup(c, "GitLab authentication failed, try again")
+		s.RedirectToSignup(c, "Provider authentication failed, try again")
 		return
 	}
 

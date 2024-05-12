@@ -67,7 +67,8 @@ func (p ProjectsMakerGitea) InitializeMissingProjects() {
 
 func (p ProjectsMakerGitea) MaybeInitializeProject(user *models.User) bool {
 	log := p.Logger
-	if user.GitlabID == nil || user.GitlabLogin == nil {
+	if user.GiteaID == nil || user.GiteaLogin == nil {
+		time.Sleep(time.Second * 5)
 		log.Error("Trying to initialize repo for user without login, aborting", zap.Uint("user_id", user.ID))
 		return false
 	}

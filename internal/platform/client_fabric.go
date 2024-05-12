@@ -31,7 +31,7 @@ func NewClient(conf *config.Config, logger *zap.Logger) (base.ClientInterface, e
 			Gitlab: client,
 		}, nil
 	case "gitea":
-		client, err := gitea.NewClient(conf.Platform.GitLab.BaseURL, gitea.SetToken(conf.Platform.Gitea.Api.Token))
+		client, err := gitea.NewClient(conf.Platform.Gitea.BaseURL, gitea.SetToken(conf.Platform.Gitea.Api.Token))
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create gitea client")
 		}

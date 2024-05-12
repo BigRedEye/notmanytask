@@ -10,9 +10,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var Endpoint = oauth2.Endpoint{
+var EndpointGitlab = oauth2.Endpoint{
 	AuthURL:  gitlab.AuthURL,
 	TokenURL: gitlab.TokenURL,
+}
+
+var EndpointGitea = oauth2.Endpoint{
+	AuthURL:  "/login/oauth/authorize",
+	TokenURL: "/login/oauth/access_token",
 }
 
 type AuthClient struct {
@@ -20,15 +25,30 @@ type AuthClient struct {
 }
 
 func NewAuthClient(conf *config.Config) *AuthClient {
-	return &AuthClient{
-		conf: &oauth2.Config{
-			ClientID:     conf.Platform.GitLab.Application.ClientID,
-			ClientSecret: conf.Platform.GitLab.Application.Secret,
-			Scopes:       []string{"read_user"},
-			Endpoint:     Endpoint,
-			RedirectURL:  conf.Endpoints.HostName + conf.Endpoints.OauthCallback,
-		},
+	var authClient AuthClient
+	switch conf.Platform.Mode {
+	case config.GitlabMode:
+		authClient = AuthClient{
+			conf: &oauth2.Config{
+				ClientID:     conf.Platform.GitLab.Application.ClientID,
+				ClientSecret: conf.Platform.GitLab.Application.Secret,
+				Scopes:       []string{"read_user"},
+				Endpoint:     EndpointGitlab,
+				RedirectURL:  conf.Endpoints.HostName + conf.Endpoints.OauthCallback,
+			},
+		}
+	case config.GiteaMode:
+		authClient = AuthClient{
+			conf: &oauth2.Config{
+				ClientID:     conf.Platform.Gitea.Application.ClientID,
+				ClientSecret: conf.Platform.Gitea.Application.Secret,
+				Scopes:       []string{"read_user"},
+				Endpoint:     EndpointGitea,
+				RedirectURL:  conf.Endpoints.HostName + conf.Endpoints.OauthCallback,
+			},
+		}
 	}
+	return &authClient
 }
 
 func (c *AuthClient) LoginURL(state string) string {
