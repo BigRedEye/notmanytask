@@ -19,8 +19,6 @@ type GitLabConfig struct {
 		Name string
 		ID   int
 	}
-	DefaultReadme string
-	TaskUrlPrefix string
 
 	Application struct {
 		ClientID string
@@ -38,8 +36,6 @@ type GiteaConfig struct {
 		Name string
 		ID   int
 	}
-	DefaultReadme string
-	TaskUrlPrefix string
 
 	Application struct {
 		ClientID string
@@ -49,6 +45,14 @@ type GiteaConfig struct {
 		Token string
 	}
 	CIConfigPath string
+}
+
+type PlatformConfig struct {
+	GitLab        GitLabConfig
+	Gitea         GiteaConfig
+	Mode          string
+	TaskUrlPrefix string
+	DefaultReadme string
 }
 
 type EndpointsConfig struct {
@@ -122,12 +126,6 @@ type PullIntervalsConfig struct {
 type TelegramBotConfig struct {
 	BotLogin string
 	BotToken string
-}
-
-type PlatformConfig struct {
-	GitLab GitLabConfig
-	Gitea  GiteaConfig
-	Mode   string
 }
 
 type Config struct {

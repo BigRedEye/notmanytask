@@ -41,7 +41,7 @@ func (c *ClientGitea) InitializeProject(user *models.User) error {
 
 		opts := gitea.CreateRepoOption{
 			Name:          projectName,
-			Description:   c.Config.Platform.Gitea.DefaultReadme,
+			Description:   c.Config.Platform.DefaultReadme,
 			DefaultBranch: base.Master,
 			Private:       true,
 			AutoInit:      true,
@@ -151,7 +151,7 @@ func (c *ClientGitea) MakeBranchURL(user *models.User, pipeline *models.Pipeline
 }
 
 func (c *ClientGitea) MakeTaskURL(task string) string {
-	return fmt.Sprintf("%s/%s", c.Config.Platform.Gitea.TaskUrlPrefix, task)
+	return fmt.Sprintf("%s/%s", c.Config.Platform.TaskUrlPrefix, task)
 }
 
 var _ base.ClientInterface = &ClientGitea{}

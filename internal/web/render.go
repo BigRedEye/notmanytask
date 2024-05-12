@@ -119,7 +119,7 @@ func (s *server) makeLinks(user *models.User) *Links {
 	return &Links{
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
-		TasksRepository: s.config.Platform.GitLab.TaskUrlPrefix,
+		TasksRepository: s.config.Platform.TaskUrlPrefix,
 		Repository:      s.client.MakeProjectURL(user),
 		Submits:         s.client.MakeProjectSubmitsURL(user),
 		Logout:          s.config.Endpoints.Logout,

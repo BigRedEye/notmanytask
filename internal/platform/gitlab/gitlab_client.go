@@ -70,7 +70,7 @@ func (c *ClientGitlab) InitializeProject(user *models.User) error {
 		Actions: []*gitlab.CommitActionOptions{{
 			Action:   gitlab.FileAction(gitlab.FileCreate),
 			FilePath: gitlab.String("README.md"),
-			Content:  gitlab.String(c.Config.Platform.GitLab.DefaultReadme),
+			Content:  gitlab.String(c.Config.Platform.DefaultReadme),
 		}},
 	})
 
@@ -172,7 +172,7 @@ func (c *ClientGitlab) MakeBranchURL(user *models.User, pipeline *models.Pipelin
 }
 
 func (c *ClientGitlab) MakeTaskURL(task string) string {
-	return fmt.Sprintf("%s/%s", c.Config.Platform.GitLab.TaskUrlPrefix, task)
+	return fmt.Sprintf("%s/%s", c.Config.Platform.TaskUrlPrefix, task)
 }
 
 var _ base.ClientInterface = &ClientGitlab{}
