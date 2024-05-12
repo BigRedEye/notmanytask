@@ -273,10 +273,10 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 		MaxScore:  0,
 		FinalMark: 0.0,
 		User: User{
-			FirstName:     user.FirstName,
-			LastName:      user.LastName,
-			GitlabLogin:   *user.GitlabLogin,
-			GitlabProject: s.projects.MakeProjectName(user),
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			Login:     *s.db.UserLogin(user),
+			Project:   s.projects.MakeProjectName(user),
 		},
 	}
 
