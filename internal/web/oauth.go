@@ -16,8 +16,8 @@ var EndpointGitlab = oauth2.Endpoint{
 }
 
 var EndpointGitea = oauth2.Endpoint{
-	AuthURL:  "/login/oauth/authorize",
-	TokenURL: "/login/oauth/access_token",
+	AuthURL:  "https://gitea.com/login/oauth/authorize",
+	TokenURL: "https://gitea.com/login/oauth/access_token",
 }
 
 type AuthClient struct {
