@@ -41,11 +41,11 @@ func (c *ClientGitea) InitializeProject(user *models.User) error {
 
 		opts := gitea.CreateRepoOption{
 			Name:          projectName,
-			Description:   fmt.Sprintf("%s private repository", *user.GiteaLogin),
+			Description:   c.Config.Platform.Gitea.DefaultReadme,
 			DefaultBranch: base.Master,
 			Private:       true,
 			AutoInit:      true,
-			Readme:        c.Config.Platform.Gitea.DefaultReadme,
+			Template:      true,
 		}
 		repo, _, err = c.Gitea.CreateOrgRepo(c.Config.Platform.Gitea.Organization.Name, opts)
 		if err != nil {
