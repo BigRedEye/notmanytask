@@ -457,10 +457,12 @@ func (s *server) validateSession(verifyTelegram bool) func(c *gin.Context) {
 			zap.Uint("user_id", user.ID),
 			zap.Stringp("gitlab_login", user.GitlabLogin),
 			zap.Intp("gitlab_id", user.GitlabID),
+			zap.Stringp("gitea_login", user.GiteaLogin),
+			zap.Int64p("gitea_id", user.GiteaID),
 		)
 
-		if user.GitlabID == nil || user.GitlabLogin == nil {
-			s.logger.Warn("Found user without gitlab account, redirecting to /login",
+		if (user.GitlabID == nil || user.GitlabLogin == nil) && (user.GiteaID == nil || user.GiteaLogin == nil) {
+			s.logger.Warn("Found user without provider account, redirecting to /login",
 				zap.String("token", session.Token),
 				zap.Uint("user_id", user.ID),
 			)
