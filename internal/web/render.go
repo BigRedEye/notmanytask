@@ -20,6 +20,7 @@ func (s *server) RenderSignupPage(c *gin.Context, err string) {
 		"CourseName":   "HSE Advanced C++",
 		"Config":       s.config,
 		"ErrorMessage": err,
+		"Platform":     s.config.Platform.Mode,
 	})
 }
 

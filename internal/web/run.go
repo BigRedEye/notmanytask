@@ -54,7 +54,7 @@ func Run() error {
 		return errors.Wrap(err, "Failed to open database")
 	}
 
-	bot, err := tgbot.NewBot(config, logger.Named("tgbot"), db)
+	bot, err := tgbot.NewBot(config, logger.Named("tgbot"), &db_proxy)
 	if err != nil {
 		return errors.Wrap(err, "failed to create telegram bot")
 	}

@@ -14,7 +14,7 @@ import (
 
 func NewPipelinesFetcher(conf *config.Config, client base.ClientInterface, db *database.DataBase) (base.PipelinesFetcherInterface, error) {
 	switch conf.Platform.Mode {
-	case "gitlab":
+	case config.GitlabMode:
 		client_gitlab, done := client.(*gitlab_client.ClientGitlab)
 		if !done {
 			return nil, errors.Wrap(nil, "failed to cast client to gitlab")
@@ -27,7 +27,7 @@ func NewPipelinesFetcher(conf *config.Config, client base.ClientInterface, db *d
 				Db:     db,
 			},
 		}, nil
-	case "gitea":
+	case config.GiteaMode:
 		client_gitea, done := client.(*gitea_client.ClientGitea)
 		if !done {
 			return nil, errors.Wrap(nil, "failed to cast client to gitlab")

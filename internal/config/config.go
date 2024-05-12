@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	GitlabMode = "gitlab"
-	GiteaMode  = "gitea"
+	GitlabMode = "GitLab"
+	GiteaMode  = "Gitea"
 )
 
 type GitLabConfig struct {
