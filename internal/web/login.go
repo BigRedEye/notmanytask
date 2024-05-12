@@ -227,12 +227,12 @@ func (s loginService) login(c *gin.Context) {
 	c.Redirect(http.StatusFound, s.server.auth.LoginURL(oauthState))
 }
 
-func (s loginService) giteaOauth(token *oauth2.Token, user *models.User, c *gin.Context) error {
+func (s loginService) giteaOauth(token *oauth2.Token, user *models.User, c *gin.Context) (bool, error) {
 	giteaUser, err := platform.GetOAuthGiteaUser(s.config, token.AccessToken)
 	if err != nil {
 		s.log.Error("Failed to get gitea user", zap.Error(err))
 		s.RedirectToSignup(c, "Gitea authentication failed, try again")
-		return err
+		return false, err
 	}
 	s.log.Info("Fetched gitea user", zap.String("gitea_login", giteaUser.Login), zap.Int64("gitea_id", giteaUser.ID))
 
@@ -243,7 +243,7 @@ func (s loginService) giteaOauth(token *oauth2.Token, user *models.User, c *gin.
 		if err != nil {
 			s.log.Error("Unknown user", zap.Error(err), zap.Int64("gitea_id", giteaUser.ID))
 			s.RedirectToSignup(c, "You are not registered, please try to register first")
-			return err
+			return false, err
 		}
 	}
 
@@ -251,11 +251,11 @@ func (s loginService) giteaOauth(token *oauth2.Token, user *models.User, c *gin.
 		if err = s.fillSessionForUser(c, user); err != nil {
 			s.log.Error("Failed to create session", zap.Error(err), zap.Int64("gitea_id", giteaUser.ID))
 			s.RedirectToSignup(c, "Internal server error, try again later")
-			return err
+			return false, err
 		}
 		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GiteaLogin(giteaUser.Login), lf.GiteaID(giteaUser.ID))
 		c.Redirect(http.StatusFound, s.config.Endpoints.Home)
-		return nil
+		return true, nil
 	}
 
 	user.GiteaUser = models.GiteaUser{
@@ -272,17 +272,17 @@ func (s loginService) giteaOauth(token *oauth2.Token, user *models.User, c *gin.
 			s.log.Error("Failed to set user gitlab account", zap.Error(err))
 			s.RedirectToSignup(c, "Internal server error, try again later")
 		}
-		return err
+		return false, err
 	}
-	return nil
+	return false, nil
 }
 
-func (s loginService) gitlabOauth(token *oauth2.Token, user *models.User, c *gin.Context) error {
+func (s loginService) gitlabOauth(token *oauth2.Token, user *models.User, c *gin.Context) (bool, error) {
 	gitlabUser, err := platform.GetOAuthGitLabUser(token.AccessToken)
 	if err != nil {
 		s.log.Error("Failed to get gitlab user", zap.Error(err))
 		s.RedirectToSignup(c, "GitLab authentication failed, try again")
-		return err
+		return false, err
 	}
 	s.log.Info("Fetched gitlab user", zap.String("gitlab_login", gitlabUser.Login), zap.Int("gitlab_id", gitlabUser.ID))
 
@@ -293,7 +293,7 @@ func (s loginService) gitlabOauth(token *oauth2.Token, user *models.User, c *gin
 		if err != nil {
 			s.log.Error("Unknown user", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
 			s.RedirectToSignup(c, "You are not registered, please try to register first")
-			return err
+			return false, err
 		}
 	}
 
@@ -301,11 +301,11 @@ func (s loginService) gitlabOauth(token *oauth2.Token, user *models.User, c *gin
 		if err = s.fillSessionForUser(c, user); err != nil {
 			s.log.Error("Failed to create session", zap.Error(err), zap.Int("gitlab_id", gitlabUser.ID))
 			s.RedirectToSignup(c, "Internal server error, try again later")
-			return err
+			return false, err
 		}
 		s.log.Info("Filled session for existing user", lf.UserID(user.ID), lf.GitlabLogin(gitlabUser.Login), lf.GitlabID(gitlabUser.ID))
 		c.Redirect(http.StatusFound, s.config.Endpoints.Home)
-		return nil
+		return true, nil
 	}
 
 	user.GitlabUser = models.GitlabUser{
@@ -322,9 +322,9 @@ func (s loginService) gitlabOauth(token *oauth2.Token, user *models.User, c *gin
 			s.log.Error("Failed to set user gitlab account", zap.Error(err))
 			s.RedirectToSignup(c, "Internal server error, try again later")
 		}
-		return err
+		return false, err
 	}
-	return nil
+	return false, nil
 }
 
 func (s loginService) oauth(c *gin.Context) {
@@ -361,9 +361,15 @@ func (s loginService) oauth(c *gin.Context) {
 
 	switch s.config.Platform.Mode {
 	case config.GitlabMode:
-		s.gitlabOauth(token, user, c)
+		success, err := s.gitlabOauth(token, user, c)
+		if err != nil || success {
+			return
+		}
 	case config.GiteaMode:
-		s.giteaOauth(token, user, c)
+		success, err := s.giteaOauth(token, user, c)
+		if err != nil || success {
+			return
+		}
 	default:
 		s.log.Error("Unknown platform mode", zap.String("mode", s.config.Platform.Mode))
 		s.RedirectToSignup(c, "Internal server error, try again later")
