@@ -75,7 +75,7 @@ type pipelinesMap map[string]*models.Pipeline
 type flagsMap map[string]*models.Flag
 
 type pipelinesProvider = func(project string) (pipelines []models.Pipeline, err error)
-type flagsProvider = func(gitlabLogin string) (flags []models.Flag, err error)
+type flagsProvider = func(login string) (flags []models.Flag, err error)
 
 func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider) (pipelinesMap, error) {
 	pipelines, err := provider(s.projects.MakeProjectName(user))
@@ -96,7 +96,7 @@ func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider)
 }
 
 func (s Scorer) loadUserFlags(user *models.User, provider flagsProvider) (flagsMap, error) {
-	flags, err := provider(*user.GitlabLogin)
+	flags, err := provider(*s.db.UserLogin(user))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to list user flags")
 	}
@@ -211,16 +211,16 @@ func (s Scorer) makeCachedFlagsProvider() (flagsProvider, error) {
 
 	flagsMap := make(map[string][]models.Flag)
 	for _, flag := range flags {
-		prev, found := flagsMap[*flag.GitlabLogin]
+		prev, found := flagsMap[*flag.Login]
 		if !found {
 			prev = make([]models.Flag, 0, 1)
 		}
 		prev = append(prev, flag)
-		flagsMap[*flag.GitlabLogin] = prev
+		flagsMap[*flag.Login] = prev
 	}
 
-	return func(gitlabLogin string) (flags []models.Flag, err error) {
-		return flagsMap[gitlabLogin], nil
+	return func(login string) (flags []models.Flag, err error) {
+		return flagsMap[login], nil
 	}, nil
 }
 
@@ -247,7 +247,7 @@ func parseOverrides(overrides []models.OverriddenScore) (result map[overrideKey]
 	result = make(map[overrideKey]*models.OverriddenScore)
 	for i := range overrides {
 		result[overrideKey{
-			login: overrides[i].GitlabLogin,
+			login: overrides[i].Login,
 			task:  overrides[i].Task,
 		}] = &overrides[i]
 	}
@@ -319,7 +319,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 				}
 			}
 
-			override, found := overrides[overrideKey{login: *user.GitlabLogin, task: task.Task}]
+			override, found := overrides[overrideKey{login: *s.db.UserLogin(user), task: task.Task}]
 			if found {
 				tasks[i].Score = override.Score
 				tasks[i].Status = ClassifyPipelineStatus(override.Status)

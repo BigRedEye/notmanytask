@@ -394,10 +394,10 @@ func (db *DataBase) ListOverrides() (overrides []models.OverriddenScore, err err
 
 func (db *DataBase) AddOverrideGitlab(gitlabLogin, task string, score int, status models.PipelineStatus) error {
 	overridenScore := &models.OverriddenScore{
-		GitlabLogin: gitlabLogin,
-		Task:        task,
-		Score:       score,
-		Status:      status,
+		Login:  gitlabLogin,
+		Task:   task,
+		Score:  score,
+		Status: status,
 	}
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "gitlab_login"}, {Name: "task"}},
@@ -407,10 +407,10 @@ func (db *DataBase) AddOverrideGitlab(gitlabLogin, task string, score int, statu
 
 func (db *DataBase) AddOverrideGitea(giteaLogin, task string, score int, status models.PipelineStatus) error {
 	overridenScore := &models.OverriddenScore{
-		GiteaLogin: giteaLogin,
-		Task:       task,
-		Score:      score,
-		Status:     status,
+		Login:  giteaLogin,
+		Task:   task,
+		Score:  score,
+		Status: status,
 	}
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "gitea_login"}, {Name: "task"}},
