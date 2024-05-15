@@ -101,9 +101,10 @@ func (p *PipelinesFetcherGitea) GetPipelines(project string) ([]PipelineInfoGite
 		p.Logger.Error("Failed to request pipelines via API", zap.Error(err))
 		return nil, errors.Wrap(err, "Failed to make pipelines fetch request itself")
 	}
-
+	// Make page iteration TODO(shaprunovk)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "token "+p.Config.Platform.Gitea.Api.Token)
+	// req.SetPathValue("page", fmt.Sprint(1))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -166,7 +167,7 @@ func (p *PipelinesFetcherGitea) FetchAllPipelines() {
 	err := p.ForEachProject(func(project base.Project) error {
 		project_gitea, cast := project.(*gitea.Repository)
 		if !cast {
-			return errors.New("Failed to cast project to gitlab project")
+			return errors.New("Failed to cast project to gitea project")
 		}
 		p.Logger.Debug("Found project", lf.ProjectName(project_gitea.Name))
 		pipelines, err := p.GetPipelines(project_gitea.Name)
@@ -226,7 +227,7 @@ func (p *PipelinesFetcherGitea) FetchFreshPipelines() {
 		info, err := p.Fetch(id.Id, id.Project)
 		info_gitea, cast := info.(*PipelineInfoGitea)
 		if !cast {
-			p.Logger.Error("Failed to cast pipeline info to gitlab pipeline info", lf.ProjectName(id.Project), lf.PipelineID(id.Id))
+			p.Logger.Error("Failed to cast pipeline info to gitea pipeline info", lf.ProjectName(id.Project), lf.PipelineID(id.Id))
 		}
 		if err != nil {
 			p.Logger.Error("Failed to fetch pipeline", zap.Error(err))

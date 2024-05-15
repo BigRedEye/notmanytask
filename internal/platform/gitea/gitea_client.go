@@ -1,6 +1,7 @@
 package gitea
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 
@@ -45,7 +46,6 @@ func (c *ClientGitea) InitializeProject(user *models.User) error {
 			DefaultBranch: base.Master,
 			Private:       true,
 			AutoInit:      true,
-			Template:      true,
 		}
 		repo, _, err = c.Gitea.CreateOrgRepo(c.Config.Platform.Gitea.Organization.Name, opts)
 		if err != nil {
@@ -62,8 +62,29 @@ func (c *ClientGitea) InitializeProject(user *models.User) error {
 		log.Info("Found existing repository")
 	}
 
-	// Protect master branch from unintended commits
+	// Prepare action.yml with CI configuration
+	create_file_opts := gitea.CreateFileOptions{
+		FileOptions: gitea.FileOptions{
+			Message:    "Initialize repo",
+			BranchName: base.Master,
+			Author: gitea.Identity{
+				Name:  "notmanytask",
+				Email: "mail@notmanytask.org",
+			},
+			Committer: gitea.Identity{
+				Name:  "notmanytask",
+				Email: "mail@notmanytask.org",
+			},
+		},
+		Content: base64.StdEncoding.EncodeToString([]byte(c.Config.Platform.Gitea.CIConfig)),
+	}
+	_, _, err = c.Gitea.CreateFile(c.Config.Platform.Gitea.Organization.Name, repo.Name, c.Config.Platform.Gitea.CIConfigPath, create_file_opts)
+	if err != nil {
+		log.Error("Failed to create CI configuration", zap.Error(err))
+		return errors.Wrap(err, "Failed to create CI configuration")
+	}
 
+	// Protect master branch from unintended commits
 	branch_protection_opts := gitea.CreateBranchProtectionOption{
 		BranchName:           base.Master,
 		EnablePush:           false,

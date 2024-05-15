@@ -44,6 +44,7 @@ type GiteaConfig struct {
 	Api struct {
 		Token string
 	}
+	CIConfig     string
 	CIConfigPath string
 }
 
