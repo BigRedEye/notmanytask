@@ -483,7 +483,7 @@ func (s *server) validateSession(verifyTelegram bool) func(c *gin.Context) {
 
 func (s *server) fillUserFromQuery(c *gin.Context) {
 	login := c.Query("login")
-	user, err := s.db.FindUserByGitlabLogin(login)
+	user, err := s.db.FindUserByLogin(login)
 	if err != nil {
 		s.logger.Warn("Failed to find user", lf.GitlabLogin(login))
 		c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.Signup)

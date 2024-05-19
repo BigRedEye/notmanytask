@@ -86,7 +86,7 @@ func (s apiService) report(c *gin.Context) {
 }
 
 func (s apiService) createFlag(c *gin.Context) {
-	s.log.Info("Handling crasme flag request")
+	s.log.Info("Handling crashme flag request")
 	onError := func(code int, err error) {
 		s.log.Warn("Failed to create flag for crasme", zap.Error(err))
 		c.JSON(code, &api.FlagResponse{
@@ -160,7 +160,7 @@ func (s apiService) override(c *gin.Context) {
 		zap.String("status", req.Status),
 	)
 
-	_, err := s.server.db.FindUserByGitlabLogin(req.Login)
+	_, err := s.server.db.FindUserByLogin(req.Login)
 	if err != nil {
 		s.log.Error("Failed to get user by login", lf.GitlabLogin(req.Login))
 		onError(http.StatusNotFound, fmt.Errorf("not found user"))
@@ -217,7 +217,7 @@ func (s apiService) changeGroup(c *gin.Context) {
 		return
 	}
 
-	user, err := s.server.db.FindUserByGitlabLogin(req.Login)
+	user, err := s.server.db.FindUserByLogin(req.Login)
 	if err != nil {
 		s.log.Error("Failed to get user by login", lf.GitlabLogin(req.Login))
 		onError(http.StatusNotFound, fmt.Errorf("not found user"))
@@ -270,7 +270,7 @@ func (s apiService) userScores(c *gin.Context) {
 		return
 	}
 
-	user, err := s.server.db.FindUserByGitlabLogin(req.Login)
+	user, err := s.server.db.FindUserByLogin(req.Login)
 	if err != nil {
 		s.log.Error("Failed to get user by login", lf.GitlabLogin(req.Login))
 		onError(http.StatusNotFound, fmt.Errorf("not found user"))

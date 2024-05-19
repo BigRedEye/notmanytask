@@ -144,7 +144,7 @@ func (s *server) RenderHomePage(c *gin.Context) {
 }
 
 func (s *server) RenderCheaterPage(c *gin.Context) {
-	user, err := s.db.FindUserByGitlabLogin(c.Query("login"))
+	user, err := s.db.FindUserByLogin(c.Query("login"))
 	var scores *scorer.UserScores
 	if err == nil {
 		scores, err = s.scorer.CalcUserScores(user)
@@ -206,7 +206,7 @@ func (s *server) RenderRetakesPage(c *gin.Context) {
 
 func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 	group := "hse"
-	user, _ := s.db.FindUserByGitlabLogin(c.Query("login"))
+	user, _ := s.db.FindUserByLogin(c.Query("login"))
 	scores, err := s.scorer.CalcScoreboard(group)
 	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
