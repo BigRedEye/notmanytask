@@ -104,6 +104,24 @@ func (db *DataBase) FindUserByGitlabID(id int) (*models.User, error) {
 	return &user, nil
 }
 
+func (db *DataBase) FindUserByGiteaLogin(login string) (*models.User, error) {
+	var user models.User
+	err := db.First(&user, "gitea_login = ?", login).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (db *DataBase) FindUserByGiteaID(id int64) (*models.User, error) {
+	var user models.User
+	err := db.First(&user, "gitea_id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (db *DataBase) FindUserByTelegramID(id int64) (*models.User, error) {
 	var user models.User
 	err := db.First(&user, "telegram_id = ?", id).Error
@@ -116,9 +134,18 @@ func (db *DataBase) FindUserByTelegramID(id int64) (*models.User, error) {
 	return &user, nil
 }
 
-func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
+func (db *DataBase) ListGitlabUsersWithoutRepos() ([]*models.User, error) {
 	var users []*models.User
 	err := db.Find(&users, "repository IS NULL AND gitlab_id IS NOT NULL AND gitlab_login IS NOT NULL").Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (db *DataBase) ListGiteaUsersWithoutRepos() ([]*models.User, error) {
+	var users []*models.User
+	err := db.Find(&users, "repository IS NULL AND gitea_id IS NOT NULL AND gitea_login IS NOT NULL").Error
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +167,27 @@ func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) erro
 		Updates(map[string]interface{}{
 			"gitlab_id":    user.GitlabID,
 			"gitlab_login": user.GitlabLogin,
+		})
+
+	if res.Error != nil {
+		if isUnqiueViolation(res.Error) {
+			return &DuplicateKey{res.Error}
+		}
+		return res.Error
+	}
+
+	if res.RowsAffected < 1 {
+		return fmt.Errorf("unknown user %d", uid)
+	}
+	return nil
+}
+
+func (db *DataBase) SetUserGiteaAccount(uid uint, user *models.GiteaUser) error {
+	res := db.Model(&models.User{}).
+		Where("id = ? AND (gitea_id IS NULL OR gitea_login IS NULL)", uid).
+		Updates(map[string]interface{}{
+			"gitea_id":    user.GiteaID,
+			"gitea_login": user.GiteaLogin,
 		})
 
 	if res.Error != nil {
@@ -262,7 +310,7 @@ func (db *DataBase) CreateFlag(task string) (*models.Flag, error) {
 	return flag, nil
 }
 
-func (db *DataBase) SubmitFlag(id, gitlabLogin string) error {
+func (db *DataBase) SubmitFlagGitlab(id, gitlabLogin string) error {
 	result := db.Model(&models.Flag{}).Where("id = ? AND gitlab_login IS NULL", id).Update("gitlab_login", gitlabLogin)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return fmt.Errorf("unknown flag")
@@ -276,7 +324,21 @@ func (db *DataBase) SubmitFlag(id, gitlabLogin string) error {
 	return nil
 }
 
-func (db *DataBase) ListUserFlags(gitlabLogin string) (flags []models.Flag, err error) {
+func (db *DataBase) SubmitFlagGitea(id, giteaLogin string) error {
+	result := db.Model(&models.Flag{}).Where("id = ? AND gitea_login IS NULL", id).Update("gitea_login", giteaLogin)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("unknown flag")
+	}
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("unknown flag")
+	}
+	return nil
+}
+
+func (db *DataBase) ListUserFlagsGitlab(gitlabLogin string) (flags []models.Flag, err error) {
 	flags = make([]models.Flag, 0)
 	err = db.Find(&flags, "gitlab_login = ?", gitlabLogin).Error
 	if err != nil {
@@ -285,18 +347,36 @@ func (db *DataBase) ListUserFlags(gitlabLogin string) (flags []models.Flag, err 
 	return
 }
 
-func (db *DataBase) ListSubmittedFlags() (flags []models.Flag, err error) {
+func (db *DataBase) ListUserFlagsGitea(giteaLogin string) (flags []models.Flag, err error) {
 	flags = make([]models.Flag, 0)
-	err = db.Find(&flags, "gitlab_login IS NOT NULL").Error
+	err = db.Find(&flags, "gitea_login = ?", giteaLogin).Error
 	if err != nil {
 		flags = nil
 	}
 	return
 }
 
-func (db *DataBase) ListUserOverrides(login string) (overrides []models.OverriddenScore, err error) {
+func (db *DataBase) ListSubmittedFlags() (flags []models.Flag, err error) {
+	flags = make([]models.Flag, 0)
+	err = db.Find(&flags, "gitlab_login IS NOT NULL OR gitea_login IS NOT NULL").Error
+	if err != nil {
+		flags = nil
+	}
+	return
+}
+
+func (db *DataBase) ListUserOverridesGitlab(login string) (overrides []models.OverriddenScore, err error) {
 	overrides = make([]models.OverriddenScore, 0)
 	err = db.Find(&overrides, "gitlab_login = ?", login).Error
+	if err != nil {
+		overrides = nil
+	}
+	return
+}
+
+func (db *DataBase) ListUserOverridesGitea(login string) (overrides []models.OverriddenScore, err error) {
+	overrides = make([]models.OverriddenScore, 0)
+	err = db.Find(&overrides, "gitea_login = ?", login).Error
 	if err != nil {
 		overrides = nil
 	}
@@ -312,12 +392,12 @@ func (db *DataBase) ListOverrides() (overrides []models.OverriddenScore, err err
 	return
 }
 
-func (db *DataBase) AddOverride(gitlabLogin, task string, score int, status models.PipelineStatus) error {
+func (db *DataBase) AddOverrideGitlab(gitlabLogin, task string, score int, status models.PipelineStatus) error {
 	overridenScore := &models.OverriddenScore{
-		GitlabLogin: gitlabLogin,
-		Task:        task,
-		Score:       score,
-		Status:      status,
+		Login:  gitlabLogin,
+		Task:   task,
+		Score:  score,
+		Status: status,
 	}
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "gitlab_login"}, {Name: "task"}},
@@ -325,9 +405,29 @@ func (db *DataBase) AddOverride(gitlabLogin, task string, score int, status mode
 	}).Create(overridenScore).Error
 }
 
-func (db *DataBase) RemoveOverride(gitlabLogin, task string) error {
+func (db *DataBase) AddOverrideGitea(giteaLogin, task string, score int, status models.PipelineStatus) error {
+	overridenScore := &models.OverriddenScore{
+		Login:  giteaLogin,
+		Task:   task,
+		Score:  score,
+		Status: status,
+	}
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "gitea_login"}, {Name: "task"}},
+		DoUpdates: clause.AssignmentColumns([]string{"score", "status"}),
+	}).Create(overridenScore).Error
+}
+
+func (db *DataBase) RemoveOverrideGitlab(gitlabLogin, task string) error {
 	return db.
 		Where("gitlab_login = ? AND task = ?", gitlabLogin, task).
+		Delete(models.OverriddenScore{}).
+		Error
+}
+
+func (db *DataBase) RemoveOverrideGitea(giteaLogin, task string) error {
+	return db.
+		Where("gitea_login = ? AND task = ?", giteaLogin, task).
 		Delete(models.OverriddenScore{}).
 		Error
 }

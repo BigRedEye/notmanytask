@@ -59,10 +59,10 @@ type ScoredTaskGroup struct {
 }
 
 type User struct {
-	FirstName     string
-	LastName      string
-	GitlabLogin   string
-	GitlabProject string
+	FirstName string
+	LastName  string
+	Login     string
+	Project   string
 }
 
 func (u User) FullName() string {

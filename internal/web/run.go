@@ -10,7 +10,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
-	"github.com/bigredeye/notmanytask/internal/gitlab"
+	"github.com/bigredeye/notmanytask/internal/platform"
 	"github.com/bigredeye/notmanytask/internal/scorer"
 	"github.com/bigredeye/notmanytask/internal/tgbot"
 	zlog "github.com/bigredeye/notmanytask/pkg/log"
@@ -45,11 +45,16 @@ func Run() error {
 		config.DataBase.Port,
 		config.DataBase.Name,
 	))
+
+	db_proxy := database.DataBaseProxy{
+		DataBase: db,
+		Conf:     config,
+	}
 	if err != nil {
 		return errors.Wrap(err, "Failed to open database")
 	}
 
-	bot, err := tgbot.NewBot(config, logger.Named("tgbot"), db)
+	bot, err := tgbot.NewBot(config, logger.Named("tgbot"), &db_proxy)
 	if err != nil {
 		return errors.Wrap(err, "failed to create telegram bot")
 	}
@@ -59,22 +64,22 @@ func Run() error {
 		return errors.Wrap(err, "Failed to create deadlines fetcher")
 	}
 
-	git, err := gitlab.NewClient(config, logger.Named("gitlab"))
+	git, err := platform.NewClient(config, logger.Named(config.Platform.Mode))
 	if err != nil {
-		return errors.Wrap(err, "Failed to create gitlab client")
+		return errors.Wrap(err, fmt.Sprintf("Failed to create %s client", config.Platform.Mode))
 	}
 
-	projects, err := gitlab.NewProjectsMaker(git, db)
-	if err != nil {
-		return errors.Wrap(err, "Failed to create projects maker")
-	}
-
-	pipelines, err := gitlab.NewPipelinesFetcher(git, db)
+	projects, err := platform.NewProjectsMaker(config, git, &db_proxy)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}
 
-	scorer := scorer.NewScorer(db, deadlines, git)
+	pipelines, err := platform.NewPipelinesFetcher(config, git, db)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create pipeline fetcher")
+	}
+
+	scorer := scorer.NewScorer(config, &db_proxy, deadlines, git)
 
 	wg.Add(5)
 	go func() {
@@ -98,7 +103,7 @@ func Run() error {
 		bot.Run(ctx)
 	}()
 
-	s := newServer(config, logger.Named("server"), db, deadlines, projects, pipelines, scorer, git)
+	s := newServer(config, logger.Named("server"), &db_proxy, deadlines, projects, pipelines, scorer, git)
 
 	return errors.Wrap(s.run(), "Server failed")
 }

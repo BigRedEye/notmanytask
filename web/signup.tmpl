@@ -57,12 +57,12 @@
                 {{ end }}
 
                 <div class="d-grid mb-3">
-                  <button type="submit" class="btn btn-outline-success">Sign up via GitLab</button>
+                  <button type="submit" class="btn btn-outline-success">Sign up via {{ .Platform }}</button>
                 </div>
               </form>
 
               <div class="d-grid">
-                <a class="btn btn-outline-primary btn-block" href="{{ .Config.Endpoints.Login }}">Login via GitLab</a>
+                <a class="btn btn-outline-primary btn-block" href="{{ .Config.Endpoints.Login }}">Login via {{ .Platform }}</a>
               </div>
             </div>
           </div>

@@ -7,13 +7,19 @@ import (
 type GitlabUser struct {
 	GitlabID    *int    `gorm:"uniqueIndex"`
 	GitlabLogin *string `gorm:"uniqueIndex"`
-	Repository  *string
+}
+
+type GiteaUser struct {
+	GiteaID    *int64  `gorm:"uniqueIndex"`
+	GiteaLogin *string `gorm:"uniqueIndex"`
 }
 
 type User struct {
 	gorm.Model
 
 	GitlabUser
+	GiteaUser
+	Repository *string
 
 	FirstName  string `gorm:"uniqueIndex:idx_name"`
 	LastName   string `gorm:"uniqueIndex:idx_name"`

@@ -16,10 +16,10 @@ import (
 type Bot struct {
 	bot *tgbotapi.BotAPI
 	log *zap.Logger
-	db  *database.DataBase
+	db  *database.DataBaseProxy
 }
 
-func NewBot(conf *config.Config, log *zap.Logger, db *database.DataBase) (*Bot, error) {
+func NewBot(conf *config.Config, log *zap.Logger, db *database.DataBaseProxy) (*Bot, error) {
 	bot, err := tgbotapi.NewBotAPI(conf.Telegram.BotToken)
 	if err != nil {
 		return nil, err
@@ -99,8 +99,13 @@ func (b *Bot) handleWhois(update tgbotapi.Update) error {
 	var err error
 
 	switch system {
-	case "gitlab":
+	case config.GitlabMode:
 		user, err = b.db.FindUserByGitlabLogin(name)
+		if err != nil {
+			return err
+		}
+	case config.GiteaMode:
+		user, err = b.db.FindUserByGiteaLogin(name)
 		if err != nil {
 			return err
 		}
