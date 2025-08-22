@@ -32,12 +32,13 @@ func (c *Client) LoadStandings(group string) (*scorer.Standings, error) {
 		SetResult(res).
 		SetQueryParam("group", group).
 		Get("/api/standings")
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch standings: %w", err)
 	}
 
 	if !res.Ok {
-		return nil, fmt.Errorf("failed to fetch standings: %s", res.Error)
+		return nil, fmt.Errorf("failed to fetch standings: %s (res: %+v)", res.Error, res)
 	}
 
 	return res.Standings, nil
@@ -50,7 +51,7 @@ func (c *Client) LoadUsers(group string) ([]*models.User, error) {
 		SetPathParam("group", group).
 		Get("/api/group/{group}/members")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch group members: %w", err)
 	}
 
 	if !res.Ok {
