@@ -14,7 +14,7 @@ func makeDumpSuccessfulSubmits() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "submits",
-		Short: "Dump submits",
+		Short: "Dump successful submits",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return dumpSuccessfulSubmits(group, task)
 		},
