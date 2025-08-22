@@ -52,6 +52,8 @@ type EndpointsConfig struct {
 
 type ServerConfig struct {
 	ListenAddress string
+	CourseName    string
+	HeaderName    string
 	Cookies       struct {
 		AuthenticationKey string
 		EncryptionKey     string
@@ -76,6 +78,7 @@ type GroupConfig struct {
 	DeadlinesURL    string
 	DeadlinesFormat string
 	ShowMarks       bool
+	Default         bool
 }
 
 type GroupsConfig []GroupConfig
@@ -87,6 +90,20 @@ func (g GroupsConfig) FindGroup(name string) *GroupConfig {
 		}
 	}
 	return nil
+}
+
+func (g GroupsConfig) FindDefaultGroup() *GroupConfig {
+	for i := range g {
+		if g[i].Default {
+			return &g[i]
+		}
+	}
+
+	if len(g) == 0 {
+		return nil
+	}
+
+	return &g[0]
 }
 
 type PullIntervalsConfig struct {

@@ -17,7 +17,7 @@ import (
 
 func (s *server) RenderSignupPage(c *gin.Context, err string) {
 	c.HTML(http.StatusOK, "signup.tmpl", gin.H{
-		"CourseName":   "HSE Advanced C++",
+		"CourseName":   s.config.Server.CourseName,
 		"Config":       s.config,
 		"ErrorMessage": err,
 	})
@@ -25,7 +25,7 @@ func (s *server) RenderSignupPage(c *gin.Context, err string) {
 
 func (s *server) RenderTelegramLogin(c *gin.Context, err string) {
 	c.HTML(http.StatusOK, "telegram.tmpl", gin.H{
-		"CourseName":   "HSE Advanced C++",
+		"CourseName":   s.config.Server.CourseName,
 		"Config":       s.config,
 		"ErrorMessage": err,
 	})
@@ -38,7 +38,7 @@ func (s *server) RenderSubmitFlagPage(c *gin.Context) {
 func (s *server) RenderSubmitFlagPageDetails(c *gin.Context, err, success string) {
 	user := c.MustGet("user").(*models.User)
 	c.HTML(http.StatusOK, "flag.tmpl", gin.H{
-		"CourseName":     "HSE Advanced C++",
+		"CourseName":     s.config.Server.CourseName,
 		"Config":         s.config,
 		"ErrorMessage":   err,
 		"SuccessMessage": success,
@@ -109,8 +109,8 @@ func (s *server) RenderHomePage(c *gin.Context) {
 
 	c.HTML(http.StatusOK, "home.tmpl", gin.H{
 		// FIXME(BigRedEye): Do not hardcode title
-		"CourseName": "HSE Advanced C++",
-		"Title":      "HSE Advanced C++",
+		"CourseName": s.config.Server.CourseName,
+		"Title":      s.config.Server.CourseName,
 		"Config":     s.config,
 		"Scores":     scores,
 		"Error":      err,
@@ -127,8 +127,8 @@ func (s *server) RenderCheaterPage(c *gin.Context) {
 	reverseScores(scores)
 
 	c.HTML(http.StatusOK, "home.tmpl", gin.H{
-		"CourseName": "HSE Advanced C++",
-		"Title":      "HSE Advanced C++",
+		"CourseName": s.config.Server.CourseName,
+		"Title":      s.config.Server.CourseName,
 		"Config":     s.config,
 		"Scores":     scores,
 		"Error":      err,
@@ -146,7 +146,10 @@ func reverseScoreboardGroups(standings *scorer.Standings) {
 func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter scorer.UserFilter) {
 	group := c.Query("group")
 	if group == "" {
-		group = "hse"
+		defaul := s.config.Groups.FindDefaultGroup()
+		if defaul != nil {
+			group = defaul.Name
+		}
 	}
 	var links *Links
 	if user, session, err := s.tryFindUserByToken(c); err == nil && session != nil {

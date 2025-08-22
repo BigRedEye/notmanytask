@@ -330,7 +330,14 @@ func (s apiService) standings(c *gin.Context) {
 		)
 	}
 
-	standings, err := s.server.scorer.CalcScoreboard("hse")
+	var group string
+	if g := c.Query("group"); g != "" {
+		group = g
+	} else {
+		group = s.config.Groups.FindDefaultGroup().Name
+	}
+
+	standings, err := s.server.scorer.CalcScoreboard(group)
 	if err != nil {
 		onError(http.StatusInternalServerError, fmt.Errorf("failed to list scores: %w", err))
 		return
