@@ -102,7 +102,10 @@ func (c Client) InitializeProject(user *models.User) error {
 	var errresp *gitlab.ErrorResponse
 	// I'm sorry
 	if err != nil && goerrors.As(err, &errresp) && errresp.Message == "{message: A file with this name already exists}" {
-		log.Warn("Failed to create README (file already exists)", zap.Error(err))
+		log.Warn("Failed to create README: file already exists", zap.Error(err))
+		// continue
+	} else if err != nil && goerrors.As(err, &errresp) && errresp.Message == "{message: 403 Forbidden - You are not allowed to push into this branch}" {
+		log.Warn("Failed to create README: main branch is protected", zap.Error(err))
 		// continue
 	} else if err != nil {
 		return errors.Wrap(err, "Failed to create README")
@@ -113,13 +116,19 @@ func (c Client) InitializeProject(user *models.User) error {
 	}
 
 	// Protect master branch from unintended commits
-	_, _, err = c.gitlab.Branches.ProtectBranch(project.ID, master, &gitlab.ProtectBranchOptions{
-		DevelopersCanPush:  gitlab.Bool(false),
-		DevelopersCanMerge: gitlab.Bool(false),
+	_, _, err = c.gitlab.ProtectedBranches.ProtectRepositoryBranches(project.ID, &gitlab.ProtectRepositoryBranchesOptions{
+		Name:                 gitlab.String(master),
+		PushAccessLevel:      gitlab.AccessLevel(gitlab.MaintainerPermissions),
+		MergeAccessLevel:     gitlab.AccessLevel(gitlab.MaintainerPermissions),
+		UnprotectAccessLevel: gitlab.AccessLevel(gitlab.MaintainerPermissions),
 	})
 	if err != nil {
-		log.Error("Failed to protect master branch", zap.Error(err))
-		return errors.Wrap(err, "Failed to protect master branch")
+		if goerrors.As(err, &errresp) && errresp.Message == "{message: Protected branch 'master' already exists}" {
+			log.Warn("Failed to protect master branch: branch is alreay protected", zap.Error(err))
+		} else {
+			log.Error("Failed to protect master branch", zap.Error(err))
+			return errors.Wrap(err, "Failed to protect master branch")
+		}
 	}
 	log.Info("Protected master branch")
 
