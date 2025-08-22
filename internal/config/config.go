@@ -126,7 +126,7 @@ type Config struct {
 	Testing       TestingConfig
 	Groups        GroupsConfig
 	PullIntervals PullIntervalsConfig
-	Telegram      TelegramBotConfig
+	Telegram      *TelegramBotConfig
 }
 
 func ParseConfig() (*Config, error) {

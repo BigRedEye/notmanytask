@@ -20,6 +20,10 @@ type Bot struct {
 }
 
 func NewBot(conf *config.Config, log *zap.Logger, db *database.DataBase) (*Bot, error) {
+	if conf.Telegram == nil {
+		return nil, nil
+	}
+
 	bot, err := tgbotapi.NewBotAPI(conf.Telegram.BotToken)
 	if err != nil {
 		return nil, err
@@ -28,6 +32,10 @@ func NewBot(conf *config.Config, log *zap.Logger, db *database.DataBase) (*Bot, 
 }
 
 func (b *Bot) Run(ctx context.Context) {
+	if b == nil {
+		return
+	}
+
 	b.log.Info("Authorized on account %s", zap.String("username", b.bot.Self.UserName))
 
 	u := tgbotapi.NewUpdate(0)
