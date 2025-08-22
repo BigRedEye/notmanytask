@@ -244,7 +244,7 @@ func (s loginService) oauth(c *gin.Context) {
 		s.RedirectToSignup(c, "GitLab authentication failed, try again")
 		return
 	}
-	gitlabUser, err := gitlab.GetOAuthGitLabUser(token.AccessToken)
+	gitlabUser, err := gitlab.GetOAuthGitLabUser(token.AccessToken, s.config.GitLab.BaseURL)
 	if err != nil {
 		s.log.Error("Failed to get gitlab user", zap.Error(err))
 		s.RedirectToSignup(c, "GitLab authentication failed, try again")

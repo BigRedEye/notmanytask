@@ -12,8 +12,8 @@ type User struct {
 	Login string
 }
 
-func GetOAuthGitLabUser(token string) (*User, error) {
-	client, err := gitlab.NewOAuthClient(token)
+func GetOAuthGitLabUser(token, baseURL string) (*User, error) {
+	client, err := gitlab.NewOAuthClient(token, gitlab.WithBaseURL(baseURL))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create gitlab client")
 	}
