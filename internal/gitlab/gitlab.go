@@ -69,7 +69,7 @@ func (c Client) InitializeProject(user *models.User) error {
 			NamespaceID:          &c.config.GitLab.Group.ID,
 			DefaultBranch:        gitlab.String(master),
 			Visibility:           gitlab.Visibility(gitlab.PrivateVisibility),
-			SharedRunnersEnabled: gitlab.Bool(false),
+			SharedRunnersEnabled: gitlab.Bool(true),
 			CIConfigPath:         &c.config.GitLab.CIConfigPath,
 		})
 		if err != nil {
