@@ -162,8 +162,8 @@ func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter score
 		return scores, err
 	})
 	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
-		"CourseName":  "HSE Advanced C++",
-		"Title":       "HSE Advanced C++",
+		"CourseName":  s.config.Server.CourseName,
+		"Title":       s.config.Server.CourseName,
 		"Config":      s.config,
 		"GroupConfig": s.config.Groups.FindGroup(group),
 		"Standings":   scores.Value().(*scorer.Standings),
@@ -188,8 +188,8 @@ func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 	scores, err := s.scorer.CalcScoreboard(group)
 	reverseScoreboardGroups(scores)
 	c.HTML(http.StatusOK, "standings.tmpl", gin.H{
-		"CourseName":  "HSE Advanced C++",
-		"Title":       "HSE Advanced C++",
+		"CourseName":  s.config.Server.CourseName,
+		"Title":       s.config.Server.CourseName,
 		"Config":      s.config,
 		"GroupConfig": s.config.Groups.FindGroup(group),
 		"Standings":   scores,
