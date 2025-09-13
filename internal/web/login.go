@@ -363,7 +363,7 @@ func (s *server) validateSession(verifyTelegram bool) func(c *gin.Context) {
 			return
 		}
 
-		if verifyTelegram && user.TelegramID == nil {
+		if verifyTelegram && s.config.Telegram != nil && user.TelegramID == nil {
 			s.logger.Info("Found user without telegram login", lf.UserID(user.ID))
 			c.Redirect(http.StatusTemporaryRedirect, s.config.Endpoints.TelegramLogin)
 			c.Abort()
