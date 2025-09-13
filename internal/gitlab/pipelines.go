@@ -194,7 +194,7 @@ func (p *PipelinesFetcher) fetchFreshPipelines() {
 
 const (
 	branchPrefix = "submits/"
-	tasksPrefix = "tasks/"
+	tasksPrefix  = "tasks/"
 )
 
 func ParseTaskFromBranch(task string) string {
