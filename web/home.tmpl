@@ -81,16 +81,41 @@
         </nav>
 
         {{ if .Scores }}
+            <div class="container p-2 my-4">
+                <div class="bg-light rounded p-4 shadow-sm d-flex flex-wrap align-items-center justify-content-between">
+                    <div class="d-flex align-items-center me-4 mb-2 mb-md-0">
+                        <div class="me-4 pe-4 border-end">
+                            <div class="text-uppercase text-muted small fw-bold" style="font-size: 0.7rem; letter-spacing: 1px;">Final Mark</div>
+                            <div class="display-5 fw-bold text-dark lh-1">{{printf "%.2f" .Scores.FinalMark}}</div>
+                        </div>
+                        <div class="d-flex gap-4">
+                            {{ range .Scores.ScoringGroups }}
+                            <div>
+                                <div class="text-muted small" style="font-size: 0.75rem;">{{ .Name }}</div>
+                                <div class="fw-bold h5 mb-0">{{printf "%.1f" .TenScaleScore}}<span class="text-muted fw-normal small">/10</span></div>
+                                <div class="text-muted small" style="font-size: 0.7rem;">{{ .Score }} / {{ .MaxScore }}</div>
+                            </div>
+                            {{ end }}
+                        </div>
+                    </div>
+                    <div class="text-muted small">
+                        Max: {{printf "%.2f" .Scores.MaxFinalMark}}
+                    </div>
+                </div>
+            </div>
+
             {{ range .Scores.Groups }}
                 <div class="container p-2 my-5">
-                    <div class="p-2">
+                    <div class="p-2 mb-3">
                         <a name="{{ .PrettyTitle }}" href="#{{ .PrettyTitle }}" class="text-decoration-none text-dark">
-                            <h1 class="row">
-                                <div class="col-8">
+                            <h1 class="row align-items-baseline">
+                                <div class="col-auto">
                                     {{ .PrettyTitle }}
-                                    <span class="text-muted">{{ .Deadline.String }}</span>
                                 </div>
-                                <span class="col text-end">Total score: {{ .Score }} / {{ .MaxScore }}</span>
+                                <div class="col-auto">
+                                    <span class="h4 text-muted fw-light">{{ .Deadline.String }}</span>
+                                </div>
+                                <span class="col text-end h3 fw-light text-muted">Total score: {{ .Score }} / {{ .MaxScore }}</span>
                             </h1>
                         </a>
                     </div>

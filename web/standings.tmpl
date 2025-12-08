@@ -134,8 +134,11 @@
                         <tr>
                             <th scope="col" class="num sticky-header sticky-col first-col corner">#</th>
                             <th scope="col" class="name sticky-header sticky-col second-col corner">Student</th>
-                            {{ if $.GroupConfig.ShowMarks }}<th scope="col" class="sticky-header">Mark</th>{{ end }}
-                            <th scope="col" class="sticky-header">Score</th>
+                            <th scope="col" class="sticky-header">Final Mark</th>
+                            {{ range .Standings.Deadlines.Scoring.Groups }}
+                                <th scope="col" class="sticky-header">{{ .Name }} ({{ .Weight }})</th>
+                            {{ end }}
+                            <th scope="col" class="sticky-header">Total Score</th>
                             {{ range .Standings.Deadlines.Assignments }}
                                 {{ range .Tasks }}
                                     <th scope="col" class="task sticky-header"><span class="task-name">{{ .Task | prettifyTaskName }}</span></th>
@@ -148,7 +151,12 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">0</th>
                                 <th scope="row" class="name sticky-col second-col">Chuck Norris</th>
-                                {{ if $.GroupConfig.ShowMarks }}<td>13.37</td>{{ end }}
+                                <td>{{printf "%.2f" .MaxFinalMark}}</td>
+                                {{ range .ScoringGroups }}
+                                    <td class="text-center" title="{{ .MaxScore }}/{{ .MaxScore }}">
+                                        10.0
+                                    </td>
+                                {{ end }}
                                 <td>{{ .MaxScore }}</td>
                                 {{ range .Groups }}
                                     {{ range .Tasks }}
@@ -161,7 +169,12 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">{{ inc $index }}</th>
                                 <th scope="row" class="name sticky-col second-col">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
-                                {{ if $.GroupConfig.ShowMarks }}<td>{{printf "%.3f" $user.FinalMark}}</td>{{ end }}
+                                <td>{{printf "%.2f" $user.FinalMark}}</td>
+                                {{ range $user.ScoringGroups }}
+                                    <td class="text-center" title="{{ .Score }}/{{ .MaxScore }}">
+                                        {{printf "%.1f" .TenScaleScore}}
+                                    </td>
+                                {{ end }}
                                 <td>{{ $user.Score }}</td>
                                 {{ range $user.Groups }}
                                     {{ range .Tasks }}

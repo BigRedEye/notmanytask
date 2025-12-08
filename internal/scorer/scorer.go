@@ -266,16 +266,26 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 	overrides := parseOverrides(rawOverrides)
 
 	scores := &UserScores{
-		Groups:    make([]ScoredTaskGroup, 0),
-		Score:     0,
-		MaxScore:  0,
-		FinalMark: 0.0,
+		Groups:        make([]ScoredTaskGroup, 0),
+		ScoringGroups: make([]ScoredScoringGroup, 0),
+		Score:         0,
+		MaxScore:      0,
+		FinalMark:     0.0,
 		User: User{
 			FirstName:     user.FirstName,
 			LastName:      user.LastName,
 			GitlabLogin:   *user.GitlabLogin,
 			GitlabProject: s.projects.MakeProjectName(user),
 		},
+	}
+
+	groupStats := make(map[string]*ScoredScoringGroup)
+	for _, g := range currentDeadlines.Scoring.Groups {
+		groupStats[g.Name] = &ScoredScoringGroup{
+			Name:     g.Name,
+			Weight:   g.Weight,
+			MaxScore: g.MaxScore,
+		}
 	}
 
 	for _, group := range currentDeadlines.Assignments {
@@ -337,9 +347,41 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 		})
 		scores.Score += totalScore
 		scores.MaxScore += maxTotalScore
-		if scoringGroup != nil && scoringGroup.MaxScore > 0 {
-			scores.FinalMark += scoringGroup.Weight * float64(totalScore) / float64(scoringGroup.MaxScore)
+
+		if scoringGroup != nil {
+			stats, ok := groupStats[scoringGroup.Name]
+			if !ok {
+				stats = &ScoredScoringGroup{
+					Name:     scoringGroup.Name,
+					Weight:   scoringGroup.Weight,
+					MaxScore: scoringGroup.MaxScore,
+				}
+				groupStats[scoringGroup.Name] = stats
+			}
+			stats.Score += totalScore
+			if scoringGroup.MaxScore == 0 {
+				stats.MaxScore += maxTotalScore
+			}
 		}
+	}
+
+	for _, g := range currentDeadlines.Scoring.Groups {
+		stats, ok := groupStats[g.Name]
+		if !ok {
+			continue
+		}
+
+		if stats.MaxScore > 0 {
+			stats.WeightedScore = stats.Weight * float64(stats.Score) / float64(stats.MaxScore)
+			stats.TenScaleScore = 10.0 * float64(stats.Score) / float64(stats.MaxScore)
+		} else {
+			stats.WeightedScore = 0
+			stats.TenScaleScore = 0
+		}
+
+		scores.MaxFinalMark += stats.Weight
+		scores.FinalMark += stats.WeightedScore
+		scores.ScoringGroups = append(scores.ScoringGroups, *stats)
 	}
 
 	return scores, nil
