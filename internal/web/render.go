@@ -95,8 +95,8 @@ func (s *server) makeLinks(user *models.User) *Links {
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
 		TasksRepository: s.config.GitLab.TaskUrlPrefix,
-		Repository:      s.gitlab.MakeProjectURL(user),
-		Submits:         s.gitlab.MakeProjectSubmitsURL(user),
+		Repository:      s.githosting.MakeRepoURL(user),
+		Submits:         s.githosting.MakeRepoCIRunsURL(user),
 		Logout:          s.config.Endpoints.Logout,
 		SubmitFlag:      s.config.Endpoints.Flag,
 	}
