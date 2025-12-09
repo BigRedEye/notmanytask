@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bigredeye/notmanytask/internal/config"
+	"github.com/bigredeye/notmanytask/internal/interfaces"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/models"
 )
@@ -35,16 +36,18 @@ func NewClient(conf *config.Config, logger *zap.Logger) (*Client, error) {
 	return &Client{
 		config:   conf,
 		gitlab:   client,
-		logger:   logger,
+		logger:   logger.Named("gitlab"),
 		translit: transliterator.NewTransliterator(nil),
 	}, nil
 }
+
+var _ interfaces.GitHostingService = &Client{}
 
 const (
 	master = "master"
 )
 
-func (c Client) InitializeProject(user *models.User) error {
+func (c Client) InitializeRepo(user *models.User) error {
 	if user.GitlabID == nil || user.GitlabLogin == nil {
 		c.logger.Error("Empty gitlab user", zap.Uint("uid", user.ID))
 		return errors.New("Empty gitlab user")
@@ -53,7 +56,7 @@ func (c Client) InitializeProject(user *models.User) error {
 	log := c.logger.With(zap.Stringp("gitlab_login", user.GitlabLogin), zap.Intp("gitlab_id", user.GitlabID), zap.Uint("user_id", user.ID))
 	log.Info("Going to initialize project")
 
-	projectName := c.MakeProjectName(user)
+	projectName := c.MakeRepoName(user)
 	log = log.With(lf.ProjectName(projectName))
 
 	// Try to find existing project
@@ -194,34 +197,98 @@ func (c Client) cleanupLogin(login string) string {
 	return strings.ReplaceAll(login, "__", "")
 }
 
-func (c Client) MakeProjectName(user *models.User) string {
+func (c Client) MakeRepoName(user *models.User) string {
 	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, c.cleanupName(user.FirstName), c.cleanupName(user.LastName), c.cleanupLogin(*user.GitlabLogin))
 }
 
-func (c Client) MakeProjectURL(user *models.User) string {
-	name := c.MakeProjectName(user)
+func (c Client) MakeRepoURL(user *models.User) string {
+	name := c.MakeRepoName(user)
 	return fmt.Sprintf("%s/%s/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name)
 }
 
-func (c Client) MakeProjectSubmitsURL(user *models.User) string {
-	url := c.MakeProjectURL(user)
+func (c Client) MakeRepoCIRunsURL(user *models.User) string {
+	url := c.MakeRepoURL(user)
 	return fmt.Sprintf("%s/-/jobs", url)
 }
 
-func (c Client) MakeProjectWithNamespace(project string) string {
-	return fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, project)
+func (c Client) MakeFullRepoName(repoName string) string {
+	return fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, repoName)
 }
 
-func (c Client) MakePipelineURL(user *models.User, pipeline *models.Pipeline) string {
-	name := c.MakeProjectName(user)
+func (c Client) MakeCIRunURL(user *models.User, pipeline *models.Pipeline) string {
+	name := c.MakeRepoName(user)
 	return fmt.Sprintf("%s/%s/%s/-/pipelines/%d", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.ID)
 }
 
 func (c Client) MakeBranchURL(user *models.User, pipeline *models.Pipeline) string {
-	name := c.MakeProjectName(user)
+	name := c.MakeRepoName(user)
 	return fmt.Sprintf("%s/%s/%s/-/tree/submits/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.Task)
 }
 
 func (c Client) MakeTaskURL(task string) string {
 	return fmt.Sprintf("%s/%s", c.config.GitLab.TaskUrlPrefix, task)
+}
+
+func (c Client) GetCIRun(repoName string, pipelineID int) (*models.Pipeline, error) {
+	pipeline, _, err := c.gitlab.Pipelines.GetPipeline(c.MakeFullRepoName(repoName), pipelineID)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to fetch pipeline")
+	}
+	return &models.Pipeline{
+		ID:        pipeline.ID,
+		ProjectID: pipeline.ProjectID,
+		Ref:       pipeline.Ref,
+		Task:      ParseTaskFromBranch(pipeline.Ref),
+		Status:    pipeline.Status,
+		Project:   repoName,
+		StartedAt: *pipeline.CreatedAt,
+	}, nil
+}
+
+func (c Client) ListRepoCIRuns(repo *models.Repo) ([]*models.Pipeline, error) {
+	results := make([]*models.Pipeline, 0)
+	options := &gitlab.ListProjectPipelinesOptions{}
+	for {
+		pipelines, resp, err := c.gitlab.Pipelines.ListProjectPipelines(repo.ID, options)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to list project pipelines")
+		}
+		for _, pipeline := range pipelines {
+			results = append(results, &models.Pipeline{
+				ID:        pipeline.ID,
+				Task:      ParseTaskFromBranch(pipeline.Ref),
+				Status:    pipeline.Status,
+				Project:   repo.Name,
+				StartedAt: *pipeline.CreatedAt,
+			})
+		}
+
+		if resp.CurrentPage >= resp.TotalPages {
+			break
+		}
+		options.Page = resp.NextPage
+	}
+	return results, nil
+}
+
+func (c Client) ListAllRepos() ([]*models.Repo, error) {
+	results := make([]*models.Repo, 0)
+	options := &gitlab.ListGroupProjectsOptions{}
+	for {
+	repos, resp, err := c.gitlab.Groups.ListGroupProjects(c.config.GitLab.Group.ID, nil, nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to list group projects")
+		}
+		for _, repo := range repos {
+			results = append(results, &models.Repo{
+				ID:   repo.ID,
+				Name: repo.Name,
+			})
+		}
+		if resp.CurrentPage >= resp.TotalPages {
+			break
+		}
+		options.Page = resp.NextPage
+	}
+	return results, nil
 }

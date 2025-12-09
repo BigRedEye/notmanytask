@@ -10,25 +10,30 @@ import (
 	"github.com/xanzy/go-gitlab"
 	"go.uber.org/zap"
 
+	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
+	"github.com/bigredeye/notmanytask/internal/interfaces"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
 	"github.com/bigredeye/notmanytask/internal/models"
 )
 
 type PipelinesFetcher struct {
-	*Client
+	interfaces.GitHostingService
 
 	logger *zap.Logger
 	db     *database.DataBase
 
 	fresh sync.Map
+
+	config *config.Config
 }
 
-func NewPipelinesFetcher(client *Client, db *database.DataBase) (*PipelinesFetcher, error) {
+func NewPipelinesFetcher(githosting interfaces.GitHostingService, logger *zap.Logger, db *database.DataBase, config *config.Config) (*PipelinesFetcher, error) {
 	return &PipelinesFetcher{
-		Client: client,
-		logger: client.logger.Named("pipelines"),
-		db:     db,
+		GitHostingService: githosting,
+		logger:            logger.Named("pipelines"),
+		db:                db,
+		config:            config,
 	}, nil
 }
 
@@ -84,7 +89,7 @@ func (p *PipelinesFetcher) fetch(id int, project string) (*gitlab.PipelineInfo, 
 
 	log.Debug("Fetching pipeline")
 
-	pipeline, _, err := p.gitlab.Pipelines.GetPipeline(p.Client.MakeProjectWithNamespace(project), id)
+	pipeline, err := p.GetCIRun(project, id)
 	if err != nil {
 		log.Error("Failed to fetch pipeline", zap.Error(err))
 		return nil, errors.Wrap(err, "Failed to fetch pipeline")
@@ -94,47 +99,34 @@ func (p *PipelinesFetcher) fetch(id int, project string) (*gitlab.PipelineInfo, 
 		ID:        pipeline.ID,
 		Ref:       pipeline.Ref,
 		Status:    pipeline.Status,
-		CreatedAt: pipeline.CreatedAt,
+		CreatedAt: &pipeline.StartedAt,
 		ProjectID: pipeline.ProjectID,
 	}
-	return info, p.addPipeline(project, info)
+	return info, p.addPipeline(project, pipeline)
 }
 
-func (p *PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.PipelineInfo) error {
-	return p.db.AddPipeline(&models.Pipeline{
-		ID:        pipeline.ID,
-		Task:      ParseTaskFromBranch(pipeline.Ref),
-		Status:    pipeline.Status,
-		Project:   projectName,
-		StartedAt: *pipeline.CreatedAt,
-	})
+func (p *PipelinesFetcher) addPipeline(projectName string, pipeline *models.Pipeline) error {
+	return p.db.AddPipeline(pipeline)
 }
 
 func (p *PipelinesFetcher) fetchAllPipelines() {
 	p.logger.Debug("Start pipelines fetcher iteration")
 	defer p.logger.Debug("Finish pipelines fetcher iteration")
 
-	err := p.forEachProject(func(project *gitlab.Project) error {
+	err := p.forEachProject(func(project *models.Repo) error {
 		p.logger.Debug("Found project", lf.ProjectName(project.Name))
-		options := &gitlab.ListProjectPipelinesOptions{}
-		for {
-			pipelines, resp, err := p.gitlab.Pipelines.ListProjectPipelines(project.ID, options)
-			if err != nil {
-				p.logger.Error("Failed to list projects", zap.Error(err))
-				return err
-			}
 
-			for _, pipeline := range pipelines {
-				p.logger.Debug("Found pipeline", lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID), lf.PipelineStatus(pipeline.Status))
-				if err = p.addPipeline(project.Name, pipeline); err != nil {
-					p.logger.Error("Failed to add pipeline", zap.Error(err), lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID))
-				}
-			}
+		pipelines, err := p.ListRepoCIRuns(project)
+		if err != nil {
+			p.logger.Error("Failed to list projects", zap.Error(err))
+			return err
+		}
 
-			if resp.CurrentPage >= resp.TotalPages {
-				break
+		for _, pipeline := range pipelines {
+			p.logger.Debug("Found pipeline", lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID), lf.PipelineStatus(pipeline.Status))
+			if err = p.addPipeline(project.Name, pipeline); err != nil {
+				p.logger.Error("Failed to add pipeline", zap.Error(err), lf.ProjectName(project.Name), lf.PipelineID(pipeline.ID))
 			}
-			options.Page = resp.NextPage
 		}
 
 		return nil
@@ -147,27 +139,18 @@ func (p *PipelinesFetcher) fetchAllPipelines() {
 	}
 }
 
-func (p *PipelinesFetcher) forEachProject(callback func(project *gitlab.Project) error) error {
-	options := gitlab.ListGroupProjectsOptions{}
+func (p *PipelinesFetcher) forEachProject(callback func(project *models.Repo) error) error {
+	projects, err := p.ListAllRepos()
+	if err != nil {
+		p.logger.Error("Failed to list projects", zap.Error(err))
+		return err
+	}
 
-	for {
-		projects, resp, err := p.gitlab.Groups.ListGroupProjects(p.config.GitLab.Group.ID, &options)
-		if err != nil {
-			p.logger.Error("Failed to list projects", zap.Error(err))
+	for _, project := range projects {
+		if err = callback(project); err != nil {
+			p.logger.Error("Project callback failed", zap.Error(err))
 			return err
 		}
-
-		for _, project := range projects {
-			if err = callback(project); err != nil {
-				p.logger.Error("Project callback failed", zap.Error(err))
-				return err
-			}
-		}
-
-		if resp.CurrentPage >= resp.TotalPages {
-			break
-		}
-		options.Page = resp.NextPage
 	}
 
 	return nil

@@ -9,25 +9,18 @@ import (
 
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
+	"github.com/bigredeye/notmanytask/internal/interfaces"
 	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/pkg/errors"
 )
 
-type ProjectNameFactory interface {
-	MakeProjectURL(user *models.User) string
-	MakeProjectName(user *models.User) string
-	MakePipelineURL(user *models.User, pipeline *models.Pipeline) string
-	MakeBranchURL(user *models.User, pipeline *models.Pipeline) string
-	MakeTaskURL(task string) string
-}
-
 type Scorer struct {
 	deadlines *deadlines.Fetcher
 	db        *database.DataBase
-	projects  ProjectNameFactory
+	projects  interfaces.ProjectNameFactory
 }
 
-func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher, projects ProjectNameFactory) *Scorer {
+func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher, projects interfaces.ProjectNameFactory) *Scorer {
 	return &Scorer{deadlines, db, projects}
 }
 
@@ -76,7 +69,7 @@ type pipelinesProvider = func(project string) (pipelines []models.Pipeline, err 
 type flagsProvider = func(gitlabLogin string) (flags []models.Flag, err error)
 
 func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider) (pipelinesMap, error) {
-	pipelines, err := provider(s.projects.MakeProjectName(user))
+	pipelines, err := provider(s.projects.MakeRepoName(user))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to list use rpipelines")
 	}
@@ -274,7 +267,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 			FirstName:     user.FirstName,
 			LastName:      user.LastName,
 			GitlabLogin:   *user.GitlabLogin,
-			GitlabProject: s.projects.MakeProjectName(user),
+			GitlabProject: s.projects.MakeRepoName(user),
 		},
 	}
 
@@ -312,7 +305,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 				if found {
 					tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
 					tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, pipeline)
-					tasks[i].PipelineUrl = s.projects.MakePipelineURL(user, pipeline)
+					tasks[i].PipelineUrl = s.projects.MakeCIRunURL(user, pipeline)
 					tasks[i].BranchUrl = s.projects.MakeBranchURL(user, pipeline)
 				}
 			}

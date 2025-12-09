@@ -17,6 +17,7 @@ import (
 	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/gitlab"
+	"github.com/bigredeye/notmanytask/internal/interfaces"
 	"github.com/bigredeye/notmanytask/internal/scorer"
 	"github.com/bigredeye/notmanytask/web"
 )
@@ -25,13 +26,13 @@ type server struct {
 	config *config.Config
 	logger *zap.Logger
 
-	auth      *AuthClient
-	db        *database.DataBase
-	deadlines *deadlines.Fetcher
-	projects  *gitlab.ProjectsMaker
-	pipelines *gitlab.PipelinesFetcher
-	scorer    *scorer.Scorer
-	gitlab    *gitlab.Client
+	auth       *AuthClient
+	db         *database.DataBase
+	deadlines  *deadlines.Fetcher
+	projects   *gitlab.ProjectsMaker
+	pipelines  *gitlab.PipelinesFetcher
+	scorer     *scorer.Scorer
+	githosting interfaces.GitHostingService
 
 	cache *ccache.Cache
 }
@@ -44,19 +45,19 @@ func newServer(
 	projects *gitlab.ProjectsMaker,
 	pipelines *gitlab.PipelinesFetcher,
 	scorer *scorer.Scorer,
-	gitlab *gitlab.Client,
+	githosting interfaces.GitHostingService,
 ) *server {
 	return &server{
-		config:    config,
-		logger:    logger,
-		auth:      NewAuthClient(config),
-		db:        db,
-		deadlines: deadlines,
-		projects:  projects,
-		pipelines: pipelines,
-		scorer:    scorer,
-		gitlab:    gitlab,
-		cache:     ccache.New(ccache.Configure()),
+		config:     config,
+		logger:     logger,
+		auth:       NewAuthClient(config),
+		db:         db,
+		deadlines:  deadlines,
+		projects:   projects,
+		pipelines:  pipelines,
+		scorer:     scorer,
+		githosting: githosting,
+		cache:      ccache.New(ccache.Configure()),
 	}
 }
 

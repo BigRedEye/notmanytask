@@ -59,17 +59,17 @@ func Run() error {
 		return errors.Wrap(err, "Failed to create deadlines fetcher")
 	}
 
-	git, err := gitlab.NewClient(config, logger.Named("gitlab"))
+	git, err := gitlab.NewClient(config, logger)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create gitlab client")
 	}
 
-	projects, err := gitlab.NewProjectsMaker(git, db)
+	projects, err := gitlab.NewProjectsMaker(git, logger, db, config)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}
 
-	pipelines, err := gitlab.NewPipelinesFetcher(git, db)
+	pipelines, err := gitlab.NewPipelinesFetcher(git, logger, db, config)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}

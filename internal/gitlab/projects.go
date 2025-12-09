@@ -4,21 +4,36 @@ import (
 	"context"
 	"time"
 
+	"github.com/bigredeye/notmanytask/internal/config"
 	"github.com/bigredeye/notmanytask/internal/database"
+	"github.com/bigredeye/notmanytask/internal/interfaces"
 	"github.com/bigredeye/notmanytask/internal/models"
 	"go.uber.org/zap"
 )
 
 type ProjectsMaker struct {
-	*Client
+	interfaces.GitHostingService
 
 	logger *zap.Logger
 	db     *database.DataBase
 	users  chan *models.User
+
+	config *config.Config
 }
 
-func NewProjectsMaker(client *Client, db *database.DataBase) (*ProjectsMaker, error) {
-	return &ProjectsMaker{client, client.logger.Named("projects"), db, make(chan *models.User, 4)}, nil
+func NewProjectsMaker(
+	githosting interfaces.GitHostingService,
+	logger *zap.Logger,
+	db *database.DataBase,
+	config *config.Config,
+) (*ProjectsMaker, error) {
+	return &ProjectsMaker{
+		GitHostingService: githosting,
+		logger:            logger.Named("projects"),
+		db:                db,
+		users:             make(chan *models.User, 4),
+		config:            config,
+	}, nil
 }
 
 func (p ProjectsMaker) AsyncPrepareProject(user *models.User) {
@@ -84,7 +99,7 @@ func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
 
 	log = log.With(zap.Intp("gitlab_id", user.GitlabID), zap.Stringp("gitlab_login", user.GitlabLogin))
 
-	err := p.InitializeProject(user)
+	err := p.InitializeRepo(user)
 	if err != nil {
 		log.Error("Failed to initialize project", zap.Error(err))
 		// TODO(BigRedEye): nice backoff
@@ -92,7 +107,7 @@ func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
 		return false
 	}
 
-	project := p.MakeProjectURL(user)
+	project := p.MakeRepoURL(user)
 	log = log.With(zap.String("project", project))
 
 	user.Repository = &project
