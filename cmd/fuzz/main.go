@@ -38,11 +38,22 @@ func unwrap[T any](value T, err error) T {
 }
 
 type runOption func(*exec.Cmd)
+type watcherOption func(*exec.Cmd)
 
 func WithDir(dir string) runOption {
 	_ = os.MkdirAll(dir, 0755)
 	return func(c *exec.Cmd) {
 		c.Dir = dir
+	}
+}
+
+func WithStdin(file string) runOption {
+	f, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	return func(c *exec.Cmd) {
+		c.Stdin = f
 	}
 }
 
@@ -71,6 +82,7 @@ func WithStdout(file string) runOption {
 func Run(fmtline string, opt ...interface{}) (string, error) {
 	args := []interface{}{}
 	opts := []runOption{}
+	watchers := []watcherOption{}
 	for _, arg := range opt {
 		var f runOption
 		if reflect.TypeOf(arg).ConvertibleTo(reflect.TypeOf(f)) {
@@ -80,9 +92,9 @@ func Run(fmtline string, opt ...interface{}) (string, error) {
 		}
 	}
 	line := fmt.Sprintf(fmtline, args...)
-	log.Debug("Running command", zap.String("cmd", line))
 
 	cmd := exec.Command("bash", "-c", line)
+	log.Debug("Running command", zap.String("cmd", line), zap.String("dir", cmd.Dir))
 
 	for _, opt := range opts {
 		opt(cmd)
@@ -102,7 +114,18 @@ func Run(fmtline string, opt ...interface{}) (string, error) {
 		cmd.Stdout = io.MultiWriter(cmd.Stdout, &stderr)
 	}
 
-	err := cmd.Run()
+	err := func() error {
+		err := cmd.Start()
+		if err != nil {
+			return err
+		}
+
+		for _, o := range watchers {
+			o(cmd)
+		}
+
+		return cmd.Wait()
+	}()
 
 	if err != nil {
 		log.Error("Command failed",
@@ -159,7 +182,7 @@ func FetchSubmit(group, project, task, dest string, nocache bool) error {
 	}
 
 	return fetch(
-		fmt.Sprintf("git@gitlab.com:%s/%s.git", group, project),
+		fmt.Sprintf("git@gitlab.cpp-hse.net:%s/%s.git", group, project),
 		fmt.Sprintf("submits/%s", task),
 		output,
 	)
@@ -171,7 +194,7 @@ func FetchSubmits(args *Args) (map[string]*models.User, error) {
 		return nil, err
 	}
 
-	users, err := nmt.LoadUsers("hse")
+	users, err := nmt.LoadUsers(args.Group)
 	if err != nil {
 		return nil, err
 	}
@@ -182,13 +205,13 @@ func FetchSubmits(args *Args) (map[string]*models.User, error) {
 		}
 	}
 
-	standings, err := nmt.LoadStandings(args.Endpoint)
+	standings, err := nmt.LoadStandings(args.Group)
 	if err != nil {
 		return nil, err
 	}
 
 	g := errgroup.Group{}
-	g.SetLimit(100)
+	g.SetLimit(20)
 	count := 0
 
 	res := make(map[string]*models.User)
@@ -402,9 +425,87 @@ func RunFuzzing(args *Args) (err error) {
 	return nil
 }
 
+func RunBench(args *Args) (err error) {
+	bot, err := NewBot(os.Getenv("TELEGRAM_TOKEN"), log.Named("tgbot"))
+	if err != nil {
+		return err
+	}
+	bot.NewMessage(BIGREDEYE).Escaped("Building submits for task %s: ", args.TaskName).Send()
+
+	defer func() {
+		if perr := recover(); perr != nil {
+			bot.NewMessage(BIGREDEYE).Escaped("Bench for task %s panicked: %+v", args.TaskName, perr).Send()
+		} else if err != nil {
+			bot.NewMessage(BIGREDEYE).Escaped("Bench for task %s failed: %s", args.TaskName, err.Error()).Send()
+		} else {
+			bot.NewMessage(BIGREDEYE).Escaped("Bench for task %s finished", args.TaskName).Send()
+		}
+	}()
+
+	bins, err := BuildSubmits(args)
+	if err != nil {
+		log.Error("Failed to build submits", zap.Error(err))
+		return err
+	}
+
+	failed := atomic.NewInt32(0)
+	succeeded := atomic.NewInt32(0)
+
+	bot.NewMessage(BIGREDEYE).Escaped("Start bench task %s (%d submits)", args.TaskName, len(bins)).Send()
+
+	for solution, info := range bins {
+		start := time.Now()
+		l := log.With(zap.String("solution", solution))
+		l.Info("Start benching solution")
+
+		out, err := Run(
+			"%s %s",
+			unwrap(filepath.Abs(info.binary)),
+			unwrap(filepath.Abs(args.Corpus)),
+
+			WithStdin(args.BenchStdin),
+			WithStderr(fmt.Sprintf("logs/%s.err", solution)),
+			WithStdout(fmt.Sprintf("logs/%s.out", solution)),
+			WithDir(fmt.Sprintf("benchcwd/%s", solution)),
+		)
+
+		delta := time.Since(start)
+
+		userLink := "<unknown user>"
+		if info.user != nil {
+			userLink = fmt.Sprintf("[%s %s](tg://user?id=%d)", info.user.FirstName, info.user.LastName, *info.user.TelegramID)
+		}
+
+		if err != nil {
+			l.Error("Solution failed", zap.Error(err), zap.Duration("duration", delta))
+			failed.Add(1)
+			bot.
+				NewMessage(BIGREDEYE).
+				Escaped("❌ Solution of task %s from user %s (", args.TaskName, *info.user.GitlabLogin).
+				Raw(userLink).
+				Escaped(") failed in %s, %d/%d done", delta, failed.Load()+succeeded.Load(), len(bins)).
+				Send()
+		} else {
+			l.Info("Solution finished", zap.String("stdout", out))
+			succeeded.Add(1)
+			bot.
+				NewMessage(BIGREDEYE).
+				Escaped("✅ Solution of task %s from user %s (", args.TaskName, *info.user.GitlabLogin).
+				Raw(userLink).
+				Escaped(") passed in %s, %d/%d done", delta, failed.Load()+succeeded.Load(), len(bins)).
+				Send()
+		}
+	}
+
+	log.Info("Done benching", zap.Int32("failed", failed.Load()), zap.Int32("succeeded", succeeded.Load()))
+
+	return nil
+}
+
 type Args struct {
 	NoCache     bool
 	GitlabGroup string
+	Group       string
 	Endpoint    string
 	TaskName    string
 	MainRepo    string
@@ -412,6 +513,7 @@ type Args struct {
 	Corpus      string
 	Timeout     time.Duration
 	Jobs        int
+	BenchStdin  string
 }
 
 var (
@@ -450,6 +552,15 @@ var (
 			return RunFuzzing(&args)
 		},
 	}
+
+	BenchCmd = &cobra.Command{
+		Use:   "bench",
+		Short: "Bench submits",
+		RunE: func(cmd *cobra.Command, _args []string) error {
+			_, _ = cmd, _args
+			return RunBench(&args)
+		},
+	}
 )
 
 func initLogging() {
@@ -464,15 +575,18 @@ func initCommands() {
 	RootCmd.PersistentFlags().BoolVar(&args.NoCache, "no-cache", false, "Do not cache submits / repos")
 	RootCmd.PersistentFlags().StringVar(&args.Endpoint, "endpoint", "https://cpp-hse.net", "Scoring system endpoint")
 	RootCmd.PersistentFlags().StringVar(&args.GitlabGroup, "gitlab-group", "cpp-advanced-hse-2022", "Gitlab group name")
+	RootCmd.PersistentFlags().StringVar(&args.Group, "group", "hse", "Notmanytask group name")
 	RootCmd.PersistentFlags().StringVar(&args.TaskName, "task", "", "Task name")
 	RootCmd.PersistentFlags().StringVar(&args.TaskTarget, "target", "", "Build target")
 	RootCmd.PersistentFlags().StringVar(&args.Corpus, "corpus", "corpus", "Path to the corpus")
+	RootCmd.PersistentFlags().StringVar(&args.BenchStdin, "bench-stdin", "", "Path to the bench stdin")
 	RootCmd.PersistentFlags().DurationVar(&args.Timeout, "timeout", time.Hour*24, "Fuzzing timeout")
 	RootCmd.PersistentFlags().IntVar(&args.Jobs, "jobs", 4, "Number of fuzzing jobs per solution")
 
 	RootCmd.AddCommand(FetchCmd)
 	RootCmd.AddCommand(BuildCmd)
 	RootCmd.AddCommand(RunCmd)
+	RootCmd.AddCommand(BenchCmd)
 }
 
 func init() {
