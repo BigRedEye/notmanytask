@@ -13,7 +13,7 @@ type User struct {
 }
 
 func GetOAuthGitLabUser(token string) (*User, error) {
-	client, err := gitlab.NewOAuthClient(token, gitlab.WithBaseURL("https://gitlab.cpp-hse.ru")) // TODO: get URL from config
+	client, err := gitlab.NewOAuthClient(token, gitlab.WithBaseURL("https://gitlab.cpp-hse.net")) // TODO: get URL from config
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create gitlab client")
 	}
