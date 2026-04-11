@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <title>HSE Advanced C&#43;&#43;</title>
+    <title>{{.Title}}</title>
     <style>
 .navbar-brand {
   font-size: 3rem;
@@ -20,7 +20,7 @@
   <body>
       <nav class="navbar navbar-light bg-light">
           <div class="container">
-              <span class="navbar-brand mb-0 h1"><a href="/" class="text-decoration-none text-dark">Advanced C++</a></span>
+              <span class="navbar-brand mb-0 h1"><a href="/" class="text-decoration-none text-dark">{{.CourseName}}</a></span>
               <div class="row">
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Deadlines }}"><h5>Tasks</h5></a>
