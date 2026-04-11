@@ -15,7 +15,6 @@ import (
 
 type ProjectNameFactory interface {
 	MakeProjectURL(user *models.User) string
-	MakeProjectName(user *models.User) string
 	MakePipelineURL(user *models.User, pipeline *models.Pipeline) string
 	MakeBranchURL(user *models.User, pipeline *models.Pipeline) string
 	MakeTaskURL(task string) string
@@ -76,7 +75,7 @@ type pipelinesProvider = func(project string) (pipelines []models.Pipeline, err 
 type flagsProvider = func(gitlabLogin string) (flags []models.Flag, err error)
 
 func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider) (pipelinesMap, error) {
-	pipelines, err := provider(s.projects.MakeProjectName(user))
+	pipelines, err := provider(user.GetProjectName())
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to list use rpipelines")
 	}
@@ -274,7 +273,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 			FirstName:     user.FirstName,
 			LastName:      user.LastName,
 			GitlabLogin:   *user.GitlabLogin,
-			GitlabProject: s.projects.MakeProjectName(user),
+			GitlabProject: user.GetProjectName(),
 		},
 	}
 

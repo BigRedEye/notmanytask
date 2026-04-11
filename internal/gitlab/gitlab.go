@@ -44,23 +44,23 @@ const (
 	master = "master"
 )
 
-func (c Client) InitializeProject(user *models.User) error {
+func (c Client) InitializeProject(user *models.User) (projectURL string, err error) {
 	if user.GitlabID == nil || user.GitlabLogin == nil {
 		c.logger.Error("Empty gitlab user", zap.Uint("uid", user.ID))
-		return errors.New("Empty gitlab user")
+		return "", errors.New("Empty gitlab user")
 	}
 
 	log := c.logger.With(zap.Stringp("gitlab_login", user.GitlabLogin), zap.Intp("gitlab_id", user.GitlabID), zap.Uint("user_id", user.ID))
 	log.Info("Going to initialize project")
 
-	projectName := c.MakeProjectName(user)
+	projectName := c.makeProjectName(user)
 	log = log.With(lf.ProjectName(projectName))
 
 	// Try to find existing project
 	project, resp, err := c.gitlab.Projects.GetProject(fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName), &gitlab.GetProjectOptions{})
 	if err != nil && resp == nil {
 		log.Error("Failed to get project", zap.String("escaped_project", fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName)), zap.Error(err))
-		return errors.Wrap(err, "Failed to get project")
+		return "", errors.Wrap(err, "Failed to get project")
 	} else if resp.StatusCode == http.StatusNotFound {
 		log.Info("Project was not found", zap.String("escaped_project", fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName)))
 		// Create project
@@ -74,13 +74,13 @@ func (c Client) InitializeProject(user *models.User) error {
 		})
 		if err != nil {
 			log.Error("Failed to create project", zap.Error(err))
-			return errors.Wrap(err, "Failed to create project")
+			return "", errors.Wrap(err, "Failed to create project")
 		}
 		log = log.With(zap.Int("project_id", project.ID))
 		log.Info("Created project")
 	} else if err != nil {
 		log.Error("Failed to find project", zap.Error(err))
-		return errors.Wrap(err, "Failed to find project")
+		return "", errors.Wrap(err, "Failed to find project")
 	} else {
 		log = log.With(zap.Int("project_id", project.ID))
 		log.Info("Found existing project")
@@ -108,7 +108,7 @@ func (c Client) InitializeProject(user *models.User) error {
 		log.Warn("Failed to create README: main branch is protected", zap.Error(err))
 		// continue
 	} else if err != nil {
-		return errors.Wrap(err, "Failed to create README")
+		return "", errors.Wrap(err, "Failed to create README")
 	}
 
 	if err != nil {
@@ -127,7 +127,7 @@ func (c Client) InitializeProject(user *models.User) error {
 			log.Warn("Failed to protect master branch: branch is alreay protected", zap.Error(err))
 		} else {
 			log.Error("Failed to protect master branch", zap.Error(err))
-			return errors.Wrap(err, "Failed to protect master branch")
+			return "", errors.Wrap(err, "Failed to protect master branch")
 		}
 	}
 	log.Info("Protected master branch")
@@ -139,7 +139,7 @@ func (c Client) InitializeProject(user *models.User) error {
 		members, resp, err := c.gitlab.ProjectMembers.ListAllProjectMembers(project.ID, &options)
 		if err != nil {
 			log.Error("Failed to list project members", zap.Error(err))
-			return errors.Wrap(err, "Failed to list project members")
+			return "", errors.Wrap(err, "Failed to list project members")
 		}
 
 		for _, member := range members {
@@ -169,12 +169,12 @@ func (c Client) InitializeProject(user *models.User) error {
 		})
 		if err != nil {
 			log.Error("Failed to add user to the project", zap.Error(err))
-			return errors.Wrap(err, "Failed to add user to the project")
+			return "", errors.Wrap(err, "Failed to add user to the project")
 		}
 		log.Info("Added user to the project")
 	}
 
-	return nil
+	return c.makeProjectURL(projectName), nil
 }
 
 func (c Client) cleanupName(name string) string {
@@ -194,18 +194,28 @@ func (c Client) cleanupLogin(login string) string {
 	return strings.ReplaceAll(login, "__", "")
 }
 
-func (c Client) MakeProjectName(user *models.User) string {
-	return fmt.Sprintf("%s-%s-%s-%s", user.GroupName, c.cleanupName(user.FirstName), c.cleanupName(user.LastName), c.cleanupLogin(*user.GitlabLogin))
+// makeProjectName generates a new project name for creating a repository.
+// This is only used during project initialization.
+func (c Client) makeProjectName(user *models.User) string {
+	return fmt.Sprintf(
+		"%s-%s-%s-%s",
+		user.GroupName,
+		c.cleanupName(user.FirstName),
+		c.cleanupName(user.LastName),
+		c.cleanupLogin(*user.GitlabLogin),
+	)
+}
+
+func (c Client) makeProjectURL(projectName string) string {
+	return fmt.Sprintf("%s/%s/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, projectName)
 }
 
 func (c Client) MakeProjectURL(user *models.User) string {
-	name := c.MakeProjectName(user)
-	return fmt.Sprintf("%s/%s/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name)
+	return c.makeProjectURL(user.GetProjectName())
 }
 
 func (c Client) MakeProjectSubmitsURL(user *models.User) string {
-	url := c.MakeProjectURL(user)
-	return fmt.Sprintf("%s/-/jobs", url)
+	return fmt.Sprintf("%s/-/jobs", c.MakeProjectURL(user))
 }
 
 func (c Client) MakeProjectWithNamespace(project string) string {
@@ -213,13 +223,11 @@ func (c Client) MakeProjectWithNamespace(project string) string {
 }
 
 func (c Client) MakePipelineURL(user *models.User, pipeline *models.Pipeline) string {
-	name := c.MakeProjectName(user)
-	return fmt.Sprintf("%s/%s/%s/-/pipelines/%d", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.ID)
+	return fmt.Sprintf("%s/-/pipelines/%d", c.MakeProjectURL(user), pipeline.ID)
 }
 
 func (c Client) MakeBranchURL(user *models.User, pipeline *models.Pipeline) string {
-	name := c.MakeProjectName(user)
-	return fmt.Sprintf("%s/%s/%s/-/tree/submits/%s", c.config.GitLab.BaseURL, c.config.GitLab.Group.Name, name, pipeline.Task)
+	return fmt.Sprintf("%s/-/tree/submits/%s", c.MakeProjectURL(user), pipeline.Task)
 }
 
 func (c Client) MakeTaskURL(task string) string {

@@ -84,18 +84,16 @@ func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
 
 	log = log.With(zap.Intp("gitlab_id", user.GitlabID), zap.Stringp("gitlab_login", user.GitlabLogin))
 
-	err := p.InitializeProject(user)
+	projectURL, err := p.InitializeProject(user)
 	if err != nil {
 		log.Error("Failed to initialize project", zap.Error(err))
 		// TODO(BigRedEye): nice backoff
 		time.Sleep(time.Second * 1)
 		return false
 	}
+	log = log.With(zap.String("project", projectURL))
 
-	project := p.MakeProjectURL(user)
-	log = log.With(zap.String("project", project))
-
-	user.Repository = &project
+	user.Repository = &projectURL
 	err = p.db.SetUserRepository(user)
 	if err != nil {
 		log.Error("Failed to set user repo", zap.Error(err))
