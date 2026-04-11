@@ -1,9 +1,9 @@
 resource "yandex_container_registry" "cr-hse" {
-  name      = "cr-hse"
+  name = "cr-hse"
 }
 
 resource "yandex_container_registry_iam_binding" "puller" {
-  registry_id = "${yandex_container_registry.cr-hse.id}"
+  registry_id = yandex_container_registry.cr-hse.id
   role        = "container-registry.images.puller"
 
   members = [
@@ -13,7 +13,7 @@ resource "yandex_container_registry_iam_binding" "puller" {
 }
 
 resource "yandex_container_registry_iam_binding" "pusher" {
-  registry_id = "${yandex_container_registry.cr-hse.id}"
+  registry_id = yandex_container_registry.cr-hse.id
   role        = "container-registry.images.pusher"
 
   members = [

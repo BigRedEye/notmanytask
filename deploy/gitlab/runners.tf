@@ -1,11 +1,14 @@
 resource "yandex_compute_instance_group" "graders" {
-  name                = "graders"
-  service_account_id  = "${yandex_iam_service_account.sa-ig-editor.id}" 
+  name               = "graders"
+  service_account_id = yandex_iam_service_account.sa-ig-editor.id
 
   instance_template {
+    name     = "runner-grader-{instance.index}"
+    hostname = "runner-grader-{instance.index}"
+
     resources {
-      memory = 8
       cores  = 4
+      memory = 8
     }
     boot_disk {
       initialize_params {
@@ -19,7 +22,7 @@ resource "yandex_compute_instance_group" "graders" {
     metadata = {
       user-data = file("${path.module}/cloud_config.yaml")
     }
-    service_account_id = "${yandex_iam_service_account.sa-grader.id}"
+    service_account_id = yandex_iam_service_account.sa-grader.id
   }
 
   scale_policy {
@@ -43,11 +46,12 @@ resource "yandex_compute_instance_group" "graders" {
 }
 
 resource "yandex_compute_instance" "builder" {
-  name = "builder"
-  service_account_id = "${yandex_iam_service_account.sa-builder.id}"
+  name               = "runner-builder"
+  hostname           = "runner-builder"
+  service_account_id = yandex_iam_service_account.sa-builder.id
 
   resources {
-    cores = 4
+    cores  = 4
     memory = 8
   }
 
@@ -59,7 +63,7 @@ resource "yandex_compute_instance" "builder" {
   }
 
   network_interface {
-    subnet_id = "${yandex_vpc_subnet.subnet-hse.id}"
+    subnet_id = yandex_vpc_subnet.subnet-hse.id
   }
 
   metadata = {
