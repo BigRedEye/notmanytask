@@ -44,8 +44,8 @@ func initLogging() {
 }
 
 func initCommands() {
-    dumpCmd.AddCommand(makeDumpStandingsCommand())
-    dumpCmd.AddCommand(makeDumpSuccessfulSubmits())
+	dumpCmd.AddCommand(makeDumpStandingsCommand())
+	dumpCmd.AddCommand(makeDumpSuccessfulSubmits())
 	rootCmd.AddCommand(makeOverrideCommand())
 	rootCmd.AddCommand(dumpCmd)
 }
