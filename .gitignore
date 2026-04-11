@@ -23,3 +23,17 @@
 config.yml
 config*.yml
 build
+
+# Generated data
+cmd/fuzz/jpeg/
+cmd/cli/2025/
+
+# macOS
+.DS_Store
+
+# Terraform
+deploy/gitlab/.terraform/
+deploy/gitlab/terraform.tfstate*
+
+# Secrets
+deploy/gitlab/sa-*.json
