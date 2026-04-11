@@ -33,7 +33,7 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: mail@sskvor.dev
+      email: mail@bigredeye.me
       storage: "/acme/acme.json"
       httpChallenge:
         entryPoint: web

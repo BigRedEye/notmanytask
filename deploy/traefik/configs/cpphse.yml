@@ -1,7 +1,7 @@
 http:
   routers:
     cpphse-router:
-      rule: "Host(`cpp-hse.org`)"
+      rule: "Host(`cpp-hse.net`)"
       entryPoints:
       - websecure
       service: cpphse
