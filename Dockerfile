@@ -1,4 +1,4 @@
-FROM golang:1.16.7-alpine AS go-builder
+FROM golang:1.21-alpine3.19 AS go-builder
 
 WORKDIR /usr/src/app
 
@@ -18,7 +18,7 @@ RUN make all
 RUN cp build/web /notmanytask
 
 
-FROM alpine:3.13
+FROM alpine:3.19
 
 # Install packages required by the image
 RUN apk add --update \

@@ -7,18 +7,18 @@ make_build:
 	mkdir -p build
 
 get_statik:
-	go get -u github.com/rakyll/statik
+	go install github.com/rakyll/statik@latest
 
 statik: get_statik protos
 	statik -f -Z -src web -dest pkg
 
 web: make_build statik
-	go build -o build ./cmd/web
+	GOOS=linux GOARCH=amd64 go build -o build ./cmd/web
 
 crashme: make_build
 	go build -o build ./cmd/crashme
 
-all: web crashme
+all: web
 
 run_web: web
 	./build/web
@@ -29,10 +29,10 @@ coverage_html:
 	rm coverage.out
 
 docker_image:
-	docker build . -f Dockerfile -t cr.yandex/crpkun66rq02t8mpkpa4/notmanytask:latest
+	docker build . -f Dockerfile -t bigredeye/notmanytask-base:latest --platform=linux/amd64
 
 docker_hub: docker_image
-	docker push cr.yandex/crpkun66rq02t8mpkpa4/notmanytask:latest
+	docker push bigredeye/notmanytask-base:latest
 
 docker_image_crashme:
 	docker build . -f Dockerfile.crashme -t bigredeye/notmanytask:crashme
