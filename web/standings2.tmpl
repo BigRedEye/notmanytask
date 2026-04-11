@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+        <title>{{ .Title }}</title>
+        <style>
+.shadow-hover:hover {
+    transition: all 0.1s ease;
+    box-shadow:0 .5rem 1rem rgba(0,0,0,.15)!important
+}
+.shadow-hover {
+    -webkit-transition: all 0.1s ease;
+    -moz-transition: all 0.1s ease;
+    -o-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+    box-shadow:0 .125rem .25rem rgba(0,0,0,.075)!important
+}
+
+.task-success {
+    background-color: #a6e9d5;
+    border-color: #4dd4ac;
+}
+
+.task-failed {
+    background-color: #f8d7da;
+    border-color: #f1aeb5;
+}
+
+.task-checking {
+    border-color: #0d6efd;
+    background-color:#9ec5fe;
+}
+
+.task-assigned {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-size: 3rem;
+    font-weight: 300
+}
+
+.nav-link {
+    color: rgba(0, 0, 0, 0.9);
+}
+
+.task {
+    width: 120px;
+    max-width: 120px;
+    overflow: hidden;
+}
+        </style>
+    </head>
+    <body>
+      <nav class="navbar navbar-light bg-light">
+          <div class="container">
+              <span class="navbar-brand mb-0 h1"><a href="/" class="text-decoration-none text-dark">C++ Course</a></span>
+              <div class="row">
+                  <div class="col-auto">
+                      <a class="nav-link" href="{{ .Links.Deadlines }}"><h5>Tasks</h5></a>
+                  </div>
+                  <div class="col-auto">
+                      <a class="nav-link" href="{{ .Links.Standings }}"><h5>Standings</h5></a>
+                  </div>
+                  <div class="col-auto">
+                      <a class="nav-link" href="{{ .Links.Repository }}"><h5>My Repo</h5></a>
+                  </div>
+                  <div class="col-auto">
+                      <a class="nav-link" href="{{ .Links.Logout }}"><h5>Logout</h5></a>
+                  </div>
+              </div>
+          </div>
+          </div>
+      </nav>
+
+        <div class="container p-2 my-2">
+            <div class="container row">
+                {{ range .Groups }}
+                    <div class="col-auto">
+                      <a class="nav-link" href="{{ .Link }}"><h5>{{ .Name }}</h5></a>
+                    </div>
+                {{ end }}
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="num">#</th>
+                            <th scope="col" class="name">Student</th>
+                            <th scope="col" class="name">Group</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Score</th>
+                            {{ range .Standings.Deadlines }}
+                                {{ range .Tasks }}
+                                    <th scope="col" class="task">{{ .Task }}</th>
+                                {{ end }}
+                            {{ end }}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ with index .Standings.Users 0 }}
+                            <tr>
+                                <th scope="row" class="num">0</th>
+                                <th scope="row" class="name">Chuck Norris</th>
+                                <th scope="row" class="subgroup"></th>
+                                <td>nobody@edu.hse.ru</td>
+                                <td>{{ .MaxScore }}</td>
+                                {{ range .Groups }}
+                                    {{ range .Tasks }}
+                                        <td class="task table-success"><a href="/private/solutions/{{ .Task }}" class="text-decoration-none text-dark">{{ .MaxScore }}</a></td>
+                                    {{ end }}
+                                {{ end }}
+                            </tr>
+                        {{ end }}
+                        {{ range $index, $user := .Standings.Users }}
+                            <tr>
+                                <th scope="row" class="num">{{ inc $index }}</th>
+                                <th scope="row" class="name">{{ $user.User.LastName }} {{ $user.User.FirstName }}</th>
+                                <th scope="row" class="subgroup">
+                                    <a href="/standings/{{ $user.User.Group }}/{{ $user.User.Subgroup }}" class="text-decoration-none text-dark">
+                                        {{ $user.User.Subgroup }}
+                                    </a>
+                                </th>
+                                <td>{{ $user.User.Email }}</td>
+                                <td>{{ $user.Score }}</td>
+                                {{ range $user.Groups }}
+                                    {{ range .Tasks }}
+                                        {{ if eq .Status "success"}}
+                                            <td class="task table-success">
+                                        {{ else if eq .Status "failed"}}
+                                            <td class="task table-danger">
+                                        {{ else if eq .Status "pending"}}
+                                            <td class="task table-warning">
+                                        {{ else if eq .Status "on_review"}}
+                                            <td class="task table-info">
+                                        {{ else if eq .Status "review_resolved"}}
+                                            <td class="task table-primary">
+                                        {{ else if eq .Status "checking"}}
+                                            <td class="task table-warning">
+                                        {{ else }}
+                                            <td class="task">
+                                        {{ end }}
+                                        {{ .Score }}
+                                        </td>
+                                    {{ end }}
+                                {{ end }}
+                            </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

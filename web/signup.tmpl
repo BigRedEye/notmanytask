@@ -43,6 +43,13 @@
                   </div>
                 </div>
                 <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="floatingEmail" placeholder="ippetrov@edu.hse.ru" name="email" required pattern="^.*@(edu.)?hse.ru$">
+                  <label for="floatingLastName">HSE email</label>
+                  <div class="invalid-feedback">
+                    Please use your HSE email
+                  </div>
+                </div>
+                <div class="form-floating mb-3">
                   <input type="text" class="form-control" id="floatingSecretCode" placeholder="LolKekCheburek" name="secret" required pattern="[A-Za-z0-9-_]+">
                   <label for="floatingSecretCode">Secret code</label>
                   <div class="invalid-feedback">

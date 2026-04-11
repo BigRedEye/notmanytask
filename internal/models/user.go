@@ -20,6 +20,7 @@ type User struct {
 	LastName     string `gorm:"uniqueIndex:idx_name"`
 	GroupName    string `gorm:"uniqueIndex:idx_name"`
 	SubgroupName string `gorm:"uniqueIndex:idx_name"`
+	Email        string
 }
 
 type Session struct {

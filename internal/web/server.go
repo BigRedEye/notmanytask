@@ -127,6 +127,7 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.Flag, s.validateSession, s.RenderSubmitFlagPage)
 	r.GET(s.config.Endpoints.Standings, s.validateSession, s.RedirectToStandingsPage)
 	r.GET(s.config.Endpoints.GroupStandings, s.validateSession, s.RenderStandingsPage)
+	r.GET("/standings2/:group", s.validateSession, s.RenderStandings2Page)
 	r.GET(s.config.Endpoints.SubgroupStandings, s.validateSession, s.RenderSubgroupStandingsPage)
 	r.POST(s.config.Endpoints.Flag, s.validateSession, s.handleFlagSubmit)
 	r.GET("/private/solutions/:task", s.handleChuckNorris)

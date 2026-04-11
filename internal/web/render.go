@@ -163,6 +163,20 @@ func (s *server) RenderStandingsPage(c *gin.Context) {
 	})
 }
 
+func (s *server) RenderStandings2Page(c *gin.Context) {
+	user := c.MustGet("user").(*models.User)
+	scores, err := s.scorer.CalcScoreboard(c.Param("group"), "")
+	c.HTML(http.StatusOK, "/standings2.tmpl", gin.H{
+		"CourseName": "HSE C++ Course",
+		"Title":      "HSE C++ Course",
+		"Config":     s.config,
+		"Standings":  scores,
+		"Error":      err,
+		"Links":      s.makeLinks(user),
+		"Groups":     s.makeGroupLinks(),
+	})
+}
+
 func (s *server) RenderSubgroupStandingsPage(c *gin.Context) {
 	user := c.MustGet("user").(*models.User)
 	scores, err := s.scorer.CalcScoreboard(c.Param("group"), c.Param("subgroup"))

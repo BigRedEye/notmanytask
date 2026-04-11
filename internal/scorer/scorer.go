@@ -15,10 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ProjectNameFactory interface {
-	MakeProjectUrl(user *models.User) string
+type projectNameFactory interface {
 	MakeProjectName(user *models.User) string
-	MakePipelineUrl(user *models.User, pipeline *models.Pipeline) string
 	MakeMergeRequestUrl(user *models.User, mergeRequest *models.MergeRequest) string
 	MakeTaskUrl(task string) string
 }
@@ -26,7 +24,7 @@ type ProjectNameFactory interface {
 type Scorer struct {
 	deadlines  *deadlines.Fetcher
 	db         *database.DataBase
-	projects   ProjectNameFactory
+	projects   projectNameFactory
 	reviewTtl  time.Duration
 	robotLogin string
 }
@@ -36,7 +34,7 @@ type MergeRequestsInfo struct {
 	HasUserNotes bool
 }
 
-func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher, projects ProjectNameFactory, reviewTtl time.Duration, robotLogin string) *Scorer {
+func NewScorer(db *database.DataBase, deadlines *deadlines.Fetcher, projects projectNameFactory, reviewTtl time.Duration, robotLogin string) *Scorer {
 	return &Scorer{deadlines, db, projects, reviewTtl, robotLogin}
 }
 
@@ -192,6 +190,7 @@ func (s Scorer) calcUserScoresImpl(currentDeadlines *deadlines.Deadlines, user *
 		User: User{
 			FirstName:     user.FirstName,
 			LastName:      user.LastName,
+			Email:         user.Email,
 			Group:         user.GroupName,
 			Subgroup:      user.SubgroupName,
 			GitlabLogin:   *user.GitlabLogin,

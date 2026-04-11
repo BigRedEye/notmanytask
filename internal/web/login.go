@@ -50,6 +50,7 @@ func (s loginService) signup(c *gin.Context) {
 }
 
 var nameRe = regexp.MustCompile(`^[А-ЯЁа-яё-]+$`)
+var emailRe = regexp.MustCompile(`^.*@(edu\.)?hse.ru$`)
 
 func normalizeName(name string) string {
 	return strings.Title(strings.ToLower(name))
@@ -59,10 +60,12 @@ func (s loginService) signupForm(c *gin.Context) {
 	firstName := c.PostForm("firstname")
 	lastName := c.PostForm("lastname")
 	secret := c.PostForm("secret")
+	email := c.PostForm("email")
 
 	log := s.log.With(
 		zap.String("first_name", firstName),
 		zap.String("last_name", lastName),
+		zap.String("email", email),
 		zap.String("secret", secret),
 	)
 
@@ -78,6 +81,12 @@ func (s loginService) signupForm(c *gin.Context) {
 		s.RedirectToSignup(c, "Invalid last name, use only Cyrillic letters")
 		return
 	}
+	if !emailRe.MatchString(email) {
+		log.Warn("Invalid email from form")
+		s.RedirectToSignup(c, "Invalid email, use your HSE email")
+		return
+	}
+
 	// Find group by secret
 	groupName := ""
 	subgroupName := ""
@@ -104,6 +113,7 @@ func (s loginService) signupForm(c *gin.Context) {
 		LastName:     normalizeName(lastName),
 		GroupName:    groupName,
 		SubgroupName: subgroupName,
+		Email:        email,
 	})
 	if err != nil {
 		if database.IsDuplicateKey(err) {
