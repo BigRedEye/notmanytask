@@ -24,7 +24,7 @@ RUN file /crashme
 
 FROM ubuntu:20.04 AS base
 
-RUN echo "Don't use cache #3" > /.force_full_rebuild
+RUN echo "Don't use cache #4" > /.force_full_rebuild
 
 RUN apt-get update
 RUN apt-get install -y wget gnupg
@@ -69,9 +69,11 @@ RUN apt-get install -y libjpeg-dev libfftw3-dev
 
 FROM base AS cmake
 
-RUN echo 'Do not use cache #2' >/dev/null
+RUN echo 'Do not use cache #3' >/dev/null
 RUN mkdir -p /opt/hse
 RUN git clone --depth=1 https://gitlab.com/danlark/cpp-advanced-hse.git /opt/hse/cpp-advanced-hse
+RUN sed -i 's@2344346u@3183106095u@g' /opt/hse/cpp-advanced-hse/tasks/bonus/bad-rand/run.cpp
+RUN sed -i 's@Wrong seed@Incorrect seed@g' /opt/hse/cpp-advanced-hse/tasks/bonus/bad-rand/run.cpp
 RUN cmake -B /opt/hse/cpp-advanced-hse/build -S /opt/hse/cpp-advanced-hse -DCMAKE_BUILD_TYPE=Debug
 RUN cmake --build /opt/hse/cpp-advanced-hse/build --parallel --target build-ctf
 RUN mkdir -p /build && mv /opt/hse/cpp-advanced-hse/build/ctf_* /build/
