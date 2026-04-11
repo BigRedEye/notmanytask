@@ -1,4 +1,9 @@
-FROM golang:1.19-alpine AS go-builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS go-builder
+
+ARG TARGETOS
+ARG TARGETARCH
+ENV GOOS=${TARGETOS}
+ENV GOARCH=${TARGETARCH}
 
 WORKDIR /usr/src/app
 
@@ -7,7 +12,8 @@ RUN apk add --update \
         gcc \
         git \
         make \
-        musl-dev
+        musl-dev \
+        file
 
 COPY go.mod .
 COPY go.sum .
@@ -16,6 +22,7 @@ RUN go mod download
 COPY . .
 RUN make all
 RUN cp build/web /notmanytask
+RUN file /notmanytask
 
 
 FROM alpine:3.13

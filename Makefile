@@ -7,10 +7,10 @@ make_build:
 	mkdir -p build
 
 web: make_build
-	go build -o build ./cmd/web
+	GOARCH=amd64 GOOS=linux go build -o build ./cmd/web
 
 crashme: make_build
-	CGO_ENABLED=0 go build -ldflags="-extldflags=-static" -o build ./cmd/crashme
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -ldflags="-extldflags=-static" -o build ./cmd/crashme
 
 run_web: web
 	./build/web
