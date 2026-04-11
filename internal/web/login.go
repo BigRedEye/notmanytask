@@ -49,7 +49,7 @@ func (s loginService) signup(c *gin.Context) {
 	})
 }
 
-var nameRe = regexp.MustCompile("^[A-Za-z-]+$")
+var nameRe = regexp.MustCompile(`^[А-ЯЁа-яё-]+$`)
 
 func normalizeName(name string) string {
 	return strings.Title(strings.ToLower(name))
@@ -70,15 +70,14 @@ func (s loginService) signupForm(c *gin.Context) {
 
 	if !nameRe.MatchString(firstName) {
 		log.Warn("Invalid firstName from form")
-		s.RedirectToSignup(c, "Invalid first name, use only Latin letters")
+		s.RedirectToSignup(c, "Invalid first name, use only Cyrillic letters")
 		return
 	}
 	if !nameRe.MatchString(lastName) {
 		log.Warn("Invalid lastName from form")
-		s.RedirectToSignup(c, "Invalid last name, use only Latin letters")
+		s.RedirectToSignup(c, "Invalid last name, use only Cyrillic letters")
 		return
 	}
-
 	// Find group by secret
 	groupName := ""
 	subgroupName := ""

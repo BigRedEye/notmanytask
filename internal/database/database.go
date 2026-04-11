@@ -153,7 +153,11 @@ func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) erro
 }
 
 func (db *DataBase) SetUserRepository(user *models.User) error {
-	res := db.Model(user).Update("repository", user.Repository)
+	res := db.Model(user).Updates(map[string]interface{}{
+		"repository":   user.Repository,
+		"project_name": user.ProjectName,
+	})
+
 	if res.Error != nil {
 		return res.Error
 	}

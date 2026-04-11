@@ -8,6 +8,7 @@ type GitlabUser struct {
 	GitlabID    *int    `gorm:"uniqueIndex"`
 	GitlabLogin *string `gorm:"uniqueIndex"`
 	Repository  *string
+	ProjectName *string
 }
 
 type User struct {
