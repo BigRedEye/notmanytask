@@ -142,7 +142,7 @@
                             <th scope="col" class="sticky-header">Score</th>
                             {{ range .Standings.Deadlines.Assignments }}
                                 {{ range .Tasks }}
-                                    <th scope="col" class="task sticky-header"><span class="task-name">{{ if .Leaderboard }}<a href="/leaderboard/{{ .Task }}" class="text-decoration-none text-dark" title="Leaderboard">🏆 {{ .Task | prettifyTaskName }}</a>{{ else }}{{ .Task | prettifyTaskName }}{{ end }}</span></th>
+                                    <th scope="col" class="task sticky-header">{{ if .Leaderboard }}<a href="/leaderboard/{{ .Task }}" class="text-decoration-none text-dark" title="Leaderboard"><span class="task-name">🏆 {{ .Task | prettifyTaskName }}</span></a>{{ else }}<span class="task-name">{{ .Task | prettifyTaskName }}</span>{{ end }}</th>
                                 {{ end }}
                             {{ end }}
                         </tr>
@@ -208,6 +208,9 @@
                                         {{ .Score }}{{ if .Overridden }}*{{ end }}{{ if .HasReview }}👁{{ end }}
                                         {{ if or .BranchUrl .PipelineUrl }}
                                             </a>
+                                        {{ end }}
+                                        {{ if gt .Rank 0 }}
+                                            <br><a href="{{ .LeaderboardUrl }}" class="text-decoration-none text-muted" title="Leaderboard position">#{{ .Rank }}</a>
                                         {{ end }}
                                         </td>
                                     {{ end }}
