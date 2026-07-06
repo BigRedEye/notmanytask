@@ -2,6 +2,7 @@ package scorer
 
 import (
 	"fmt"
+	"net/url"
 	"path"
 	"regexp"
 	"sort"
@@ -141,6 +142,7 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 		return nil, err
 	}
 
+	groupUsers := users
 	if filter != nil {
 		allUsers := users
 		users = make([]*models.User, 0, len(allUsers))
@@ -171,7 +173,7 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 		return nil, fmt.Errorf("failed to list all overrides: %w", err)
 	}
 
-	boards, err := s.CalcLeaderboards(currentDeadlines)
+	boards, err := s.CalcLeaderboards(currentDeadlines, groupUsers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
 	}
@@ -274,7 +276,12 @@ func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 		mergeRequests = s.db.ListProjectMergeRequests
 	}
 
-	boards, err := s.CalcLeaderboards(currentDeadlines)
+	groupUsers, err := s.db.ListGroupUsers(user.GroupName)
+	if err != nil {
+		return nil, err
+	}
+
+	boards, err := s.CalcLeaderboards(currentDeadlines, groupUsers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
 	}
@@ -386,7 +393,7 @@ func (s Scorer) calcUserScoresImpl(
 			}
 
 			if task.Leaderboard != nil {
-				tasks[i].LeaderboardUrl = "/leaderboard/" + task.Task
+				tasks[i].LeaderboardUrl = makeLeaderboardURL(task.Task, user.GroupName)
 				if board, ok := boards[task.Task]; ok {
 					if rank, ok := board.Rank(*user.GitlabLogin); ok {
 						tasks[i].Rank = rank
@@ -448,6 +455,10 @@ func capitalizeWords(title string) string {
 
 func makeShortTaskName(name string) string {
 	return path.Base(name)
+}
+
+func makeLeaderboardURL(task, group string) string {
+	return "/leaderboard/" + task + "?group=" + url.QueryEscape(group)
 }
 
 func (s Scorer) scorePipeline(

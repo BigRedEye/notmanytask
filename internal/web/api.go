@@ -85,13 +85,23 @@ func (s apiService) report(c *gin.Context) {
 			onError(http.StatusBadRequest, fmt.Errorf("failed to parse metric: %w", err))
 			return
 		}
-		if !s.server.deadlines.TaskHasLeaderboard(req.Task) {
-			onError(http.StatusBadRequest, fmt.Errorf("task %s has no leaderboard", req.Task))
+		if req.Failed != 0 || (req.Status != "" && req.Status != models.PipelineStatusSuccess) {
+			onError(http.StatusBadRequest, fmt.Errorf("metric is only accepted for successful reports"))
 			return
 		}
 		user, err := s.server.db.FindUserByGitlabID(userID)
 		if err != nil || user.GitlabLogin == nil {
 			onError(http.StatusNotFound, fmt.Errorf("unknown user %d", userID))
+			return
+		}
+		currentDeadlines := s.server.deadlines.GroupDeadlines(user.GroupName)
+		if currentDeadlines == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("no deadlines found for group %s", user.GroupName))
+			return
+		}
+		task := currentDeadlines.FindTask(req.Task)
+		if task == nil || task.Leaderboard == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("task %s has no leaderboard for group %s", req.Task, user.GroupName))
 			return
 		}
 		err = s.server.db.AddBenchmarkResult(&models.BenchmarkResult{

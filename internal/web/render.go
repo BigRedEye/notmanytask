@@ -208,6 +208,7 @@ func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 		"CourseName":  s.config.Server.CourseName,
 		"Title":       s.config.Server.CourseName,
 		"Config":      s.config,
+		"Group":       group,
 		"GroupConfig": s.config.Groups.FindGroup(group),
 		"Standings":   scores,
 		"Error":       err,
@@ -251,31 +252,29 @@ func (s *server) RenderLeaderboardPage(c *gin.Context) {
 	taskGroup := currentDeadlines.FindTaskGroup(task)
 
 	rows, err := s.cache.Fetch(fmt.Sprintf("leaderboard/%s/%s", group, task), time.Second*10, func() (interface{}, error) {
-		boards, err := s.scorer.CalcLeaderboards(currentDeadlines)
+		names := make(map[string]string)
+		users, err := s.db.ListGroupUsers(group)
 		if err != nil {
 			return nil, err
 		}
-
-		names := make(map[string]string)
-		if users, err := s.db.ListGroupUsers(group); err == nil {
-			for _, user := range users {
-				if user.GitlabLogin != nil {
-					names[*user.GitlabLogin] = user.FirstName + " " + user.LastName
-				}
+		for _, user := range users {
+			if user.GitlabLogin != nil {
+				names[*user.GitlabLogin] = user.FirstName + " " + user.LastName
 			}
+		}
+
+		boards, err := s.scorer.CalcLeaderboards(currentDeadlines, users)
+		if err != nil {
+			return nil, err
 		}
 
 		board := boards[task]
 		rows := make([]LeaderboardRow, 0)
 		if board != nil {
 			for i, entry := range board.Entries {
-				name, found := names[entry.GitlabLogin]
-				if !found {
-					name = entry.GitlabLogin
-				}
 				rows = append(rows, LeaderboardRow{
 					Rank:        i + 1,
-					Name:        name,
+					Name:        names[entry.GitlabLogin],
 					GitlabLogin: entry.GitlabLogin,
 					Metric:      entry.Metric,
 					SubmittedAt: entry.SubmittedAt,
@@ -289,6 +288,7 @@ func (s *server) RenderLeaderboardPage(c *gin.Context) {
 		"CourseName": s.config.Server.CourseName,
 		"Title":      fmt.Sprintf("%s — leaderboard", task),
 		"Task":       task,
+		"Group":      group,
 		"Bonus":      spec.Leaderboard.Bonus,
 		"Deadline":   taskGroup.Deadline,
 		"Rows":       rows.Value().([]LeaderboardRow),

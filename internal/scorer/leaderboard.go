@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bigredeye/notmanytask/internal/deadlines"
+	"github.com/bigredeye/notmanytask/internal/models"
 )
 
 type LeaderboardEntry struct {
@@ -33,9 +34,26 @@ func (l *TaskLeaderboard) Rank(gitlabLogin string) (int, bool) {
 
 type leaderboardsMap map[string]*TaskLeaderboard
 
+func benchmarkLogins(users []*models.User) []string {
+	seen := make(map[string]struct{}, len(users))
+	logins := make([]string, 0, len(users))
+	for _, user := range users {
+		if user.GitlabLogin == nil {
+			continue
+		}
+		if _, found := seen[*user.GitlabLogin]; found {
+			continue
+		}
+		seen[*user.GitlabLogin] = struct{}{}
+		logins = append(logins, *user.GitlabLogin)
+	}
+	return logins
+}
+
 // CalcLeaderboards builds leaderboards for every benchmark task of the given
-// deadlines. Only results submitted before the task group deadline count.
-func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines) (map[string]*TaskLeaderboard, error) {
+// deadlines. Only results from the provided group users and submitted before
+// the task group deadline count.
+func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines, users []*models.User) (map[string]*TaskLeaderboard, error) {
 	boards := make(leaderboardsMap)
 	for i := range currentDeadlines.Assignments {
 		group := &currentDeadlines.Assignments[i]
@@ -54,7 +72,7 @@ func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines) (map[str
 		return boards, nil
 	}
 
-	results, err := s.db.ListAllBenchmarks()
+	results, err := s.db.ListBenchmarksForLogins(benchmarkLogins(users))
 	if err != nil {
 		return nil, err
 	}

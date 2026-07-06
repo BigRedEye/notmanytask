@@ -3,6 +3,8 @@ package scorer
 import (
 	"testing"
 	"time"
+
+	"github.com/bigredeye/notmanytask/internal/models"
 )
 
 func expectEqual(t *testing.T, got, want int, format string, args ...interface{}) {
@@ -51,5 +53,29 @@ func TestLeaderboardEntryOrder(t *testing.T) {
 	late := &LeaderboardEntry{Metric: 10.0, SubmittedAt: now}
 	if !entryLess(early, late) || entryLess(late, early) {
 		t.Error("on equal metrics the earlier submission must rank higher")
+	}
+}
+
+func TestBenchmarkLogins(t *testing.T) {
+	alice := "alice"
+	bob := "bob"
+	users := []*models.User{
+		{GitlabUser: models.GitlabUser{GitlabLogin: &alice}},
+		{GitlabUser: models.GitlabUser{GitlabLogin: &bob}},
+		{GitlabUser: models.GitlabUser{GitlabLogin: &alice}},
+		{},
+	}
+
+	logins := benchmarkLogins(users)
+	if len(logins) != 2 || logins[0] != "alice" || logins[1] != "bob" {
+		t.Fatalf("unexpected logins: %#v", logins)
+	}
+}
+
+func TestMakeLeaderboardURL(t *testing.T) {
+	got := makeLeaderboardURL("jit/fastest", "group with spaces")
+	want := "/leaderboard/jit/fastest?group=group+with+spaces"
+	if got != want {
+		t.Fatalf("unexpected leaderboard URL: got %q, want %q", got, want)
 	}
 }

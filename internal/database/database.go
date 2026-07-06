@@ -217,6 +217,18 @@ func (db *DataBase) ListAllBenchmarks() (results []models.BenchmarkResult, err e
 	return
 }
 
+func (db *DataBase) ListBenchmarksForLogins(logins []string) (results []models.BenchmarkResult, err error) {
+	results = make([]models.BenchmarkResult, 0)
+	if len(logins) == 0 {
+		return
+	}
+	err = db.Find(&results, "gitlab_login IN ?", logins).Error
+	if err != nil {
+		results = nil
+	}
+	return
+}
+
 func (db *DataBase) ListAllPipelines() (pipelines []models.Pipeline, err error) {
 	pipelines = make([]models.Pipeline, 0)
 	err = db.Find(&pipelines).Error
