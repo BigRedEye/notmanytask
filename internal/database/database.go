@@ -57,7 +57,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{})
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +200,19 @@ func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pip
 	err = db.Find(&pipelines, "project = ?", project).Error
 	if err != nil {
 		pipelines = nil
+	}
+	return
+}
+
+func (db *DataBase) AddBenchmarkResult(result *models.BenchmarkResult) error {
+	return db.Create(result).Error
+}
+
+func (db *DataBase) ListAllBenchmarks() (results []models.BenchmarkResult, err error) {
+	results = make([]models.BenchmarkResult, 0)
+	err = db.Find(&results).Error
+	if err != nil {
+		results = nil
 	}
 	return
 }

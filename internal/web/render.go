@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -211,5 +212,87 @@ func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 		"Standings":   scores,
 		"Error":       err,
 		"Links":       s.makeLinks(user),
+	})
+}
+
+type LeaderboardRow struct {
+	Rank        int
+	Name        string
+	GitlabLogin string
+	Metric      float64
+	SubmittedAt time.Time
+}
+
+func (s *server) RenderLeaderboardPage(c *gin.Context) {
+	task := strings.TrimPrefix(c.Param("task"), "/")
+
+	group := c.Query("group")
+	if group == "" {
+		if defaul := s.config.Groups.FindDefaultGroup(); defaul != nil {
+			group = defaul.Name
+		}
+	}
+
+	var links *Links
+	if user, session, err := s.tryFindUserByToken(c); err == nil && session != nil {
+		links = s.makeLinks(user)
+	}
+
+	currentDeadlines := s.deadlines.GroupDeadlines(group)
+	if currentDeadlines == nil {
+		c.String(http.StatusNotFound, "no deadlines found")
+		return
+	}
+	spec := currentDeadlines.FindTask(task)
+	if spec == nil || spec.Leaderboard == nil {
+		c.String(http.StatusNotFound, "task %s has no leaderboard", task)
+		return
+	}
+	taskGroup := currentDeadlines.FindTaskGroup(task)
+
+	rows, err := s.cache.Fetch(fmt.Sprintf("leaderboard/%s/%s", group, task), time.Second*10, func() (interface{}, error) {
+		boards, err := s.scorer.CalcLeaderboards(currentDeadlines)
+		if err != nil {
+			return nil, err
+		}
+
+		names := make(map[string]string)
+		if users, err := s.db.ListGroupUsers(group); err == nil {
+			for _, user := range users {
+				if user.GitlabLogin != nil {
+					names[*user.GitlabLogin] = user.FirstName + " " + user.LastName
+				}
+			}
+		}
+
+		board := boards[task]
+		rows := make([]LeaderboardRow, 0)
+		if board != nil {
+			for i, entry := range board.Entries {
+				name, found := names[entry.GitlabLogin]
+				if !found {
+					name = entry.GitlabLogin
+				}
+				rows = append(rows, LeaderboardRow{
+					Rank:        i + 1,
+					Name:        name,
+					GitlabLogin: entry.GitlabLogin,
+					Metric:      entry.Metric,
+					SubmittedAt: entry.SubmittedAt,
+				})
+			}
+		}
+		return rows, nil
+	})
+
+	c.HTML(http.StatusOK, "leaderboard.tmpl", gin.H{
+		"CourseName": s.config.Server.CourseName,
+		"Title":      fmt.Sprintf("%s — leaderboard", task),
+		"Task":       task,
+		"Bonus":      spec.Leaderboard.Bonus,
+		"Deadline":   taskGroup.Deadline,
+		"Rows":       rows.Value().([]LeaderboardRow),
+		"Error":      err,
+		"Links":      links,
 	})
 }

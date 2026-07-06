@@ -142,7 +142,7 @@
                             <th scope="col" class="sticky-header">Score</th>
                             {{ range .Standings.Deadlines.Assignments }}
                                 {{ range .Tasks }}
-                                    <th scope="col" class="task sticky-header"><span class="task-name">{{ .Task | prettifyTaskName }}</span></th>
+                                    <th scope="col" class="task sticky-header"><span class="task-name">{{ if .Leaderboard }}<a href="/leaderboard/{{ .Task }}" class="text-decoration-none text-dark" title="Leaderboard">🏆 {{ .Task | prettifyTaskName }}</a>{{ else }}{{ .Task | prettifyTaskName }}{{ end }}</span></th>
                                 {{ end }}
                             {{ end }}
                         </tr>

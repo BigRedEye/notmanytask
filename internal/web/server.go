@@ -71,6 +71,9 @@ func (s *server) run() error {
 			return i + 1
 		},
 		"prettifyTaskName": filepath.Base,
+		"add1": func(f float64) float64 {
+			return f + 1.0
+		},
 	}
 	tmpl, err := buildHTMLTemplates(funcs)
 	if err != nil {
@@ -109,6 +112,7 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.Retakes, s.validateSession(true), s.RenderRetakesPage)
 	r.POST(s.config.Endpoints.Flag, s.validateSession(true), s.handleFlagSubmit)
 	r.GET(s.config.Endpoints.Standings /* no need to validate session */, s.RenderStandingsPage)
+	r.GET("/leaderboard/*task" /* no need to validate session */, s.RenderLeaderboardPage)
 	r.GET("/private/solutions/:group/:task", s.handleChuckNorris)
 
 	r.StaticFS("/static", http.FS(web.StaticContent))

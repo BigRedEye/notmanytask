@@ -7,6 +7,7 @@ import (
 
 	"github.com/bigredeye/notmanytask/api"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
+	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -76,6 +77,38 @@ func (s apiService) report(c *gin.Context) {
 	if err != nil {
 		onError(http.StatusInternalServerError, err)
 		return
+	}
+
+	if req.Metric != "" {
+		metric, err := strconv.ParseFloat(req.Metric, 64)
+		if err != nil {
+			onError(http.StatusBadRequest, fmt.Errorf("failed to parse metric: %w", err))
+			return
+		}
+		if !s.server.deadlines.TaskHasLeaderboard(req.Task) {
+			onError(http.StatusBadRequest, fmt.Errorf("task %s has no leaderboard", req.Task))
+			return
+		}
+		user, err := s.server.db.FindUserByGitlabID(userID)
+		if err != nil || user.GitlabLogin == nil {
+			onError(http.StatusNotFound, fmt.Errorf("unknown user %d", userID))
+			return
+		}
+		err = s.server.db.AddBenchmarkResult(&models.BenchmarkResult{
+			GitlabLogin: *user.GitlabLogin,
+			Task:        req.Task,
+			PipelineID:  id,
+			Metric:      metric,
+		})
+		if err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+		s.log.Info("Stored benchmark result",
+			lf.GitlabLogin(*user.GitlabLogin),
+			zap.String("task", req.Task),
+			zap.Float64("metric", metric),
+		)
 	}
 
 	c.JSON(http.StatusOK, &api.ReportResponse{
