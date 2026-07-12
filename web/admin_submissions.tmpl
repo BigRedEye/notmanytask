@@ -93,8 +93,9 @@
                 {{ if .Banned }}
                   <div class="mb-1"><strong>Banned</strong>{{ if .BanReason }}: {{ .BanReason }}{{ end }}</div>
                   <small class="d-block text-muted mb-2">{{ .BannedByName }} · {{ .BannedAt.Format "02 Jan 15:04" }}</small>
-                  <form method="post" action="/admin/submissions/{{ .PipelineID }}/unban" onsubmit="return confirm('Restore pipeline #{{ .PipelineID }} to scoring?')">
+                  <form method="post" action="/admin/submissions/{{ .PipelineID }}/unban" class="d-flex gap-2" onsubmit="return confirm('Restore pipeline #{{ .PipelineID }} to scoring?')">
                     <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+                    <input class="form-control form-control-sm reason-input" name="reason" data-max-runes="500" required placeholder="Unban reason">
                     <button class="btn btn-sm btn-outline-danger" type="submit">Unban</button>
                   </form>
                 {{ else }}
@@ -103,6 +104,21 @@
                     <input class="form-control form-control-sm reason-input" name="reason" data-max-runes="500" required placeholder="Reason (up to 500 characters)">
                     <button class="btn btn-sm btn-danger" type="submit">Ban</button>
                   </form>
+                {{ end }}
+                {{ if .History }}
+                  <details class="mt-2">
+                    <summary>History ({{ len .History }})</summary>
+                    <ol class="small ps-3 mt-1 mb-0">
+                      {{ range .History }}
+                        <li class="mb-1">
+                          <strong>{{ .Action }}</strong> by {{ if .AdminName }}{{ .AdminName }}{{ else }}user #{{ .AdminUserID }}{{ end }}
+                          · {{ .CreatedAt.Format "02 Jan 2006 15:04" }}
+                          <br>{{ .Reason }}
+                          <span class="text-muted">({{ if .PreviousBanned }}banned{{ else }}active{{ end }} → {{ if .CurrentBanned }}banned{{ else }}active{{ end }})</span>
+                        </li>
+                      {{ end }}
+                    </ol>
+                  </details>
                 {{ end }}
               </td>
             </tr>

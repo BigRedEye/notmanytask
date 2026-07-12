@@ -57,7 +57,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{}, &models.SubmissionBan{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{}, &models.SubmissionBan{}, &models.SubmissionModerationEvent{})
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +65,9 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 	if err := backfillUserProjectNames(db); err != nil {
+		return nil, err
+	}
+	if err := backfillSubmissionModerationEvents(db); err != nil {
 		return nil, err
 	}
 
@@ -230,19 +233,6 @@ func (db *DataBase) FindPipelineByID(id int) (*models.Pipeline, error) {
 		return nil, err
 	}
 	return &pipeline, nil
-}
-
-func (db *DataBase) BanSubmission(pipelineID int, adminUserID uint, reason string) error {
-	ban := &models.SubmissionBan{
-		PipelineID:  pipelineID,
-		AdminUserID: adminUserID,
-		Reason:      reason,
-	}
-	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(ban).Error
-}
-
-func (db *DataBase) UnbanSubmission(pipelineID int) error {
-	return db.Delete(&models.SubmissionBan{}, "pipeline_id = ?", pipelineID).Error
 }
 
 func (db *DataBase) ListSubmissionBans() (bans []models.SubmissionBan, err error) {

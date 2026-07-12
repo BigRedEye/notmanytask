@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bigredeye/notmanytask/internal/config"
+	"github.com/bigredeye/notmanytask/internal/database"
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/models"
 )
@@ -72,6 +73,13 @@ func TestAdminSubmissionsTemplateRendersBannedLeaderboardRow(t *testing.T) {
 		"Rows": []adminSubmissionRow{{
 			PipelineID: 42, PipelineURL: "https://gitlab.example/pipelines/42", Task: "bench", Status: "success",
 			Leaderboard: true, HasMetric: true, Metric: 1.25, Banned: true, BanReason: "invalid benchmark", BannedAt: time.Now(),
+			History: []database.SubmissionModerationEvent{{
+				PipelineID: 42, AdminUserID: 7, AdminName: "Test Teacher", Action: models.SubmissionModerationActionUnban,
+				Reason: "environment verified", PreviousBanned: true, CurrentBanned: false, CreatedAt: time.Now(),
+			}, {
+				PipelineID: 42, AdminUserID: 7, AdminName: "Test Teacher", Action: models.SubmissionModerationActionBan,
+				Reason: "invalid benchmark", PreviousBanned: false, CurrentBanned: true, CreatedAt: time.Now().Add(-time.Hour),
+			}},
 		}, {
 			PipelineID: 43, PipelineURL: "https://gitlab.example/pipelines/43", Task: "bench", Status: "success", Leaderboard: true,
 		}},
@@ -86,7 +94,7 @@ func TestAdminSubmissionsTemplateRendersBannedLeaderboardRow(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := output.String()
-	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban", "Page 2 of 3", "data-max-runes=\"500\""} {
+	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban", "Page 2 of 3", "data-max-runes=\"500\"", "History (2)", "environment verified", "active → banned"} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("rendered admin page does not contain %q", expected)
 		}

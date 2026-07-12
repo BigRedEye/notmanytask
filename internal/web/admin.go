@@ -39,6 +39,7 @@ type adminSubmissionRow struct {
 	BanReason    string
 	BannedAt     time.Time
 	BannedByName string
+	History      []database.SubmissionModerationEvent
 }
 
 type adminSubmissionFilters struct {
@@ -150,6 +151,19 @@ func (s *server) RenderAdminSubmissionsPage(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "failed to prepare form")
 		return
 	}
+	pipelineIDs := make([]int, 0, len(page.Items))
+	for _, submission := range page.Items {
+		pipelineIDs = append(pipelineIDs, submission.PipelineID)
+	}
+	events, err := s.db.ListSubmissionModerationEvents(pipelineIDs)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "failed to list moderation history")
+		return
+	}
+	historyByPipeline := make(map[int][]database.SubmissionModerationEvent, len(pipelineIDs))
+	for _, event := range events {
+		historyByPipeline[event.PipelineID] = append(historyByPipeline[event.PipelineID], event)
+	}
 
 	rows := make([]adminSubmissionRow, 0, len(page.Items))
 	for _, submission := range page.Items {
@@ -167,6 +181,7 @@ func (s *server) RenderAdminSubmissionsPage(c *gin.Context) {
 			Banned:       submission.Banned,
 			BanReason:    submission.BanReason,
 			BannedByName: submission.BannedByName,
+			History:      historyByPipeline[submission.PipelineID],
 		}
 		if submission.Metric != nil {
 			row.Metric = *submission.Metric
@@ -258,12 +273,18 @@ func (s *server) handleAdminUnbanSubmission(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := s.db.UnbanSubmission(pipelineID); err != nil {
+	reason := strings.TrimSpace(c.PostForm("reason"))
+	if !validBanReason(reason) {
+		c.String(http.StatusBadRequest, "reason must contain 1 to 500 characters")
+		return
+	}
+	admin := s.getUser(c)
+	if err := s.db.UnbanSubmission(pipelineID, admin.ID, reason); err != nil {
 		c.String(http.StatusInternalServerError, "failed to unban submission")
 		return
 	}
 	s.cache.Clear()
-	s.logger.Info("Submission unbanned", zap.Int("pipeline_id", pipelineID), zap.Uint("admin_user_id", s.getUser(c).ID))
+	s.logger.Info("Submission unbanned", zap.Int("pipeline_id", pipelineID), zap.Uint("admin_user_id", admin.ID), zap.String("reason", reason))
 	c.Redirect(http.StatusSeeOther, "/admin/submissions")
 }
 

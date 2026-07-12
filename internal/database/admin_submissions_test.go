@@ -54,7 +54,7 @@ func TestListAdminSubmissionsPostgres(t *testing.T) {
 	if err := tx.Exec("SET LOCAL search_path TO " + schema).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.BenchmarkResult{}, &models.SubmissionBan{}); err != nil {
+	if err := tx.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.BenchmarkResult{}, &models.SubmissionBan{}, &models.SubmissionModerationEvent{}); err != nil {
 		t.Fatal(err)
 	}
 	db := &DataBase{DB: tx}
