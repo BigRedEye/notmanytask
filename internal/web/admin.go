@@ -176,6 +176,11 @@ func (s *server) RenderAdminSubmissionsPage(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "failed to list submission filters")
 		return
 	}
+	statistics, err := s.db.GetAdminStatistics()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "failed to load admin statistics")
+		return
+	}
 	csrfToken, err := s.adminCSRFToken(c)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "failed to prepare form")
@@ -259,6 +264,7 @@ func (s *server) RenderAdminSubmissionsPage(c *gin.Context) {
 		"BoardURL":   adminSubmissionsURL(leaderboardFilters, 1),
 		"ResetURL":   adminSubmissionsURL(resetFilters, 1),
 		"CurrentURL": adminSubmissionsURL(filters, page.Page),
+		"Statistics": statistics,
 	})
 }
 

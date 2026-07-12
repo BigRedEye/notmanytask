@@ -90,12 +90,18 @@ func TestAdminSubmissionsTemplateRendersBannedLeaderboardRow(t *testing.T) {
 		"AllURL": "/admin/submissions?kind=all", "RegularURL": "/admin/submissions?kind=regular",
 		"BoardURL": "/admin/submissions?kind=leaderboard", "ResetURL": "/admin/submissions?kind=leaderboard",
 		"CurrentURL": "/admin/submissions?kind=leaderboard&state=banned&page=2",
+		"Statistics": &database.AdminStatistics{
+			Summary:         database.AdminStatisticsSummary{ActiveBans: 3, BanActionsLast7Days: 5, RepeatOffenders: 1, AffectedTasks: 2},
+			RepeatOffenders: []database.AdminRepeatOffender{{GitlabLogin: "alice", Name: "Alice Student", BanCount: 3, ActiveBans: 1}},
+			ModeratedTasks:  []database.AdminModeratedTask{{Task: "bench", BanCount: 4, ActiveBans: 2, LastBannedAt: time.Now()}},
+			BenchmarkTrends: []database.AdminBenchmarkTrend{{Task: "bench", ReportsLast7: 8, ReportsPrevious7: 6, AverageLast7: 1.25, AveragePrevious7: 1.5, ChangePercent: -16.7, Improved: true}},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	html := output.String()
-	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban", "Page 2 of 3", "data-max-runes=\"500\"", "History (2)", "environment verified", "active → banned", "/admin/submissions/bulk", "Ban selected", "Unban selected", `form="bulk-moderation-form" name="pipeline_id" value="42"`, "Select all pipelines on this page"} {
+	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban", "Page 2 of 3", "data-max-runes=\"500\"", "History (2)", "environment verified", "active → banned", "/admin/submissions/bulk", "Ban selected", "Unban selected", `form="bulk-moderation-form" name="pipeline_id" value="42"`, "Select all pipelines on this page", "Moderation insights", "Repeated violations", "Alice Student", "Most moderated tasks", "Benchmark trend", "-16.7%"} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("rendered admin page does not contain %q", expected)
 		}

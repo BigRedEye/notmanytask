@@ -39,6 +39,39 @@
         </div>
       </div>
 
+      <section aria-labelledby="admin-statistics-title" class="mb-4">
+        <h3 id="admin-statistics-title" class="h5">Moderation insights</h3>
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Active bans</div><div class="fs-3">{{ .Statistics.Summary.ActiveBans }}</div></div></div></div>
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Ban actions · 7 days</div><div class="fs-3">{{ .Statistics.Summary.BanActionsLast7Days }}</div></div></div></div>
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Repeat offenders</div><div class="fs-3">{{ .Statistics.Summary.RepeatOffenders }}</div></div></div></div>
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Affected tasks</div><div class="fs-3">{{ .Statistics.Summary.AffectedTasks }}</div></div></div></div>
+        </div>
+        <div class="row g-3">
+          <div class="col-xl-4">
+            <div class="card h-100"><div class="card-header">Repeated violations</div><div class="table-responsive"><table class="table table-sm mb-0">
+              <thead><tr><th>Student</th><th>Bans</th><th>Active</th></tr></thead><tbody>
+              {{ range .Statistics.RepeatOffenders }}<tr><td>{{ if .Name }}{{ .Name }}{{ else }}{{ .GitlabLogin }}{{ end }}<br><small class="text-muted">{{ .GitlabLogin }}</small></td><td>{{ .BanCount }}</td><td>{{ .ActiveBans }}</td></tr>
+              {{ else }}<tr><td colspan="3" class="text-muted">No repeated violations.</td></tr>{{ end }}
+              </tbody></table></div></div>
+          </div>
+          <div class="col-xl-4">
+            <div class="card h-100"><div class="card-header">Most moderated tasks</div><div class="table-responsive"><table class="table table-sm mb-0">
+              <thead><tr><th>Task</th><th>Bans</th><th>Active</th><th>Latest</th></tr></thead><tbody>
+              {{ range .Statistics.ModeratedTasks }}<tr><td><code>{{ .Task }}</code></td><td>{{ .BanCount }}</td><td>{{ .ActiveBans }}</td><td class="text-nowrap">{{ .LastBannedAt.Format "02 Jan" }}</td></tr>
+              {{ else }}<tr><td colspan="4" class="text-muted">No moderation events.</td></tr>{{ end }}
+              </tbody></table></div></div>
+          </div>
+          <div class="col-xl-4">
+            <div class="card h-100"><div class="card-header">Benchmark trend · 7 days</div><div class="table-responsive"><table class="table table-sm mb-0">
+              <thead><tr><th>Task</th><th>Reports</th><th>Average</th><th>vs prior</th></tr></thead><tbody>
+              {{ range .Statistics.BenchmarkTrends }}<tr><td><code>{{ .Task }}</code></td><td>{{ .ReportsLast7 }}</td><td>{{ if gt .ReportsLast7 0 }}{{ printf "%.4f" .AverageLast7 }}{{ else }}—{{ end }}</td><td>{{ if eq .ReportsPrevious7 0 }}new{{ else if eq .ChangePercent 0.0 }}<span class="text-muted">0.0%</span>{{ else if .Improved }}<span class="text-success">{{ printf "%+.1f%%" .ChangePercent }}</span>{{ else }}<span class="text-danger">{{ printf "%+.1f%%" .ChangePercent }}</span>{{ end }}</td></tr>
+              {{ else }}<tr><td colspan="4" class="text-muted">No reports in the last 14 days.</td></tr>{{ end }}
+              </tbody></table></div><div class="card-footer small text-muted">Lower benchmark metrics are better.</div></div>
+          </div>
+        </div>
+      </section>
+
       <form method="get" class="row g-2 align-items-end mb-3">
         <input type="hidden" name="kind" value="{{ .Filters.Kind }}">
         <div class="col-sm-6 col-lg-2">

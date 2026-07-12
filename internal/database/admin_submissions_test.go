@@ -129,6 +129,15 @@ func TestListAdminSubmissionsPostgres(t *testing.T) {
 	if err := tx.Create(&models.SubmissionBan{PipelineID: 1, AdminUserID: users[2].ID, Reason: "invalid environment", CreatedAt: now}).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := backfillSubmissionModerationEvents(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.BanSubmission(2, users[2].ID, "repeat violation"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UnbanSubmission(2, users[2].ID, "reviewed"); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("database filters", func(t *testing.T) {
 		page, err := db.ListAdminSubmissions(AdminSubmissionFilters{
@@ -178,6 +187,25 @@ func TestListAdminSubmissionsPostgres(t *testing.T) {
 		}
 		if fmt.Sprint(options.Groups) != "[hse staff]" || fmt.Sprint(options.Tasks) != "[bench regular]" {
 			t.Fatalf("unexpected filter options: %+v", options)
+		}
+	})
+
+	t.Run("admin statistics", func(t *testing.T) {
+		statistics, err := db.GetAdminStatistics()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if statistics.Summary.ActiveBans != 1 || statistics.Summary.BanActionsLast7Days != 2 || statistics.Summary.RepeatOffenders != 1 || statistics.Summary.AffectedTasks != 2 {
+			t.Fatalf("unexpected statistics summary: %+v", statistics.Summary)
+		}
+		if len(statistics.RepeatOffenders) != 1 || statistics.RepeatOffenders[0].GitlabLogin != aliceLogin || statistics.RepeatOffenders[0].BanCount != 2 || statistics.RepeatOffenders[0].ActiveBans != 1 {
+			t.Fatalf("unexpected repeat offenders: %+v", statistics.RepeatOffenders)
+		}
+		if len(statistics.ModeratedTasks) != 2 || statistics.ModeratedTasks[0].Task != "bench" || statistics.ModeratedTasks[1].Task != "regular" {
+			t.Fatalf("unexpected moderated tasks: %+v", statistics.ModeratedTasks)
+		}
+		if len(statistics.BenchmarkTrends) != 1 || statistics.BenchmarkTrends[0].Task != "bench" || statistics.BenchmarkTrends[0].ReportsLast7 != 2 || statistics.BenchmarkTrends[0].AverageLast7 != 1.85 {
+			t.Fatalf("unexpected benchmark trends: %+v", statistics.BenchmarkTrends)
 		}
 	})
 }
