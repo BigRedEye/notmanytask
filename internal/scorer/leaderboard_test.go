@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bigredeye/notmanytask/internal/deadlines"
 	"github.com/bigredeye/notmanytask/internal/models"
 )
 
@@ -77,5 +78,37 @@ func TestMakeLeaderboardURL(t *testing.T) {
 	want := "/leaderboard/jit/fastest?group=group+with+spaces"
 	if got != want {
 		t.Fatalf("unexpected leaderboard URL: got %q, want %q", got, want)
+	}
+}
+
+func TestBannedBenchmarkIsExcludedAndRanksAreRecomputed(t *testing.T) {
+	deadline := time.Now().Add(time.Hour)
+	currentDeadlines := &deadlines.Deadlines{Assignments: []deadlines.TaskGroup{{
+		Deadline: deadlines.Date{Time: deadline},
+		Tasks: []deadlines.Task{{
+			Task:        "bench",
+			Score:       100,
+			Leaderboard: &deadlines.LeaderboardSpec{Bonus: 1},
+		}},
+	}}}
+	results := []models.BenchmarkResult{
+		{GitlabLogin: "banned-fastest", Task: "bench", PipelineID: 1, Metric: 1, CreatedAt: deadline.Add(-3 * time.Minute)},
+		{GitlabLogin: "alice", Task: "bench", PipelineID: 2, Metric: 2, CreatedAt: deadline.Add(-2 * time.Minute)},
+		{GitlabLogin: "bob", Task: "bench", PipelineID: 3, Metric: 3, CreatedAt: deadline.Add(-time.Minute)},
+	}
+	bans := submissionBans{1: {PipelineID: 1}}
+
+	board := calcLeaderboardsFromResults(currentDeadlines, results, bans)["bench"]
+	if len(board.Entries) != 2 || board.Entries[0].GitlabLogin != "alice" || board.Entries[1].GitlabLogin != "bob" {
+		t.Fatalf("unexpected ranked entries: %#v", board.Entries)
+	}
+	if rank, found := board.Rank("alice"); !found || rank != 1 {
+		t.Fatalf("alice rank was not recomputed: rank=%d found=%v", rank, found)
+	}
+	if _, found := board.Rank("banned-fastest"); found {
+		t.Fatal("banned entry still has a rank")
+	}
+	if len(board.BannedEntries) != 1 || board.BannedEntries[0].PipelineID != 1 {
+		t.Fatalf("banned entry is not retained for UI: %#v", board.BannedEntries)
 	}
 }

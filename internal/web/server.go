@@ -113,6 +113,9 @@ func (s *server) run() error {
 	r.POST(s.config.Endpoints.Flag, s.validateSession(true), s.handleFlagSubmit)
 	r.GET(s.config.Endpoints.Standings /* no need to validate session */, s.RenderStandingsPage)
 	r.GET("/leaderboard/*task" /* no need to validate session */, s.RenderLeaderboardPage)
+	r.GET("/admin/submissions", s.validateSession(true), s.validateAdmin, s.RenderAdminSubmissionsPage)
+	r.POST("/admin/submissions/:pipeline/ban", s.validateSession(true), s.validateAdmin, s.handleAdminBanSubmission)
+	r.POST("/admin/submissions/:pipeline/unban", s.validateSession(true), s.validateAdmin, s.handleAdminUnbanSubmission)
 	r.GET("/private/solutions/:group/:task", s.handleChuckNorris)
 
 	r.StaticFS("/static", http.FS(web.StaticContent))

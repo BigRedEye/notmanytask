@@ -86,6 +86,7 @@ type ServerConfig struct {
 	// SignupEmailPattern, when set, adds a required email field to the
 	// signup form validated by this regular expression.
 	SignupEmailPattern string
+	Admins             []string
 	Cookies            struct {
 		AuthenticationKey string
 		EncryptionKey     string

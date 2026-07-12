@@ -89,10 +89,11 @@ type Links struct {
 	Submits         string
 	Logout          string
 	SubmitFlag      string
+	Admin           string
 }
 
 func (s *server) makeLinks(user *models.User) *Links {
-	return &Links{
+	links := &Links{
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
 		TasksRepository: s.config.GitLab.TaskUrlPrefix,
@@ -101,6 +102,10 @@ func (s *server) makeLinks(user *models.User) *Links {
 		Logout:          s.config.Endpoints.Logout,
 		SubmitFlag:      s.config.Endpoints.Flag,
 	}
+	if s.isAdmin(user) {
+		links.Admin = "/admin/submissions"
+	}
+	return links
 }
 
 func (s *server) RenderHomePage(c *gin.Context) {
@@ -222,6 +227,8 @@ type LeaderboardRow struct {
 	GitlabLogin string
 	Metric      float64
 	SubmittedAt time.Time
+	PipelineID  int
+	Banned      bool
 }
 
 func (s *server) RenderLeaderboardPage(c *gin.Context) {
@@ -278,6 +285,17 @@ func (s *server) RenderLeaderboardPage(c *gin.Context) {
 					GitlabLogin: entry.GitlabLogin,
 					Metric:      entry.Metric,
 					SubmittedAt: entry.SubmittedAt,
+					PipelineID:  entry.PipelineID,
+				})
+			}
+			for _, entry := range board.BannedEntries {
+				rows = append(rows, LeaderboardRow{
+					Name:        names[entry.GitlabLogin],
+					GitlabLogin: entry.GitlabLogin,
+					Metric:      entry.Metric,
+					SubmittedAt: entry.SubmittedAt,
+					PipelineID:  entry.PipelineID,
+					Banned:      true,
 				})
 			}
 		}

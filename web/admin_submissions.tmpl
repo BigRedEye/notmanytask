@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
+    <title>{{ .Title }}</title>
+    {{ template "metrika" }}
+    <style>
+      .navbar-brand { font-size: 2.5rem; font-weight: 300; }
+      .nav-link { color: rgba(0, 0, 0, 0.9); }
+      .submission-table td { vertical-align: middle; }
+      .reason-input { min-width: 14rem; }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-light bg-light">
+      <div class="container-fluid px-4">
+        <span class="navbar-brand"><a href="/" class="text-decoration-none text-dark">{{ .CourseName }}</a></span>
+        <div class="d-flex gap-3 align-items-center">
+          <a class="nav-link" href="{{ .Links.Standings }}">Standings</a>
+          <a class="nav-link fw-bold" href="{{ .Links.Admin }}">Admin</a>
+          <a class="nav-link" href="{{ .Links.Logout }}">Logout</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container-fluid px-4 py-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h2 class="mb-1">Submission administration</h2>
+          <p class="text-muted mb-0">Banned pipelines are excluded from task scoring and leaderboard ranks.</p>
+        </div>
+        <div class="btn-group" role="group" aria-label="Submission kind">
+          <a class="btn {{ if eq .Filters.Kind "all" }}btn-primary{{ else }}btn-outline-primary{{ end }}" href="?kind=all">All</a>
+          <a class="btn {{ if eq .Filters.Kind "regular" }}btn-primary{{ else }}btn-outline-primary{{ end }}" href="?kind=regular">Regular</a>
+          <a class="btn {{ if eq .Filters.Kind "leaderboard" }}btn-primary{{ else }}btn-outline-primary{{ end }}" href="?kind=leaderboard">Leaderboard</a>
+        </div>
+      </div>
+
+      <form method="get" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="kind" value="{{ .Filters.Kind }}">
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label" for="group">Group</label>
+          <select class="form-select" id="group" name="group">
+            <option value="">All groups</option>
+            {{ range .Groups }}<option value="{{ . }}" {{ if eq $.Filters.Group . }}selected{{ end }}>{{ . }}</option>{{ end }}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label" for="task">Task</label>
+          <select class="form-select" id="task" name="task">
+            <option value="">All tasks</option>
+            {{ range .Tasks }}<option value="{{ . }}" {{ if eq $.Filters.Task . }}selected{{ end }}>{{ . }}</option>{{ end }}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label" for="login">Student</label>
+          <input class="form-control" id="login" name="login" value="{{ .Filters.Login }}" placeholder="Name or login">
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label" for="state">Moderation</label>
+          <select class="form-select" id="state" name="state">
+            <option value="all" {{ if eq .Filters.State "all" }}selected{{ end }}>All</option>
+            <option value="active" {{ if eq .Filters.State "active" }}selected{{ end }}>Active</option>
+            <option value="banned" {{ if eq .Filters.State "banned" }}selected{{ end }}>Banned</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-auto">
+          <button class="btn btn-primary" type="submit">Apply filters</button>
+          <a class="btn btn-outline-secondary" href="?kind={{ .Filters.Kind }}">Reset</a>
+        </div>
+      </form>
+
+      {{ if .Truncated }}<div class="alert alert-warning">Showing the newest 500 matching submissions. Narrow the filters to see older results.</div>{{ end }}
+
+      <div class="table-responsive">
+        <table class="table table-hover submission-table">
+          <thead>
+            <tr>
+              <th>Submitted</th><th>Student</th><th>Group</th><th>Task</th><th>Kind</th><th>Result</th><th>Pipeline</th><th>Moderation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .Rows }}
+            <tr {{ if .Banned }}class="table-danger" title="{{ .ModerationTitle }}"{{ end }}>
+              <td class="text-nowrap">{{ .StartedAt.Format "02 Jan 2006 15:04" }}</td>
+              <td><div>{{ if .Name }}{{ .Name }}{{ else }}Unknown user{{ end }}</div><small class="text-muted">{{ .GitlabLogin }}</small></td>
+              <td>{{ if .Group }}{{ .Group }}{{ else }}—{{ end }}</td>
+              <td><code>{{ .Task }}</code></td>
+              <td>{{ if .Leaderboard }}<span class="badge bg-warning text-dark">Leaderboard</span>{{ else }}<span class="badge bg-secondary">Regular</span>{{ end }}</td>
+              <td>{{ .Status }}{{ if .HasMetric }}<br><strong>{{ printf "%.4f" .Metric }}</strong>{{ end }}</td>
+              <td><a href="{{ .PipelineURL }}" target="_blank" rel="noopener">#{{ .PipelineID }}</a></td>
+              <td>
+                {{ if .Banned }}
+                  <div class="mb-1"><strong>Banned</strong>{{ if .BanReason }}: {{ .BanReason }}{{ end }}</div>
+                  <small class="d-block text-muted mb-2">{{ .BannedByName }} · {{ .BannedAt.Format "02 Jan 15:04" }}</small>
+                  <form method="post" action="/admin/submissions/{{ .PipelineID }}/unban" onsubmit="return confirm('Restore pipeline #{{ .PipelineID }} to scoring?')">
+                    <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Unban</button>
+                  </form>
+                {{ else }}
+                  <form method="post" action="/admin/submissions/{{ .PipelineID }}/ban" class="d-flex gap-2" onsubmit="return confirm('Exclude pipeline #{{ .PipelineID }} from scoring?')">
+                    <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+                    <input class="form-control form-control-sm reason-input" name="reason" maxlength="500" required placeholder="Reason">
+                    <button class="btn btn-sm btn-danger" type="submit">Ban</button>
+                  </form>
+                {{ end }}
+              </td>
+            </tr>
+            {{ else }}
+            <tr><td colspan="8" class="text-center text-muted py-5">No matching submissions.</td></tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </body>
+</html>

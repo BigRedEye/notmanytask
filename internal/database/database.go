@@ -57,7 +57,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{}, &models.SubmissionBan{})
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +120,12 @@ func (db *DataBase) FindUserByTelegramID(id int64) (*models.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (db *DataBase) ListUsers() (users []*models.User, err error) {
+	users = make([]*models.User, 0)
+	err = db.Order("created_at").Find(&users).Error
+	return
 }
 
 func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
@@ -215,6 +221,33 @@ func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pip
 	if err != nil {
 		pipelines = nil
 	}
+	return
+}
+
+func (db *DataBase) FindPipelineByID(id int) (*models.Pipeline, error) {
+	var pipeline models.Pipeline
+	if err := db.First(&pipeline, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &pipeline, nil
+}
+
+func (db *DataBase) BanSubmission(pipelineID int, adminUserID uint, reason string) error {
+	ban := &models.SubmissionBan{
+		PipelineID:  pipelineID,
+		AdminUserID: adminUserID,
+		Reason:      reason,
+	}
+	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(ban).Error
+}
+
+func (db *DataBase) UnbanSubmission(pipelineID int) error {
+	return db.Delete(&models.SubmissionBan{}, "pipeline_id = ?", pipelineID).Error
+}
+
+func (db *DataBase) ListSubmissionBans() (bans []models.SubmissionBan, err error) {
+	bans = make([]models.SubmissionBan, 0)
+	err = db.Find(&bans).Error
 	return
 }
 

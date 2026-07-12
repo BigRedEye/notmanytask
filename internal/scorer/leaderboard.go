@@ -20,9 +20,10 @@ type LeaderboardEntry struct {
 // benchmark task. Entries are sorted best-first; rank of Entries[i] is i+1.
 // Ties are broken by submission time (earlier wins).
 type TaskLeaderboard struct {
-	Task     string
-	Deadline deadlines.Date
-	Entries  []LeaderboardEntry
+	Task          string
+	Deadline      deadlines.Date
+	Entries       []LeaderboardEntry
+	BannedEntries []LeaderboardEntry
 
 	ranks map[string]int
 }
@@ -54,6 +55,22 @@ func benchmarkLogins(users []*models.User) []string {
 // deadlines. Only results from the provided group users and submitted before
 // the task group deadline count.
 func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines, users []*models.User) (map[string]*TaskLeaderboard, error) {
+	empty := calcLeaderboardsFromResults(currentDeadlines, nil, nil)
+	if len(empty) == 0 {
+		return empty, nil
+	}
+	results, err := s.db.ListBenchmarksForLogins(benchmarkLogins(users))
+	if err != nil {
+		return nil, err
+	}
+	bans, err := s.loadSubmissionBans()
+	if err != nil {
+		return nil, err
+	}
+	return calcLeaderboardsFromResults(currentDeadlines, results, bans), nil
+}
+
+func calcLeaderboardsFromResults(currentDeadlines *deadlines.Deadlines, results []models.BenchmarkResult, bans submissionBans) leaderboardsMap {
 	boards := make(leaderboardsMap)
 	for i := range currentDeadlines.Assignments {
 		group := &currentDeadlines.Assignments[i]
@@ -69,12 +86,7 @@ func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines, users []
 		}
 	}
 	if len(boards) == 0 {
-		return boards, nil
-	}
-
-	results, err := s.db.ListBenchmarksForLogins(benchmarkLogins(users))
-	if err != nil {
-		return nil, err
+		return boards
 	}
 
 	best := make(map[string]map[string]*LeaderboardEntry)
@@ -84,16 +96,20 @@ func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines, users []
 		if !found || result.CreatedAt.After(board.Deadline.Time) {
 			continue
 		}
-		entriesByLogin, found := best[result.Task]
-		if !found {
-			entriesByLogin = make(map[string]*LeaderboardEntry)
-			best[result.Task] = entriesByLogin
-		}
 		entry := &LeaderboardEntry{
 			GitlabLogin: result.GitlabLogin,
 			Metric:      result.Metric,
 			SubmittedAt: result.CreatedAt,
 			PipelineID:  result.PipelineID,
+		}
+		if _, banned := bans[result.PipelineID]; banned {
+			board.BannedEntries = append(board.BannedEntries, *entry)
+			continue
+		}
+		entriesByLogin, found := best[result.Task]
+		if !found {
+			entriesByLogin = make(map[string]*LeaderboardEntry)
+			best[result.Task] = entriesByLogin
 		}
 		prev, found := entriesByLogin[result.GitlabLogin]
 		if !found || entryLess(entry, prev) {
@@ -113,7 +129,12 @@ func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines, users []
 			board.ranks[board.Entries[i].GitlabLogin] = i + 1
 		}
 	}
-	return boards, nil
+	for _, board := range boards {
+		sort.Slice(board.BannedEntries, func(i, j int) bool {
+			return board.BannedEntries[i].SubmittedAt.After(board.BannedEntries[j].SubmittedAt)
+		})
+	}
+	return boards
 }
 
 func entryLess(left, right *LeaderboardEntry) bool {

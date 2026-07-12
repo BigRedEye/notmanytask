@@ -117,6 +117,11 @@
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Submits }}"><h5>Submits</h5></a>
                   </div>
+                  {{ if .Links.Admin }}
+                  <div class="col-auto">
+                      <a class="nav-link" href="{{ .Links.Admin }}"><h5>Admin</h5></a>
+                  </div>
+                  {{ end }}
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Logout }}"><h5>Logout</h5></a>
                   </div>

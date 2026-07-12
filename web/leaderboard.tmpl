@@ -29,6 +29,11 @@
 .rank-3 {
     background-color: #ecc8a8;
 }
+
+.result-banned {
+    background-color: #f8d7da;
+    color: #842029;
+}
         </style>
     </head>
     <body>
@@ -46,6 +51,11 @@
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Repository }}"><h5>My Repo</h5></a>
                   </div>
+                  {{ if .Links.Admin }}
+                  <div class="col-auto">
+                      <a class="nav-link" href="{{ .Links.Admin }}"><h5>Admin</h5></a>
+                  </div>
+                  {{ end }}
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Logout }}"><h5>Logout</h5></a>
                   </div>
@@ -82,9 +92,9 @@
                 </thead>
                 <tbody>
                     {{ range .Rows }}
-                    <tr {{ if eq .Rank 1 }}class="rank-1"{{ else if eq .Rank 2 }}class="rank-2"{{ else if eq .Rank 3 }}class="rank-3"{{ end }}>
-                        <th scope="row">{{ .Rank }}</th>
-                        <td>{{ .Name }}</td>
+                    <tr {{ if .Banned }}class="result-banned" title="This submission is banned and does not affect ranks or scores"{{ else if eq .Rank 1 }}class="rank-1"{{ else if eq .Rank 2 }}class="rank-2"{{ else if eq .Rank 3 }}class="rank-3"{{ end }}>
+                        <th scope="row">{{ if .Banned }}—{{ else }}{{ .Rank }}{{ end }}</th>
+                        <td>{{ .Name }}{{ if .Banned }} <span class="badge bg-danger">Banned</span>{{ end }}</td>
                         <td>{{ printf "%.2f" .Metric }}</td>
                         <td>{{ .SubmittedAt.Format "02 Jan 15:04" }}</td>
                     </tr>
