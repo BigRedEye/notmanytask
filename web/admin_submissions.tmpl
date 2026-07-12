@@ -11,6 +11,7 @@
       .nav-link { color: rgba(0, 0, 0, 0.9); }
       .submission-table td { vertical-align: middle; }
       .reason-input { min-width: 14rem; }
+	  .bulk-reason-input { min-width: 18rem; }
     </style>
   </head>
   <body>
@@ -72,16 +73,27 @@
         </div>
       </form>
 
+	  <form id="bulk-moderation-form" method="post" action="/admin/submissions/bulk" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+		<input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+		<input type="hidden" name="return_to" value="{{ .CurrentURL }}">
+		<label class="visually-hidden" for="bulk-reason">Bulk moderation reason</label>
+		<input id="bulk-reason" class="form-control bulk-reason-input w-auto" name="reason" data-max-runes="500" required placeholder="Reason for selected pipelines">
+		<button class="btn btn-danger bulk-action" name="action" value="ban" type="submit">Ban selected</button>
+		<button class="btn btn-outline-danger bulk-action" name="action" value="unban" type="submit">Unban selected</button>
+		<span id="bulk-selected-count" class="text-muted" aria-live="polite">0 selected</span>
+	  </form>
+
       <div class="table-responsive">
         <table class="table table-hover submission-table">
           <thead>
             <tr>
-              <th>Submitted</th><th>Student</th><th>Group</th><th>Task</th><th>Kind</th><th>Result</th><th>Pipeline</th><th>Moderation</th>
+			  <th><input id="select-page" class="form-check-input" type="checkbox" aria-label="Select all pipelines on this page"></th><th>Submitted</th><th>Student</th><th>Group</th><th>Task</th><th>Kind</th><th>Result</th><th>Pipeline</th><th>Moderation</th>
             </tr>
           </thead>
           <tbody>
             {{ range .Rows }}
             <tr {{ if .Banned }}class="table-danger" title="{{ .ModerationTitle }}"{{ end }}>
+			  <td><input class="form-check-input pipeline-select" type="checkbox" form="bulk-moderation-form" name="pipeline_id" value="{{ .PipelineID }}" aria-label="Select pipeline {{ .PipelineID }}"></td>
               <td class="text-nowrap">{{ .StartedAt.Format "02 Jan 2006 15:04" }}</td>
               <td><div>{{ if .Name }}{{ .Name }}{{ else }}Unknown user{{ end }}</div><small class="text-muted">{{ .GitlabLogin }}</small></td>
               <td>{{ if .Group }}{{ .Group }}{{ else }}—{{ end }}</td>
@@ -123,7 +135,7 @@
               </td>
             </tr>
             {{ else }}
-            <tr><td colspan="8" class="text-center text-muted py-5">No matching submissions.</td></tr>
+			<tr><td colspan="9" class="text-center text-muted py-5">No matching submissions.</td></tr>
             {{ end }}
           </tbody>
         </table>
@@ -154,6 +166,29 @@
         input.addEventListener('input', validate);
         validate();
       });
+	  var selectPage = document.getElementById('select-page');
+	  var pipelineSelections = Array.from(document.querySelectorAll('.pipeline-select'));
+	  var bulkButtons = Array.from(document.querySelectorAll('.bulk-action'));
+	  var selectedCount = document.getElementById('bulk-selected-count');
+	  var updateBulkSelection = function () {
+		var count = pipelineSelections.filter(function (checkbox) { return checkbox.checked; }).length;
+		selectedCount.textContent = count + ' selected';
+		bulkButtons.forEach(function (button) { button.disabled = count === 0; });
+		selectPage.checked = pipelineSelections.length > 0 && count === pipelineSelections.length;
+		selectPage.indeterminate = count > 0 && count < pipelineSelections.length;
+	  };
+	  selectPage.addEventListener('change', function () {
+		pipelineSelections.forEach(function (checkbox) { checkbox.checked = selectPage.checked; });
+		updateBulkSelection();
+	  });
+	  pipelineSelections.forEach(function (checkbox) { checkbox.addEventListener('change', updateBulkSelection); });
+	  document.getElementById('bulk-moderation-form').addEventListener('submit', function (event) {
+		var action = event.submitter && event.submitter.value === 'unban' ? 'unban' : 'ban';
+		if (!confirm(action.charAt(0).toUpperCase() + action.slice(1) + ' ' + pipelineSelections.filter(function (checkbox) { return checkbox.checked; }).length + ' selected pipelines?')) {
+		  event.preventDefault();
+		}
+	  });
+	  updateBulkSelection();
     </script>
   </body>
 </html>

@@ -2,6 +2,7 @@ package web
 
 import (
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,15 +12,18 @@ import (
 	"unicode/utf8"
 
 	"github.com/bigredeye/notmanytask/internal/database"
+	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 const (
 	adminCSRFSessionKey = "admin_csrf"
 	maxBanReasonRunes   = 500
+	maxBulkPipelines    = database.DefaultAdminSubmissionsPageSize
 )
 
 type adminSubmissionRow struct {
@@ -126,6 +130,32 @@ func validBanReason(reason string) bool {
 	return runes >= 1 && runes <= maxBanReasonRunes
 }
 
+func parseBulkPipelineIDs(values []string) ([]int, error) {
+	if len(values) == 0 || len(values) > maxBulkPipelines {
+		return nil, fmt.Errorf("select 1 to %d pipelines", maxBulkPipelines)
+	}
+	seen := make(map[int]struct{}, len(values))
+	ids := make([]int, 0, len(values))
+	for _, value := range values {
+		id, err := strconv.Atoi(value)
+		if err != nil || id <= 0 {
+			return nil, errors.New("invalid pipeline id")
+		}
+		if _, exists := seen[id]; !exists {
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+func safeAdminReturnURL(value string) string {
+	if value == "/admin/submissions" || strings.HasPrefix(value, "/admin/submissions?") {
+		return value
+	}
+	return "/admin/submissions"
+}
+
 func (s *server) RenderAdminSubmissionsPage(c *gin.Context) {
 	filters := normalizeAdminFilters(c)
 	page, err := s.db.ListAdminSubmissions(database.AdminSubmissionFilters{
@@ -228,6 +258,7 @@ func (s *server) RenderAdminSubmissionsPage(c *gin.Context) {
 		"RegularURL": adminSubmissionsURL(regularFilters, 1),
 		"BoardURL":   adminSubmissionsURL(leaderboardFilters, 1),
 		"ResetURL":   adminSubmissionsURL(resetFilters, 1),
+		"CurrentURL": adminSubmissionsURL(filters, page.Page),
 	})
 }
 
@@ -286,6 +317,41 @@ func (s *server) handleAdminUnbanSubmission(c *gin.Context) {
 	s.cache.Clear()
 	s.logger.Info("Submission unbanned", zap.Int("pipeline_id", pipelineID), zap.Uint("admin_user_id", admin.ID), zap.String("reason", reason))
 	c.Redirect(http.StatusSeeOther, "/admin/submissions")
+}
+
+func (s *server) handleAdminBulkModeration(c *gin.Context) {
+	if !s.validateAdminCSRF(c) {
+		c.String(http.StatusForbidden, "invalid CSRF token")
+		return
+	}
+	pipelineIDs, err := parseBulkPipelineIDs(c.PostFormArray("pipeline_id"))
+	if err != nil {
+		c.String(http.StatusBadRequest, err.Error())
+		return
+	}
+	reason := strings.TrimSpace(c.PostForm("reason"))
+	if !validBanReason(reason) {
+		c.String(http.StatusBadRequest, "reason must contain 1 to 500 characters")
+		return
+	}
+	action := models.SubmissionModerationAction(c.PostForm("action"))
+	if action != models.SubmissionModerationActionBan && action != models.SubmissionModerationActionUnban {
+		c.String(http.StatusBadRequest, "invalid moderation action")
+		return
+	}
+	admin := s.getUser(c)
+	changed, err := s.db.ModerateSubmissions(pipelineIDs, admin.ID, action, reason)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.String(http.StatusNotFound, "pipeline not found")
+			return
+		}
+		c.String(http.StatusInternalServerError, "failed to moderate submissions")
+		return
+	}
+	s.cache.Clear()
+	s.logger.Info("Bulk submission moderation applied", zap.String("action", string(action)), zap.Ints("pipeline_ids", pipelineIDs), zap.Int("changed", changed), zap.Uint("admin_user_id", admin.ID), zap.String("reason", reason))
+	c.Redirect(http.StatusSeeOther, safeAdminReturnURL(c.PostForm("return_to")))
 }
 
 func (row adminSubmissionRow) ModerationTitle() string {

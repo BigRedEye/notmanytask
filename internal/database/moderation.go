@@ -2,6 +2,8 @@ package database
 
 import (
 	"errors"
+	"fmt"
+	"sort"
 	"time"
 
 	"github.com/bigredeye/notmanytask/internal/models"
@@ -41,70 +43,105 @@ func backfillSubmissionModerationEvents(db *gorm.DB) error {
 	})
 }
 
-func lockPipeline(tx *gorm.DB, pipelineID int) error {
-	var pipeline models.Pipeline
-	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&pipeline, "id = ?", pipelineID).Error
+func normalizePipelineIDs(pipelineIDs []int) []int {
+	ids := append([]int(nil), pipelineIDs...)
+	sort.Ints(ids)
+	unique := ids[:0]
+	for _, id := range ids {
+		if id > 0 && (len(unique) == 0 || unique[len(unique)-1] != id) {
+			unique = append(unique, id)
+		}
+	}
+	return unique
 }
 
 func (db *DataBase) BanSubmission(pipelineID int, adminUserID uint, reason string) error {
-	return db.Transaction(func(tx *gorm.DB) error {
-		if err := lockPipeline(tx, pipelineID); err != nil {
-			return err
-		}
-		var existing models.SubmissionBan
-		err := tx.First(&existing, "pipeline_id = ?", pipelineID).Error
-		if err == nil {
-			return nil
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		now := time.Now()
-		ban := &models.SubmissionBan{PipelineID: pipelineID, AdminUserID: adminUserID, Reason: reason, CreatedAt: now}
-		if err := tx.Create(ban).Error; err != nil {
-			return err
-		}
-		return tx.Create(&models.SubmissionModerationEvent{
-			PipelineID:     pipelineID,
-			AdminUserID:    adminUserID,
-			Action:         models.SubmissionModerationActionBan,
-			Reason:         reason,
-			PreviousBanned: false,
-			CurrentBanned:  true,
-			CreatedAt:      now,
-		}).Error
-	})
+	_, err := db.ModerateSubmissions([]int{pipelineID}, adminUserID, models.SubmissionModerationActionBan, reason)
+	return err
 }
 
 func (db *DataBase) UnbanSubmission(pipelineID int, adminUserID uint, reason string) error {
-	return db.Transaction(func(tx *gorm.DB) error {
-		if err := lockPipeline(tx, pipelineID); err != nil {
+	_, err := db.ModerateSubmissions([]int{pipelineID}, adminUserID, models.SubmissionModerationActionUnban, reason)
+	return err
+}
+
+// ModerateSubmissions applies one moderation action atomically. Pipeline rows
+// are locked in ID order so overlapping bulk requests cannot deadlock or create
+// duplicate state transitions.
+func (db *DataBase) ModerateSubmissions(pipelineIDs []int, adminUserID uint, action models.SubmissionModerationAction, reason string) (int, error) {
+	ids := normalizePipelineIDs(pipelineIDs)
+	if len(ids) == 0 {
+		return 0, errors.New("no pipeline IDs")
+	}
+	if action != models.SubmissionModerationActionBan && action != models.SubmissionModerationActionUnban {
+		return 0, fmt.Errorf("unsupported moderation action %q", action)
+	}
+
+	changed := 0
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var lockedIDs []int
+		if err := tx.Model(&models.Pipeline{}).
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id IN ?", ids).
+			Order("id").
+			Pluck("id", &lockedIDs).Error; err != nil {
 			return err
 		}
-		var existing models.SubmissionBan
-		err := tx.First(&existing, "pipeline_id = ?", pipelineID).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
+		if len(lockedIDs) != len(ids) {
+			return gorm.ErrRecordNotFound
 		}
-		if err != nil {
+
+		var current []models.SubmissionBan
+		if err := tx.Where("pipeline_id IN ?", ids).Find(&current).Error; err != nil {
 			return err
+		}
+		banned := make(map[int]bool, len(current))
+		for _, ban := range current {
+			banned[ban.PipelineID] = true
 		}
 
 		now := time.Now()
-		if err := tx.Delete(&models.SubmissionBan{}, "pipeline_id = ?", pipelineID).Error; err != nil {
-			return err
+		bansToCreate := make([]models.SubmissionBan, 0, len(ids))
+		bansToDelete := make([]int, 0, len(ids))
+		events := make([]models.SubmissionModerationEvent, 0, len(ids))
+		for _, pipelineID := range ids {
+			if action == models.SubmissionModerationActionBan && banned[pipelineID] {
+				continue
+			}
+			if action == models.SubmissionModerationActionUnban && !banned[pipelineID] {
+				continue
+			}
+			previousBanned := banned[pipelineID]
+			currentBanned := action == models.SubmissionModerationActionBan
+			if currentBanned {
+				bansToCreate = append(bansToCreate, models.SubmissionBan{PipelineID: pipelineID, AdminUserID: adminUserID, Reason: reason, CreatedAt: now})
+			} else {
+				bansToDelete = append(bansToDelete, pipelineID)
+			}
+			events = append(events, models.SubmissionModerationEvent{
+				PipelineID: pipelineID, AdminUserID: adminUserID, Action: action, Reason: reason,
+				PreviousBanned: previousBanned, CurrentBanned: currentBanned, CreatedAt: now,
+			})
 		}
-		return tx.Create(&models.SubmissionModerationEvent{
-			PipelineID:     pipelineID,
-			AdminUserID:    adminUserID,
-			Action:         models.SubmissionModerationActionUnban,
-			Reason:         reason,
-			PreviousBanned: true,
-			CurrentBanned:  false,
-			CreatedAt:      now,
-		}).Error
+		if len(bansToCreate) > 0 {
+			if err := tx.Create(&bansToCreate).Error; err != nil {
+				return err
+			}
+		}
+		if len(bansToDelete) > 0 {
+			if err := tx.Delete(&models.SubmissionBan{}, "pipeline_id IN ?", bansToDelete).Error; err != nil {
+				return err
+			}
+		}
+		if len(events) > 0 {
+			if err := tx.Create(&events).Error; err != nil {
+				return err
+			}
+		}
+		changed = len(events)
+		return nil
 	})
+	return changed, err
 }
 
 func (db *DataBase) ListSubmissionModerationEvents(pipelineIDs []int) ([]SubmissionModerationEvent, error) {

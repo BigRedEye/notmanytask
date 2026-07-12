@@ -89,12 +89,13 @@ func TestAdminSubmissionsTemplateRendersBannedLeaderboardRow(t *testing.T) {
 		},
 		"AllURL": "/admin/submissions?kind=all", "RegularURL": "/admin/submissions?kind=regular",
 		"BoardURL": "/admin/submissions?kind=leaderboard", "ResetURL": "/admin/submissions?kind=leaderboard",
+		"CurrentURL": "/admin/submissions?kind=leaderboard&state=banned&page=2",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	html := output.String()
-	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban", "Page 2 of 3", "data-max-runes=\"500\"", "History (2)", "environment verified", "active → banned"} {
+	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban", "Page 2 of 3", "data-max-runes=\"500\"", "History (2)", "environment verified", "active → banned", "/admin/submissions/bulk", "Ban selected", "Unban selected", `form="bulk-moderation-form" name="pipeline_id" value="42"`, "Select all pipelines on this page"} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("rendered admin page does not contain %q", expected)
 		}
@@ -132,6 +133,39 @@ func TestAdminSubmissionsURLPreservesFiltersAndPage(t *testing.T) {
 	for _, expected := range []string{"kind=leaderboard", "group=group+with+spaces", "task=jit%2Ffast", "login=%D0%90%D0%BB%D0%B8%D1%81%D0%B0", "state=banned", "page=3"} {
 		if !strings.Contains(url, expected) {
 			t.Errorf("pagination URL %q does not contain %q", url, expected)
+		}
+	}
+}
+
+func TestParseBulkPipelineIDs(t *testing.T) {
+	ids, err := parseBulkPipelineIDs([]string{"42", "7", "42"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 2 || ids[0] != 42 || ids[1] != 7 {
+		t.Fatalf("parsed IDs = %v, want [42 7]", ids)
+	}
+
+	tooMany := make([]string, maxBulkPipelines+1)
+	for i := range tooMany {
+		tooMany[i] = "1"
+	}
+	for _, values := range [][]string{nil, {"0"}, {"not-an-id"}, tooMany} {
+		if _, err := parseBulkPipelineIDs(values); err == nil {
+			t.Errorf("parseBulkPipelineIDs(%v) unexpectedly succeeded", values)
+		}
+	}
+}
+
+func TestSafeAdminReturnURL(t *testing.T) {
+	for _, value := range []string{"/admin/submissions", "/admin/submissions?kind=leaderboard&page=2"} {
+		if got := safeAdminReturnURL(value); got != value {
+			t.Errorf("safeAdminReturnURL(%q) = %q", value, got)
+		}
+	}
+	for _, value := range []string{"https://evil.example", "//evil.example", "/admin/submissions-evil"} {
+		if got := safeAdminReturnURL(value); got != "/admin/submissions" {
+			t.Errorf("unsafe return URL %q was accepted as %q", value, got)
 		}
 	}
 }

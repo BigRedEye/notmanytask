@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -49,6 +50,7 @@ func TestSubmissionModerationPostgres(t *testing.T) {
 	pipelines := []models.Pipeline{
 		{ID: 101, Project: "alice-project", Task: "bench", Status: models.PipelineStatusSuccess, StartedAt: time.Now()},
 		{ID: 102, Project: "bob-project", Task: "bench", Status: models.PipelineStatusSuccess, StartedAt: time.Now()},
+		{ID: 103, Project: "carol-project", Task: "bench", Status: models.PipelineStatusSuccess, StartedAt: time.Now()},
 	}
 	if err := tx.Create(&pipelines).Error; err != nil {
 		t.Fatal(err)
@@ -113,6 +115,32 @@ func TestSubmissionModerationPostgres(t *testing.T) {
 	if len(legacyEvents) != 1 || legacyEvents[0].Reason != "legacy ban" || legacyEvents[0].CreatedAt.UTC() != legacyCreatedAt {
 		t.Fatalf("unexpected backfilled event: %+v", legacyEvents)
 	}
+
+	changed, err := db.ModerateSubmissions([]int{103, 101, 103}, admin.ID, models.SubmissionModerationActionBan, "bulk violation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed != 1 {
+		t.Fatalf("bulk ban changed %d submissions, want 1", changed)
+	}
+	assertModerationCounts(t, tx, 101, 1, 3)
+	assertModerationCounts(t, tx, 103, 1, 1)
+
+	changed, err = db.ModerateSubmissions([]int{103, 101, 102}, admin.ID, models.SubmissionModerationActionUnban, "bulk review complete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed != 3 {
+		t.Fatalf("bulk unban changed %d submissions, want 3", changed)
+	}
+	assertModerationCounts(t, tx, 101, 0, 4)
+	assertModerationCounts(t, tx, 102, 0, 2)
+	assertModerationCounts(t, tx, 103, 0, 2)
+
+	if _, err := db.ModerateSubmissions([]int{101, 999999}, admin.ID, models.SubmissionModerationActionBan, "must roll back"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("missing pipeline error = %v, want record not found", err)
+	}
+	assertModerationCounts(t, tx, 101, 0, 4)
 }
 
 func assertModerationCounts(t *testing.T, db *gorm.DB, pipelineID, wantBans, wantEvents int64) {
