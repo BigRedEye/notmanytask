@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -14,6 +15,17 @@ import (
 
 type apiService struct {
 	webService
+}
+
+func parseBenchmarkMetric(raw string) (float64, error) {
+	metric, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(metric) || math.IsInf(metric, 0) {
+		return 0, fmt.Errorf("metric must be finite")
+	}
+	return metric, nil
 }
 
 func setupApiService(server *server, r *gin.Engine) error {
@@ -80,7 +92,7 @@ func (s apiService) report(c *gin.Context) {
 	}
 
 	if req.Metric != "" {
-		metric, err := strconv.ParseFloat(req.Metric, 64)
+		metric, err := parseBenchmarkMetric(req.Metric)
 		if err != nil {
 			onError(http.StatusBadRequest, fmt.Errorf("failed to parse metric: %w", err))
 			return
