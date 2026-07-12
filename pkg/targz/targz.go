@@ -10,6 +10,7 @@ import (
 	"os"
 	pathpkg "path"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -119,7 +120,8 @@ func wrapFileError(operation, name string, err error) error {
 }
 
 type fsVisitor struct {
-	root string
+	root           string
+	directoryModes map[string]fs.FileMode
 }
 
 func newFSVisitor(root string) (*fsVisitor, error) {
@@ -134,7 +136,10 @@ func newFSVisitor(root string) (*fsVisitor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("make extraction root absolute: %w", err)
 	}
-	return &fsVisitor{root: resolvedRoot}, nil
+	return &fsVisitor{
+		root:           resolvedRoot,
+		directoryModes: make(map[string]fs.FileMode),
+	}, nil
 }
 
 func (v *fsVisitor) resolve(name string) (fullPath, relativePath string, err error) {
@@ -182,13 +187,52 @@ func (v *fsVisitor) VisitDirectory(info fs.FileInfo) error {
 	if err := v.rejectSymlinkComponents(relativePath); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(fullPath, info.Mode().Perm()); err != nil {
+	// Keep the directory writable/searchable while later archive entries are
+	// created beneath it. The archived mode is restored after extraction.
+	temporaryMode := info.Mode().Perm() | 0o700
+	if err := os.MkdirAll(fullPath, temporaryMode); err != nil {
 		return err
 	}
 	if err := v.rejectSymlinkComponents(relativePath); err != nil {
 		return err
 	}
-	return os.Chmod(fullPath, info.Mode().Perm())
+	if err := os.Chmod(fullPath, temporaryMode); err != nil {
+		return err
+	}
+	v.directoryModes[relativePath] = info.Mode().Perm()
+	return nil
+}
+
+func (v *fsVisitor) finalizeDirectories() error {
+	paths := make([]string, 0, len(v.directoryModes))
+	for relativePath := range v.directoryModes {
+		paths = append(paths, relativePath)
+	}
+	// Finalize children before parents so restrictive parent modes do not
+	// prevent access to nested directories that still need chmod.
+	sort.Slice(paths, func(i, j int) bool {
+		leftDepth := strings.Count(paths[i], string(filepath.Separator))
+		rightDepth := strings.Count(paths[j], string(filepath.Separator))
+		if leftDepth != rightDepth {
+			return leftDepth > rightDepth
+		}
+		return paths[i] > paths[j]
+	})
+
+	var resultErr error
+	for _, relativePath := range paths {
+		fullPath, _, err := v.resolve(relativePath)
+		if err == nil {
+			err = v.rejectSymlinkComponents(relativePath)
+		}
+		if err == nil {
+			err = os.Chmod(fullPath, v.directoryModes[relativePath])
+		}
+		if err != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("finalize directory %q: %w", relativePath, err))
+		}
+	}
+	return resultErr
 }
 
 func (v *fsVisitor) VisitFile(info fs.FileInfo) (io.WriteCloser, error) {
@@ -223,5 +267,6 @@ func ExtractToDir(input io.Reader, destination string) error {
 	if err != nil {
 		return err
 	}
-	return Extract(input, visitor)
+	extractErr := Extract(input, visitor)
+	return errors.Join(extractErr, visitor.finalizeDirectories())
 }

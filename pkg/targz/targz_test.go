@@ -108,6 +108,42 @@ func TestExtractToDirCreatesNestedTree(t *testing.T) {
 	}
 }
 
+func TestExtractDefersRestrictiveDirectoryModes(t *testing.T) {
+	destination := t.TempDir()
+	t.Cleanup(func() {
+		_ = os.Chmod(filepath.Join(destination, "readonly"), 0o700)
+		_ = os.Chmod(filepath.Join(destination, "readonly", "nested"), 0o700)
+		_ = os.Chmod(filepath.Join(destination, "readonly", "nested", "file.txt"), 0o600)
+	})
+	archive := makeArchive(t,
+		archiveEntry{name: "readonly", typeflag: tar.TypeDir, mode: 0o555},
+		archiveEntry{name: "readonly/nested", typeflag: tar.TypeDir, mode: 0o500},
+		archiveEntry{name: "readonly/nested/file.txt", body: "created after restrictive directories", mode: 0o400},
+	)
+	if err := ExtractToDir(bytes.NewReader(archive), destination); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(destination, "readonly", "nested", "file.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "created after restrictive directories" {
+		t.Fatalf("unexpected content: %q", content)
+	}
+	for path, wantMode := range map[string]fs.FileMode{
+		"readonly":        0o555,
+		"readonly/nested": 0o500,
+	} {
+		info, err := os.Stat(filepath.Join(destination, path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != wantMode {
+			t.Errorf("%s mode = %o, want %o", path, info.Mode().Perm(), wantMode)
+		}
+	}
+}
+
 func TestExtractRejectsUnsafePaths(t *testing.T) {
 	tests := []string{
 		"../escape.txt",
