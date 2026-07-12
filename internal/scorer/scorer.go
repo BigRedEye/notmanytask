@@ -99,7 +99,7 @@ func (s Scorer) loadSubmissionBans() (submissionBans, error) {
 func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider, bans submissionBans) (pipelinesMap, error) {
 	pipelines, err := provider(user.GetProjectName())
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to list use rpipelines")
+		return nil, errors.Wrap(err, "failed to list user pipelines")
 	}
 
 	pipelinesMap := make(pipelinesMap)

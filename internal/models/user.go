@@ -21,7 +21,7 @@ type User struct {
 
 	FirstName    string `gorm:"uniqueIndex:idx_name"`
 	LastName     string `gorm:"uniqueIndex:idx_name"`
-	GroupName    string `gorm:"uniqueIndex:idx_name"`
+	GroupName    string `gorm:"uniqueIndex:idx_name;index"`
 	SubgroupName string `gorm:"uniqueIndex:idx_name;not null;default:''"`
 	Email        string
 	TelegramID   *int64

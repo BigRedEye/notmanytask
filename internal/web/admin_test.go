@@ -72,41 +72,58 @@ func TestAdminSubmissionsTemplateRendersBannedLeaderboardRow(t *testing.T) {
 		"Rows": []adminSubmissionRow{{
 			PipelineID: 42, PipelineURL: "https://gitlab.example/pipelines/42", Task: "bench", Status: "success",
 			Leaderboard: true, HasMetric: true, Metric: 1.25, Banned: true, BanReason: "invalid benchmark", BannedAt: time.Now(),
+		}, {
+			PipelineID: 43, PipelineURL: "https://gitlab.example/pipelines/43", Task: "bench", Status: "success", Leaderboard: true,
 		}},
 		"CSRFToken": "csrf",
+		"Pagination": adminSubmissionPagination{
+			Page: 2, TotalPages: 3, Total: 125, HasPrevious: true, PreviousURL: "/admin/submissions?page=1", HasNext: true, NextURL: "/admin/submissions?page=3",
+		},
+		"AllURL": "/admin/submissions?kind=all", "RegularURL": "/admin/submissions?kind=regular",
+		"BoardURL": "/admin/submissions?kind=leaderboard", "ResetURL": "/admin/submissions?kind=leaderboard",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	html := output.String()
-	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban"} {
+	for _, expected := range []string{"table-danger", "invalid benchmark", "1.2500", "/admin/submissions/42/unban", "Page 2 of 3", "data-max-runes=\"500\""} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("rendered admin page does not contain %q", expected)
 		}
 	}
 }
 
-func TestAdminSubmissionFilters(t *testing.T) {
-	row := adminSubmissionRow{GitlabLogin: "alice", Name: "Alice Student", Group: "hse", Task: "jit/fast", Leaderboard: true, Banned: true}
-	matching := []adminSubmissionFilters{
-		{Kind: "all", State: "all"},
-		{Kind: "leaderboard", State: "banned", Group: "hse", Task: "jit/fast", Login: "ALI"},
-		{Kind: "leaderboard", State: "banned", Login: "student"},
+func TestBanReasonCountsUnicodeCharacters(t *testing.T) {
+	valid := []string{
+		"Причина блокировки",
+		strings.Repeat("я", maxBanReasonRunes),
+		strings.Repeat("🙂", maxBanReasonRunes),
 	}
-	for _, filters := range matching {
-		if !adminSubmissionMatches(row, filters) {
-			t.Errorf("row unexpectedly rejected by filters: %+v", filters)
+	for _, reason := range valid {
+		if !validBanReason(reason) {
+			t.Errorf("valid %d-rune reason was rejected", len([]rune(reason)))
 		}
 	}
-	notMatching := []adminSubmissionFilters{
-		{Kind: "regular", State: "all"},
-		{Kind: "leaderboard", State: "active"},
-		{Kind: "all", State: "all", Group: "other"},
-		{Kind: "all", State: "all", Login: "bob"},
+	invalid := []string{
+		"",
+		"   ",
+		strings.Repeat("я", maxBanReasonRunes+1),
+		strings.Repeat("🙂", maxBanReasonRunes+1),
 	}
-	for _, filters := range notMatching {
-		if adminSubmissionMatches(row, filters) {
-			t.Errorf("row unexpectedly accepted by filters: %+v", filters)
+	for _, reason := range invalid {
+		if validBanReason(reason) {
+			t.Errorf("invalid %d-rune reason was accepted", len([]rune(reason)))
+		}
+	}
+}
+
+func TestAdminSubmissionsURLPreservesFiltersAndPage(t *testing.T) {
+	url := adminSubmissionsURL(adminSubmissionFilters{
+		Kind: "leaderboard", Group: "group with spaces", Task: "jit/fast", Login: "Алиса", State: "banned",
+	}, 3)
+	for _, expected := range []string{"kind=leaderboard", "group=group+with+spaces", "task=jit%2Ffast", "login=%D0%90%D0%BB%D0%B8%D1%81%D0%B0", "state=banned", "page=3"} {
+		if !strings.Contains(url, expected) {
+			t.Errorf("pagination URL %q does not contain %q", url, expected)
 		}
 	}
 }

@@ -21,5 +21,5 @@ type Pipeline struct {
 
 	Task      string `gorm:"index"`
 	Status    PipelineStatus
-	StartedAt time.Time
+	StartedAt time.Time `gorm:"index"`
 }
