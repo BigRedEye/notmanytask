@@ -61,6 +61,9 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := backfillUserProjectNames(db); err != nil {
+		return nil, err
+	}
 
 	return &DataBase{db}, nil
 }
@@ -156,13 +159,21 @@ func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) erro
 }
 
 func (db *DataBase) SetUserRepository(user *models.User) error {
-	res := db.Model(user).Update("repository", user.Repository)
+	projectName := ""
+	if user.Repository != nil {
+		projectName = models.ProjectNameFromRepository(*user.Repository)
+	}
+	res := db.Model(user).Updates(map[string]interface{}{
+		"repository":   user.Repository,
+		"project_name": projectName,
+	})
 	if res.Error != nil {
 		return res.Error
 	}
 	if res.RowsAffected < 1 {
 		return fmt.Errorf("unknown user %d", user.ID)
 	}
+	user.ProjectName = projectName
 	return nil
 }
 
