@@ -71,6 +71,38 @@ func TestListAdminSubmissionsPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if users[0].ProjectName != "alice-project" || users[1].ProjectName != "bob-project" {
+		t.Fatalf("project names were not initialized: %q, %q", users[0].ProjectName, users[1].ProjectName)
+	}
+	// The indexed project identity, rather than the display/clone URL format,
+	// must drive pipeline ownership joins.
+	if err := tx.Model(users[0]).UpdateColumn("repository", "ssh://git@gitlab.example/course/url-no-longer-matches").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Model(users[1]).UpdateColumn("project_name", "").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := backfillUserProjectNames(tx); err != nil {
+		t.Fatal(err)
+	}
+	var backfilled models.User
+	if err := tx.First(&backfilled, users[1].ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if backfilled.ProjectName != "bob-project" {
+		t.Fatalf("backfilled project name = %q, want bob-project", backfilled.ProjectName)
+	}
+	if !tx.Migrator().HasIndex(&models.User{}, "ProjectName") {
+		t.Fatal("users.project_name index was not created")
+	}
+	newTeacherRepo := "https://gitlab.example/course/teacher-renamed"
+	users[2].Repository = &newTeacherRepo
+	if err := db.SetUserRepository(users[2]); err != nil {
+		t.Fatal(err)
+	}
+	if users[2].ProjectName != "teacher-renamed" {
+		t.Fatalf("SetUserRepository project name = %q, want teacher-renamed", users[2].ProjectName)
+	}
 	now := time.Now().UTC().Truncate(time.Second)
 	pipelines := []models.Pipeline{
 		{ID: 1, Project: "alice-project", Task: "bench", Status: models.PipelineStatusSuccess, StartedAt: now.Add(-time.Minute)},
@@ -89,6 +121,9 @@ func TestListAdminSubmissionsPostgres(t *testing.T) {
 		{GitlabLogin: bobLogin, Task: "bench", PipelineID: 3, Metric: 2.5, CreatedAt: now},
 	}
 	if err := tx.Create(&benchmarks).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateBenchmarkResults(tx); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Create(&models.SubmissionBan{PipelineID: 1, AdminUserID: users[2].ID, Reason: "invalid environment", CreatedAt: now}).Error; err != nil {

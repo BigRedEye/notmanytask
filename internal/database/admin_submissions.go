@@ -75,8 +75,7 @@ func (db *DataBase) adminSubmissionsQuery(filters AdminSubmissionFilters) *gorm.
 	query := db.Table("pipelines AS p").
 		Joins(`LEFT JOIN users AS u
                ON u.deleted_at IS NULL
-              AND u.repository IS NOT NULL
-              AND regexp_replace(u.repository, '^.*/', '') = p.project`).
+              AND u.project_name = p.project`).
 		Joins(`LEFT JOIN LATERAL (
                  SELECT b.pipeline_id, b.gitlab_login, b.metric
                    FROM benchmark_results AS b
