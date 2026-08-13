@@ -28,6 +28,22 @@ func parseBenchmarkMetric(raw string) (float64, error) {
 	return metric, nil
 }
 
+func validateBenchmarkReport(user *models.User, pipeline *models.Pipeline, task, project string) error {
+	if user.GetProjectName() == "" || user.GetProjectName() != project {
+		return fmt.Errorf("project %s does not belong to user", project)
+	}
+	if pipeline.Project != project {
+		return fmt.Errorf("pipeline project %s does not match report project %s", pipeline.Project, project)
+	}
+	if pipeline.Task != task {
+		return fmt.Errorf("pipeline task %s does not match report task %s", pipeline.Task, task)
+	}
+	if pipeline.Status != models.PipelineStatusSuccess {
+		return fmt.Errorf("pipeline %d is not successful", pipeline.ID)
+	}
+	return nil
+}
+
 func setupApiService(server *server, r *gin.Engine) error {
 	s := apiService{webService{server, server.config, server.logger}}
 
@@ -85,12 +101,6 @@ func (s apiService) report(c *gin.Context) {
 		return
 	}
 
-	err = s.server.pipelines.AddFresh(id, req.ProjectName)
-	if err != nil {
-		onError(http.StatusInternalServerError, err)
-		return
-	}
-
 	if req.Metric != "" {
 		metric, err := parseBenchmarkMetric(req.Metric)
 		if err != nil {
@@ -116,10 +126,23 @@ func (s apiService) report(c *gin.Context) {
 			onError(http.StatusBadRequest, fmt.Errorf("task %s has no leaderboard for group %s", req.Task, user.GroupName))
 			return
 		}
+		if user.GetProjectName() == "" || user.GetProjectName() != req.ProjectName {
+			onError(http.StatusBadRequest, fmt.Errorf("project %s does not belong to user %d", req.ProjectName, userID))
+			return
+		}
+		pipeline, err := s.server.pipelines.Refresh(id, req.ProjectName)
+		if err != nil {
+			onError(http.StatusBadGateway, fmt.Errorf("failed to verify pipeline: %w", err))
+			return
+		}
+		if err := validateBenchmarkReport(user, pipeline, req.Task, req.ProjectName); err != nil {
+			onError(http.StatusBadRequest, err)
+			return
+		}
 		err = s.server.db.AddBenchmarkResult(&models.BenchmarkResult{
 			GitlabLogin: *user.GitlabLogin,
 			Task:        req.Task,
-			PipelineID:  id,
+			PipelineID:  pipeline.ID,
 			Metric:      metric,
 		})
 		if err != nil {
@@ -131,6 +154,11 @@ func (s apiService) report(c *gin.Context) {
 			zap.String("task", req.Task),
 			zap.Float64("metric", metric),
 		)
+	} else {
+		if err := s.server.pipelines.AddFresh(id, req.ProjectName); err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, &api.ReportResponse{

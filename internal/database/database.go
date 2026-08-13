@@ -61,6 +61,9 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := migrateBenchmarkResults(db); err != nil {
+		return nil, err
+	}
 	if err := backfillUserProjectNames(db); err != nil {
 		return nil, err
 	}
@@ -202,7 +205,7 @@ func (db *DataBase) SetUserGroupName(user *models.User) error {
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status"}),
+		DoUpdates: clause.AssignmentColumns([]string{"project", "task", "status", "started_at"}),
 	}).Create(pipeline).Error
 }
 
@@ -216,7 +219,10 @@ func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pip
 }
 
 func (db *DataBase) AddBenchmarkResult(result *models.BenchmarkResult) error {
-	return db.Create(result).Error
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "pipeline_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"gitlab_login", "task", "metric", "created_at"}),
+	}).Create(result).Error
 }
 
 func (db *DataBase) ListAllBenchmarks() (results []models.BenchmarkResult, err error) {
