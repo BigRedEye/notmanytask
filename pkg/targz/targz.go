@@ -29,8 +29,11 @@ func (i archiveFileInfo) Name() string {
 }
 
 func cleanArchivePath(name string) (string, error) {
-	if name == "" || strings.ContainsRune(name, '\x00') {
+	if name == "" {
 		return "", fmt.Errorf("invalid empty archive path")
+	}
+	if strings.ContainsRune(name, '\x00') {
+		return "", fmt.Errorf("invalid archive path: NUL byte is not allowed")
 	}
 	// Tar paths use forward slashes. Reject backslashes so that an archive
 	// cannot become unsafe when extracted on Windows.
@@ -40,6 +43,9 @@ func cleanArchivePath(name string) (string, error) {
 	cleaned := pathpkg.Clean(name)
 	if pathpkg.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return "", fmt.Errorf("archive path %q escapes the destination", name)
+	}
+	if filepath.VolumeName(filepath.FromSlash(cleaned)) != "" {
+		return "", fmt.Errorf("archive path %q contains a volume name", name)
 	}
 	return cleaned, nil
 }
@@ -199,7 +205,7 @@ func (v *fsVisitor) VisitDirectory(info fs.FileInfo) error {
 	if err := os.Chmod(fullPath, temporaryMode); err != nil {
 		return err
 	}
-	v.directoryModes[relativePath] = info.Mode().Perm()
+	v.directoryModes[relativePath] = info.Mode().Perm() | info.Mode()&fs.ModeSticky
 	return nil
 }
 

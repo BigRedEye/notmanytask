@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -73,7 +74,7 @@ func TestExtractToDirCreatesNestedTree(t *testing.T) {
 		t.Fatal(err)
 	}
 	archive := makeArchive(t,
-		archiveEntry{name: "nested", typeflag: tar.TypeDir, mode: 0o750},
+		archiveEntry{name: "nested", typeflag: tar.TypeDir, mode: 0o1750},
 		archiveEntry{name: "nested/file.txt", body: "hello", mode: 0o640},
 		archiveEntry{name: "implicit/parent/file.txt", body: "world", mode: 0o600},
 	)
@@ -105,6 +106,9 @@ func TestExtractToDirCreatesNestedTree(t *testing.T) {
 	}
 	if dirInfo.Mode().Perm() != 0o750 {
 		t.Errorf("directory mode = %o, want 750", dirInfo.Mode().Perm())
+	}
+	if dirInfo.Mode()&fs.ModeSticky == 0 {
+		t.Error("directory sticky bit was not preserved")
 	}
 }
 
@@ -162,9 +166,22 @@ func TestExtractRejectsUnsafePaths(t *testing.T) {
 	}
 }
 
+func TestCleanArchivePathRejectsNULAndPlatformVolumes(t *testing.T) {
+	if _, err := cleanArchivePath("bad\x00path"); err == nil || !strings.Contains(err.Error(), "NUL") {
+		t.Fatalf("NUL path returned %v", err)
+	}
+
+	name := "C:/escape.txt"
+	if filepath.VolumeName(filepath.FromSlash(name)) != "" {
+		if _, err := cleanArchivePath(name); err == nil {
+			t.Fatalf("volume-qualified path %q was accepted", name)
+		}
+	}
+}
+
 func TestExtractRejectsSpecialEntries(t *testing.T) {
 	for _, typeflag := range []byte{tar.TypeSymlink, tar.TypeLink, tar.TypeChar, tar.TypeBlock, tar.TypeFifo} {
-		t.Run(string([]byte{typeflag}), func(t *testing.T) {
+		t.Run(fmt.Sprintf("type_%d", typeflag), func(t *testing.T) {
 			err := ExtractToDir(bytes.NewReader(makeArchive(t, archiveEntry{
 				name: "special", typeflag: typeflag, linkname: "../outside",
 			})), t.TempDir())
