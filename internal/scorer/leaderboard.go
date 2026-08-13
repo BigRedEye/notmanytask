@@ -84,10 +84,10 @@ func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines, users []
 		if !found || result.CreatedAt.After(board.Deadline.Time) {
 			continue
 		}
-		users, found := best[result.Task]
+		entriesByLogin, found := best[result.Task]
 		if !found {
-			users = make(map[string]*LeaderboardEntry)
-			best[result.Task] = users
+			entriesByLogin = make(map[string]*LeaderboardEntry)
+			best[result.Task] = entriesByLogin
 		}
 		entry := &LeaderboardEntry{
 			GitlabLogin: result.GitlabLogin,
@@ -95,15 +95,15 @@ func (s Scorer) CalcLeaderboards(currentDeadlines *deadlines.Deadlines, users []
 			SubmittedAt: result.CreatedAt,
 			PipelineID:  result.PipelineID,
 		}
-		prev, found := users[result.GitlabLogin]
+		prev, found := entriesByLogin[result.GitlabLogin]
 		if !found || entryLess(entry, prev) {
-			users[result.GitlabLogin] = entry
+			entriesByLogin[result.GitlabLogin] = entry
 		}
 	}
 
-	for task, users := range best {
+	for task, entriesByLogin := range best {
 		board := boards[task]
-		for _, entry := range users {
+		for _, entry := range entriesByLogin {
 			board.Entries = append(board.Entries, *entry)
 		}
 		sort.Slice(board.Entries, func(i, j int) bool {

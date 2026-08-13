@@ -144,6 +144,7 @@ func (s apiService) report(c *gin.Context) {
 			Task:        req.Task,
 			PipelineID:  pipeline.ID,
 			Metric:      metric,
+			CreatedAt:   pipeline.StartedAt,
 		})
 		if err != nil {
 			onError(http.StatusInternalServerError, err)

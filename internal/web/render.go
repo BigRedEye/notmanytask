@@ -283,6 +283,10 @@ func (s *server) RenderLeaderboardPage(c *gin.Context) {
 		}
 		return rows, nil
 	})
+	leaderboardRows := make([]LeaderboardRow, 0)
+	if rows != nil {
+		leaderboardRows = rows.Value().([]LeaderboardRow)
+	}
 
 	c.HTML(http.StatusOK, "leaderboard.tmpl", gin.H{
 		"CourseName": s.config.Server.CourseName,
@@ -290,8 +294,8 @@ func (s *server) RenderLeaderboardPage(c *gin.Context) {
 		"Task":       task,
 		"Group":      group,
 		"Bonus":      spec.Leaderboard.Bonus,
-		"Deadline":   taskGroup.Deadline,
-		"Rows":       rows.Value().([]LeaderboardRow),
+		"Deadline":   taskGroup.Deadline.String(),
+		"Rows":       leaderboardRows,
 		"Error":      err,
 		"Links":      links,
 	})
