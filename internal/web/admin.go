@@ -317,6 +317,10 @@ func (s *server) handleAdminUnbanSubmission(c *gin.Context) {
 	}
 	admin := s.getUser(c)
 	if err := s.db.UnbanSubmission(pipelineID, admin.ID, reason); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.String(http.StatusNotFound, "pipeline not found")
+			return
+		}
 		c.String(http.StatusInternalServerError, "failed to unban submission")
 		return
 	}
