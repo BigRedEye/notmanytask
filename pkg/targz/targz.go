@@ -84,7 +84,7 @@ func (f *fsVisitor) VisitDirectory(info fs.FileInfo) error {
 }
 
 func (v *fsVisitor) VisitFile(info fs.FileInfo) (io.WriteCloser, error) {
-	return os.MkdirAll(info.Name(), info.Mode())
+	return nil, fmt.Errorf("filesystem extraction is not implemented")
 }
 
 func ExtractToDir(input io.Reader, path string) error {
