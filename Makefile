@@ -49,3 +49,17 @@ test-unit-verified:
 	GOFLAGS= go test -count=1 -json ./... >"$$results"; test_status=$$?; \
 	if [ "$$test_status" -ne 0 ]; then cat "$$results"; exit "$$test_status"; fi; \
 	GOFLAGS= go run ./internal/testkit/cmd/checktestjson -manifest internal/testkit/required-unit-tests.txt <"$$results"
+
+.PHONY: test-integration test-postgres
+
+test-integration:
+	@test -n "$${TEST_DATABASE_URL:-}" || { printf '%s\n' 'TEST_DATABASE_URL is required' >&2; exit 2; }
+	@results=$$(mktemp /tmp/notmanytask-integration-json.XXXXXX) || exit; \
+	trap 'status=$$?; trap - 0; rm -f "$$results"; exit "$$status"' 0; \
+	GOFLAGS= GOPROXY=off go test -tags=integration -count=1 -json ./internal/database >"$$results"; status=$$?; \
+	if [ "$$status" -ne 0 ]; then cat "$$results"; exit "$$status"; fi; \
+	GOFLAGS= GOPROXY=off go run ./internal/testkit/cmd/checktestjson \
+	  -manifest internal/database/testdata/required-integration-tests.txt <"$$results"
+
+test-postgres:
+	@./scripts/test-postgres -- $(MAKE) test-integration

@@ -1,0 +1,127 @@
+#!/bin/bash -p
+set +x
+PATH=/usr/bin:/bin
+export PATH
+for name in BASH_ENV ENV BASH_XTRACEFD CDPATH; do
+    [[ ${!name+x} ]] && { printf '%s\n' 'postgres harness: forbidden shell environment' >&2; exit 2; }
+done
+while IFS= read -r -d '' entry; do
+    name=${entry%%=*}
+    [[ $name == SHELLOPTS || $name == BASHOPTS || $name == BASH_FUNC_* ]] && {
+        printf '%s\n' 'postgres harness: forbidden shell environment' >&2
+        exit 2
+    }
+done </proc/$$/environ
+set -Eeuo pipefail
+umask 077
+
+[[ ${1:-} == -- && $# -ge 2 ]] || { printf '%s\n' 'usage: scripts/test-postgres -- COMMAND [ARG...]' >&2; exit 2; }
+shift
+[[ ! ${TEST_DATABASE_URL+x} ]] || { printf '%s\n' 'postgres harness: TEST_DATABASE_URL must be unset' >&2; exit 2; }
+for name in DOCKER_HOST DOCKER_CONTEXT DOCKER_CONFIG DOCKER_TLS_VERIFY DOCKER_CERT_PATH COMPOSE_FILE COMPOSE_PROJECT_NAME \
+    NMT_PG_DATABASE NMT_PG_USER NMT_PG_PASSWORD; do
+    [[ ${!name+x} ]] && { printf '%s\n' 'postgres harness: Docker override rejected' >&2; exit 2; }
+done
+
+root="$(CDPATH= cd -- "$(/usr/bin/dirname -- "$0")/.." && pwd -P)"
+compose_file="$root/deploy/docker-compose.test.yml"
+run_dir=''
+project=''
+env_file=''
+owned=0
+
+docker() { DOCKER_CONFIG="$run_dir/docker-config" /usr/bin/docker --context default "$@"; }
+compose() {
+    docker compose --project-directory "$root" --env-file "$env_file" -f "$compose_file" -p "$project" "$@"
+}
+resource_ids() {
+    local kind=$1 filter=$2
+    if [[ $kind == container ]]; then
+        DOCKER_CONFIG="$run_dir/docker-config" /usr/bin/timeout -k 2s 10s \
+            /usr/bin/docker --context default container ls -aq --no-trunc --filter "$filter"
+    else
+        DOCKER_CONFIG="$run_dir/docker-config" /usr/bin/timeout -k 2s 10s \
+            /usr/bin/docker --context default "$kind" ls -q --filter "$filter"
+    fi
+}
+cleanup() {
+    local original=$?
+    trap - EXIT
+    trap '' HUP INT QUIT TERM
+    set +e
+    local failed=0
+    if ((owned)); then
+        DOCKER_CONFIG="$run_dir/docker-config" /usr/bin/timeout -k 5s 30s /usr/bin/docker --context default compose \
+            --project-directory "$root" --env-file "$env_file" -f "$compose_file" -p "$project" \
+            down --timeout 10 --volumes --remove-orphans >/dev/null 2>&1 || failed=1
+        local filter="label=com.docker.compose.project=$project" output
+        for kind in container network volume; do
+            output="$(resource_ids "$kind" "$filter" 2>/dev/null)" || failed=1
+            [[ -z $output ]] || failed=1
+        done
+    fi
+    if [[ -n $run_dir ]]; then
+        if [[ $run_dir =~ ^/tmp/nmt-postgres\.[A-Za-z0-9]{12}$ && -d $run_dir && ! -L $run_dir ]]; then
+            /usr/bin/rm -rf --one-file-system -- "$run_dir" || failed=1
+            [[ ! -e $run_dir ]] || failed=1
+        else
+            failed=1
+        fi
+    fi
+    ((failed)) && exit 125
+    exit "$original"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 131' QUIT
+trap 'exit 143' TERM
+
+run_dir="$(/usr/bin/mktemp -d /tmp/nmt-postgres.XXXXXXXXXXXX)"
+/usr/bin/chmod 0700 "$run_dir"
+/usr/bin/mkdir -m 0700 "$run_dir/docker-config"
+env_file="$run_dir/compose.env"
+
+random_hex() {
+    local bytes=$1 value
+    value="$(/usr/bin/od -An -N "$bytes" -tx1 /dev/urandom | /usr/bin/tr -d ' \n')"
+    [[ $value =~ ^[0-9a-f]+$ && ${#value} -eq bytes*2 ]] || return 1
+    printf '%s' "$value"
+}
+suffix="$(random_hex 16)"
+password="$(random_hex 32)"
+project="nmt-test-$suffix"
+database="nmt_test_$suffix"
+user="nmt_user_$suffix"
+[[ $project =~ ^nmt-test-[0-9a-f]{32}$ && $database =~ ^nmt_test_[0-9a-f]{32}$ && $user =~ ^nmt_user_[0-9a-f]{32}$ && $password =~ ^[0-9a-f]{64}$ ]] || exit 2
+printf 'NMT_PG_DATABASE=%s\nNMT_PG_USER=%s\nNMT_PG_PASSWORD=%s\n' "$database" "$user" "$password" >"$env_file"
+/usr/bin/chmod 0600 "$env_file"
+
+endpoint="$(docker context inspect default --format '{{.Endpoints.docker.Host}}')"
+[[ $endpoint == unix:///var/run/docker.sock ]] || { printf '%s\n' 'postgres harness: default Docker context rejected' >&2; exit 2; }
+filter="label=com.docker.compose.project=$project"
+for kind in container network volume; do
+    output="$(resource_ids "$kind" "$filter")"
+    [[ -z $output ]] || { printf '%s\n' 'postgres harness: project collision' >&2; exit 2; }
+done
+owned=1
+
+DOCKER_CONFIG="$run_dir/docker-config" /usr/bin/timeout -k 5s 70s /usr/bin/docker --context default compose \
+    --project-directory "$root" --env-file "$env_file" -f "$compose_file" -p "$project" \
+    up -d --wait --wait-timeout 60 --pull never --no-build db
+container_id="$(compose ps --quiet --no-trunc db)"
+[[ $container_id =~ ^[0-9a-f]{64}$ ]] || { printf '%s\n' 'postgres harness: database container rejected' >&2; exit 2; }
+published="$(docker container port "$container_id" 5432/tcp)"
+[[ $published != *$'\n'* ]] || { printf '%s\n' 'postgres harness: database port rejected' >&2; exit 2; }
+[[ $published =~ ^127\.0\.0\.1:([0-9]+)$ ]] || { printf '%s\n' 'postgres harness: database port rejected' >&2; exit 2; }
+port=${BASH_REMATCH[1]}
+((port >= 1024 && port <= 65535)) || { printf '%s\n' 'postgres harness: database port rejected' >&2; exit 2; }
+
+docker container exec "$container_id" /bin/sh -c \
+    'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "COMMENT ON DATABASE \"$POSTGRES_DB\" IS '\''notmanytask-disposable-test:v1'\''"' >/dev/null
+dsn="postgresql://${user}:${password}@127.0.0.1:${port}/${database}?sslmode=disable"
+set +e
+TEST_DATABASE_URL="$dsn" "$@"
+status=$?
+set -e
+exit "$status"
