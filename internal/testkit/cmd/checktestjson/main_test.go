@@ -35,7 +35,8 @@ func TestCheckerAcceptsInterleavedEvents(t *testing.T) {
 
 func TestCheckerRejectsDescendantSkip(t *testing.T) {
 	manifest := packageA + "\tTestAlpha\n"
-	events := event("run", packageA, "TestAlpha") + "\n" +
+	events := event("start", packageA, "") + "\n" +
+		event("run", packageA, "TestAlpha") + "\n" +
 		event("skip", packageA, "TestAlpha/nested") + "\n" +
 		event("pass", packageA, "TestAlpha") + "\n"
 	assertCheckError(t, manifest, events, "skipped at TestAlpha/nested")
@@ -67,12 +68,14 @@ func TestCheckerRejectsDuplicateManifest(t *testing.T) {
 
 func TestCheckerRejectsDuplicateOrConflictingTerminal(t *testing.T) {
 	manifest := packageA + "\tTestAlpha\n"
-	duplicate := event("run", packageA, "TestAlpha") + "\n" +
+	duplicate := event("start", packageA, "") + "\n" +
+		event("run", packageA, "TestAlpha") + "\n" +
 		event("pass", packageA, "TestAlpha") + "\n" +
 		event("pass", packageA, "TestAlpha") + "\n"
 	assertCheckError(t, manifest, duplicate, "duplicate/conflicting terminals")
 
-	conflicting := event("run", packageA, "TestAlpha") + "\n" +
+	conflicting := event("start", packageA, "") + "\n" +
+		event("run", packageA, "TestAlpha") + "\n" +
 		event("pass", packageA, "TestAlpha") + "\n" +
 		event("skip", packageA, "TestAlpha") + "\n"
 	assertCheckError(t, manifest, conflicting, "skipped")
@@ -94,24 +97,74 @@ func TestCheckerRejectsMalformedOrTruncatedJSON(t *testing.T) {
 
 func TestCheckerRejectsMissingTest(t *testing.T) {
 	manifest := packageA + "\tTestAlpha\n"
-	events := event("start", packageA, "") + "\n" + event("pass", packageA, "") + "\n"
+	events := event("start", packageA, "") + "\n"
 	assertCheckError(t, manifest, events, "did not run")
+}
+
+func TestCheckerRejectsMissingPackageStart(t *testing.T) {
+	manifest := packageA + "\tTestAlpha\n"
+	events := event("run", packageA, "TestAlpha") + "\n" +
+		event("pass", packageA, "TestAlpha") + "\n" +
+		event("pass", packageA, "") + "\n"
+	assertCheckError(t, manifest, events, "before package start")
+}
+
+func TestCheckerRejectsMissingPackageTerminal(t *testing.T) {
+	manifest := packageA + "\tTestAlpha\n"
+	events := event("start", packageA, "") + "\n" +
+		event("run", packageA, "TestAlpha") + "\n" +
+		event("pass", packageA, "TestAlpha") + "\n"
+	assertCheckError(t, manifest, events, "did not complete with pass")
+}
+
+func TestCheckerRejectsPackageLifecycleViolations(t *testing.T) {
+	manifest := packageA + "\tTestAlpha\n"
+	for name, testEvents := range map[string][]string{
+		"duplicate-start": {
+			event("start", packageA, ""),
+			event("start", packageA, ""),
+		},
+		"terminal-before-tests": {
+			event("start", packageA, ""),
+			event("pass", packageA, ""),
+		},
+		"duplicate-terminal": {
+			event("start", packageA, ""),
+			event("run", packageA, "TestAlpha"),
+			event("pass", packageA, "TestAlpha"),
+			event("pass", packageA, ""),
+			event("pass", packageA, ""),
+		},
+		"test-after-terminal": {
+			event("start", packageA, ""),
+			event("run", packageA, "TestAlpha"),
+			event("pass", packageA, "TestAlpha"),
+			event("pass", packageA, ""),
+			event("output", packageA, "TestAlpha"),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assertCheckError(t, manifest, strings.Join(testEvents, "\n")+"\n", "")
+		})
+	}
 }
 
 func TestCheckerRejectsPackageFail(t *testing.T) {
 	manifest := packageA + "\tTestAlpha\n"
-	events := event("run", packageA, "TestAlpha") + "\n" + event("fail", packageB, "") + "\n"
+	events := event("start", packageA, "") + "\n" + event("fail", packageB, "") + "\n"
 	assertCheckError(t, manifest, events, "package "+packageB+" failed")
 }
 
 func TestCheckerRejectsPassWithoutRun(t *testing.T) {
 	manifest := packageA + "\tTestAlpha\n"
-	assertCheckError(t, manifest, event("pass", packageA, "TestAlpha")+"\n", "pass without run")
+	events := event("start", packageA, "") + "\n" + event("pass", packageA, "TestAlpha") + "\n"
+	assertCheckError(t, manifest, events, "pass without run")
 }
 
 func TestCheckerRejectsSkip(t *testing.T) {
 	manifest := packageA + "\tTestAlpha\n"
-	events := event("run", packageA, "TestAlpha") + "\n" + event("skip", packageA, "TestAlpha") + "\n"
+	events := event("start", packageA, "") + "\n" +
+		event("run", packageA, "TestAlpha") + "\n" + event("skip", packageA, "TestAlpha") + "\n"
 	assertCheckError(t, manifest, events, "skipped")
 }
 

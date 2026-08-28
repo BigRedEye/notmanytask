@@ -26,6 +26,11 @@ type testState struct {
 	terminal string
 }
 
+type packageState struct {
+	started  bool
+	terminal string
+}
+
 type testEvent struct {
 	Action  string  `json:"Action"`
 	Package string  `json:"Package"`
@@ -53,8 +58,16 @@ func check(manifestPath string, input io.Reader) error {
 		return err
 	}
 	states := make(map[testID]*testState, len(required))
+	packageStates := make(map[string]*packageState)
+	requiredByPackage := make(map[string][]testID)
+	var requiredPackages []string
 	for _, id := range required {
 		states[id] = new(testState)
+		if _, ok := packageStates[id.Package]; !ok {
+			packageStates[id.Package] = new(packageState)
+			requiredPackages = append(requiredPackages, id.Package)
+		}
+		requiredByPackage[id.Package] = append(requiredByPackage[id.Package], id)
 	}
 
 	scanner := bufio.NewScanner(input)
@@ -76,6 +89,45 @@ func check(manifestPath string, input io.Reader) error {
 		if !knownAction(event.Action) {
 			return fmt.Errorf("event %d has unknown action %q", eventCount, event.Action)
 		}
+
+		pkgState, requiredPackage := packageStates[event.Package]
+		owner, requiredTestEvent := requiredOwner(required, event.Package, event.Test)
+		if event.Test == "" && requiredPackage {
+			switch event.Action {
+			case "start":
+				if pkgState.started {
+					return fmt.Errorf("required package %s has duplicate start", event.Package)
+				}
+				if pkgState.terminal != "" {
+					return fmt.Errorf("required package %s started after terminal %s", event.Package, pkgState.terminal)
+				}
+				pkgState.started = true
+			case "pass", "fail", "skip":
+				if !pkgState.started {
+					return fmt.Errorf("required package %s has terminal %s without start", event.Package, event.Action)
+				}
+				if pkgState.terminal != "" {
+					return fmt.Errorf("required package %s has duplicate/conflicting terminals %s and %s", event.Package, pkgState.terminal, event.Action)
+				}
+				if event.Action != "pass" {
+					return fmt.Errorf("required package %s ended with %s", event.Package, event.Action)
+				}
+				for _, id := range requiredByPackage[event.Package] {
+					if states[id].terminal != "pass" {
+						return fmt.Errorf("required package %s passed before required test %s completed", event.Package, id.Test)
+					}
+				}
+				pkgState.terminal = event.Action
+			}
+		} else if requiredTestEvent {
+			if !pkgState.started {
+				return fmt.Errorf("required test %s %s has event %s before package start", owner.Package, owner.Test, event.Action)
+			}
+			if pkgState.terminal != "" {
+				return fmt.Errorf("required test %s %s has event %s after package terminal %s", owner.Package, owner.Test, event.Action, pkgState.terminal)
+			}
+		}
+
 		if event.Action == "fail" {
 			if event.Test == "" {
 				return fmt.Errorf("package %s failed", event.Package)
@@ -84,7 +136,7 @@ func check(manifestPath string, input io.Reader) error {
 		}
 
 		if event.Action == "skip" {
-			if owner, ok := requiredOwner(required, event.Package, event.Test); ok {
+			if requiredTestEvent {
 				return fmt.Errorf("required test %s %s skipped at %s", owner.Package, owner.Test, event.Test)
 			}
 		}
@@ -127,6 +179,15 @@ func check(manifestPath string, input io.Reader) error {
 		}
 		if state.terminal != "pass" {
 			return fmt.Errorf("required test %s %s did not pass", id.Package, id.Test)
+		}
+	}
+	for _, pkg := range requiredPackages {
+		state := packageStates[pkg]
+		if !state.started {
+			return fmt.Errorf("required package %s did not start", pkg)
+		}
+		if state.terminal != "pass" {
+			return fmt.Errorf("required package %s did not complete with pass", pkg)
 		}
 	}
 	return nil

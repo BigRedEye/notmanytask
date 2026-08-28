@@ -1,3 +1,7 @@
+github.com/bigredeye/notmanytask/internal/deadlines	TestDeadlinesParsingV1
+github.com/bigredeye/notmanytask/internal/deadlines	TestDeadlinesParsingV2
+github.com/bigredeye/notmanytask/internal/scorer	TestExponentialScoring
+github.com/bigredeye/notmanytask/internal/scorer	TestLinearScoring
 github.com/bigredeye/notmanytask/internal/testkit/clock	TestFixedAdvance
 github.com/bigredeye/notmanytask/internal/testkit/clock	TestFixedRejectsNegativeAdvance
 github.com/bigredeye/notmanytask/internal/testkit/clock	TestManualTickerConcurrentTickStop
@@ -7,8 +11,11 @@ github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerR
 github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsDuplicateManifest
 github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsDuplicateOrConflictingTerminal
 github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsMalformedOrTruncatedJSON
+github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsMissingPackageStart
+github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsMissingPackageTerminal
 github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsMissingTest
 github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsPackageFail
+github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsPackageLifecycleViolations
 github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsPassWithoutRun
 github.com/bigredeye/notmanytask/internal/testkit/cmd/checktestjson	TestCheckerRejectsSkip
 github.com/bigredeye/notmanytask/internal/testkit/gitlabfake	TestConcurrentOneShotFailure
