@@ -1,3 +1,21 @@
+.PHONY: test test-unit test-fake test-unit-verified
+
+test: test-unit
+
+test-unit:
+	go test -count=1 ./...
+
+test-fake:
+	go test -count=1 ./internal/testkit/gitlabfake
+
+test-unit-verified:
+	@results=$$(mktemp /tmp/notmanytask-test-json.XXXXXX) || exit; \
+	trap 'status=$$?; trap - 0; rm -f "$$results"; exit "$$status"' 0; \
+	trap 'exit 129' 1; trap 'exit 130' 2; trap 'exit 131' 3; trap 'exit 143' 15; \
+	go test -count=1 -json ./... >"$$results"; test_status=$$?; \
+	if [ "$$test_status" -ne 0 ]; then cat "$$results"; exit "$$test_status"; fi; \
+	go run ./internal/testkit/cmd/checktestjson -manifest internal/testkit/required-unit-tests.txt <"$$results"
+
 all: web crashme
 
 protos:
