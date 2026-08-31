@@ -57,7 +57,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +209,41 @@ func (db *DataBase) ListAllPipelines() (pipelines []models.Pipeline, err error) 
 	err = db.Find(&pipelines).Error
 	if err != nil {
 		pipelines = nil
+	}
+	return
+}
+
+func (db *DataBase) UpsertMergeRequest(mergeRequest *models.MergeRequest) error {
+	return db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"state",
+			"user_notes_count",
+			"merge_status",
+			"merge_user_login",
+			"has_unresolved_notes",
+			"last_note_created_at",
+			"last_pipeline_status",
+			"last_pipeline_created_at",
+			"extra_changes",
+		}),
+	}).Create(mergeRequest).Error
+}
+
+func (db *DataBase) ListProjectMergeRequests(project string) (mergeRequests []models.MergeRequest, err error) {
+	mergeRequests = make([]models.MergeRequest, 0)
+	err = db.Find(&mergeRequests, "project = ?", project).Error
+	if err != nil {
+		mergeRequests = nil
+	}
+	return
+}
+
+func (db *DataBase) ListAllMergeRequests() (mergeRequests []models.MergeRequest, err error) {
+	mergeRequests = make([]models.MergeRequest, 0)
+	err = db.Find(&mergeRequests).Error
+	if err != nil {
+		mergeRequests = nil
 	}
 	return
 }

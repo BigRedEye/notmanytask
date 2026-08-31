@@ -83,9 +83,44 @@ func TestOpenDataBase(t *testing.T) {
 	if err := sqlDB.PingContext(ctx); err != nil {
 		t.Fatal("database ping failed")
 	}
-	for _, model := range []interface{}{&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}} {
+	for _, model := range []interface{}{&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}} {
 		if !store.Migrator().HasTable(model) {
 			t.Fatal("AutoMigrate table missing")
 		}
+	}
+
+	createdAt := time.Unix(100, 0).UTC()
+	mergeRequest := &models.MergeRequest{
+		ID:                    1,
+		IID:                   2,
+		Project:               "project",
+		Task:                  "task",
+		State:                 models.MergeRequestStateOpened,
+		StartedAt:             createdAt,
+		LastPipelineStatus:    models.PipelineStatusPending,
+		LastPipelineCreatedAt: createdAt,
+	}
+	if err := store.UpsertMergeRequest(mergeRequest); err != nil {
+		t.Fatal("merge request insert failed")
+	}
+	mergeRequest.State = models.MergeRequestStateMerged
+	mergeRequest.UserNotesCount = 1
+	mergeRequest.LastPipelineStatus = models.PipelineStatusSuccess
+	if err := store.UpsertMergeRequest(mergeRequest); err != nil {
+		t.Fatal("merge request update failed")
+	}
+
+	projectRows, err := store.ListProjectMergeRequests("project")
+	if err != nil || len(projectRows) != 1 {
+		t.Fatal("project merge request query failed")
+	}
+	got := projectRows[0]
+	if got.State != models.MergeRequestStateMerged || got.UserNotesCount != 1 ||
+		got.LastPipelineStatus != models.PipelineStatusSuccess {
+		t.Fatal("merge request update was not persisted")
+	}
+	allRows, err := store.ListAllMergeRequests()
+	if err != nil || len(allRows) != 1 {
+		t.Fatal("all merge request query failed")
 	}
 }
