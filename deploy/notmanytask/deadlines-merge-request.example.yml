@@ -1,0 +1,37 @@
+# Deadlines for a merge request course (deadlinesFormat: v2).
+#
+# The "week" policy reproduces the classic base course rule: full score until
+# the deadline, then linear decay to zero over one week.
+scoring:
+  policies:
+  - name: week
+    kind: linear
+    spec:
+      after: 168h
+      multiplier: 0
+
+  groups:
+  - name: default
+    weight: 10.0
+    policy: week
+
+  defaultGroup: default
+
+assignments:
+- title:    01-numbers
+  start:    27-01-2026 09:00
+  deadline: 10-02-2026 23:59
+  tasks:
+    - task: fizzbuzz
+      score: 100
+    - task: primes
+      score: 200
+
+- title:    02-classes
+  start:    18-02-2026 09:00
+  deadline: 04-03-2026 23:59
+  tasks:
+    - task: lru_cache
+      score: 100
+    - task: interpreter
+      score: 200
