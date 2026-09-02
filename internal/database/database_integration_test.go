@@ -123,4 +123,33 @@ func TestOpenDataBase(t *testing.T) {
 	if err != nil || len(allRows) != 1 {
 		t.Fatal("all merge request query failed")
 	}
+	taskRows, err := store.ListProjectTaskMergeRequests("project", "task")
+	if err != nil || len(taskRows) != 1 {
+		t.Fatal("project task merge request query failed")
+	}
+	if taskRows, err = store.ListProjectTaskMergeRequests("project", "other"); err != nil || len(taskRows) != 0 {
+		t.Fatal("project task merge request query must filter by task")
+	}
+	mergedTasks, err := store.ListMergedTasks("project")
+	if err != nil || len(mergedTasks) != 1 || !mergedTasks["task"] {
+		t.Fatalf("merged tasks query failed: %v %v", mergedTasks, err)
+	}
+
+	// Users of the same group differ by subgroup; the subgroup defaults to "".
+	// AddUser is find-or-create, so the same name in the same subgroup returns
+	// the existing row.
+	ids := make(map[string]uint)
+	for _, subgroup := range []string{"", "254-1", "254-1"} {
+		user, err := store.AddUser(&models.User{FirstName: "Иван", LastName: "Петров", GroupName: "ami", SubgroupName: subgroup})
+		if err != nil {
+			t.Fatalf("add user with subgroup %q failed: %v", subgroup, err)
+		}
+		if prev, found := ids[subgroup]; found && prev != user.ID {
+			t.Fatalf("same user in subgroup %q must be found, not created", subgroup)
+		}
+		ids[subgroup] = user.ID
+	}
+	if ids[""] == ids["254-1"] {
+		t.Fatal("users in different subgroups must be distinct")
+	}
 }
