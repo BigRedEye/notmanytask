@@ -22,6 +22,17 @@ gitlab:
     secret: {GITLAB_APPLICATION_SECRET}
     clientId: {GITLAB_APPLICATION_CLIENT_ID}
 
+  # Merge request workflow (base course): student repositories are imported
+  # from the template, every submits/<task> branch gets a merge request into
+  # the target branch, green and quiet merge requests are merged by the robot.
+  # Remove the whole block for the pipeline workflow (advanced course).
+  #
+  # projectTemplateURL: https://gitlab.com/{USER}/{REPO}.git
+  # mergeRequests:
+  #   targetBranch: main
+  #   reviewTtl: 72h
+  #   robotLogin: {GITLAB_API_TOKEN_OWNER_LOGIN}
+
 endpoints:
   hostname: https://{SITE_DOMAIN}
   home: /
@@ -39,6 +50,9 @@ endpoints:
 
 server:
   listenAddress: ":18080"
+  courseName: "HSE C++"
+  # Optional: require an email on signup matching this regexp
+  # signupEmailPattern: '^.*@(edu\.)?hse\.ru$'
   cookies:
     authenticationKey: {RANDOM_COOKIE_AUTH_KEY}
     encryptionKey: {RANDOM_COOKIE_ENCRYPTION_KEY}
@@ -60,6 +74,10 @@ groups:
   secret: ihatecpp
   deadlinesUrl: https://gitlab.com/{USER}/{REPO}/-/raw/main/deadlines/hse.yml
   deadlinesFormat: v2
+  # Optional subgroups with their own signup secrets and standings filter
+  # subgroups:
+  # - name: 254-1
+  #   secret: ihatecpp-254-1
 - name: test
   secret: ilovecpp
   deadlinesUrl: https://gitlab.com/{USER}/{REPO}/-/raw/main/deadlines/test.yml
@@ -69,3 +87,5 @@ pullIntervals:
   projects: 10s
   pipelines: 30s
   deadlines: 10s
+  # Required in the merge request workflow
+  # mergeRequests: 60s
