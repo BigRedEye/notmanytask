@@ -60,14 +60,19 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 	} else if resp.StatusCode == http.StatusNotFound {
 		log.Info("Project was not found", zap.String("escaped_project", fmt.Sprintf("%s/%s", c.config.GitLab.Group.Name, projectName)))
 		// Create project
-		project, _, err = c.gitlab.Projects.CreateProject(&gitlab.CreateProjectOptions{
+		options := &gitlab.CreateProjectOptions{
 			Name:                 &projectName,
 			NamespaceID:          &c.config.GitLab.Group.ID,
-			DefaultBranch:        gitlab.String(master),
 			Visibility:           gitlab.Visibility(gitlab.PrivateVisibility),
 			SharedRunnersEnabled: gitlab.Bool(true),
 			CIConfigPath:         &c.config.GitLab.CIConfigPath,
-		})
+		}
+		if c.useProjectTemplate() {
+			options.ImportURL = gitlab.String(c.config.GitLab.ProjectTemplateURL)
+		} else {
+			options.DefaultBranch = gitlab.String(master)
+		}
+		project, _, err = c.gitlab.Projects.CreateProject(options)
 		if err != nil {
 			log.Error("Failed to create project", zap.Error(err))
 			return "", errors.Wrap(err, "Failed to create project")
@@ -82,8 +87,28 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 		log.Info("Found existing project")
 	}
 
+	if !c.useProjectTemplate() {
+		if err = c.initializeEmptyProject(log, project); err != nil {
+			return "", err
+		}
+	}
+
+	if err = c.addProjectMember(log, project, user); err != nil {
+		return "", err
+	}
+
+	return c.makeProjectURL(projectName), nil
+}
+
+// useProjectTemplate reports whether student repositories are imported from a
+// template repository (merge request courses) or created empty with README.
+func (c Client) useProjectTemplate() bool {
+	return c.config.GitLab.ProjectTemplateURL != ""
+}
+
+func (c Client) initializeEmptyProject(log *zap.Logger, project *gitlab.Project) error {
 	// Prepare README.md with basic info
-	_, _, err = c.gitlab.Commits.CreateCommit(project.ID, &gitlab.CreateCommitOptions{
+	_, _, err := c.gitlab.Commits.CreateCommit(project.ID, &gitlab.CreateCommitOptions{
 		Branch:        gitlab.String(master),
 		CommitMessage: gitlab.String("Initialize repo"),
 		AuthorName:    gitlab.String("notmanytask"),
@@ -104,7 +129,7 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 		log.Warn("Failed to create README: main branch is protected", zap.Error(err))
 		// continue
 	} else if err != nil {
-		return "", errors.Wrap(err, "Failed to create README")
+		return errors.Wrap(err, "Failed to create README")
 	}
 
 	if err != nil {
@@ -123,11 +148,14 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 			log.Warn("Failed to protect master branch: branch is alreay protected", zap.Error(err))
 		} else {
 			log.Error("Failed to protect master branch", zap.Error(err))
-			return "", errors.Wrap(err, "Failed to protect master branch")
+			return errors.Wrap(err, "Failed to protect master branch")
 		}
 	}
 	log.Info("Protected master branch")
+	return nil
+}
 
+func (c Client) addProjectMember(log *zap.Logger, project *gitlab.Project, user *models.User) error {
 	// Check if user is alreay in project
 	foundUser := false
 	options := gitlab.ListProjectMembersOptions{}
@@ -135,7 +163,7 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 		members, resp, err := c.gitlab.ProjectMembers.ListAllProjectMembers(project.ID, &options)
 		if err != nil {
 			log.Error("Failed to list project members", zap.Error(err))
-			return "", errors.Wrap(err, "Failed to list project members")
+			return errors.Wrap(err, "Failed to list project members")
 		}
 
 		for _, member := range members {
@@ -157,20 +185,46 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 
 	if foundUser {
 		log.Info("User is already in the project")
-	} else {
-		// Add our dear user to the project
-		_, _, err = c.gitlab.ProjectMembers.AddProjectMember(project.ID, &gitlab.AddProjectMemberOptions{
-			UserID:      *user.GitlabID,
-			AccessLevel: gitlab.AccessLevel(gitlab.DeveloperPermissions),
-		})
-		if err != nil {
-			log.Error("Failed to add user to the project", zap.Error(err))
-			return "", errors.Wrap(err, "Failed to add user to the project")
-		}
-		log.Info("Added user to the project")
+		return nil
 	}
 
-	return c.makeProjectURL(projectName), nil
+	// Add our dear user to the project
+	_, _, err := c.gitlab.ProjectMembers.AddProjectMember(project.ID, &gitlab.AddProjectMemberOptions{
+		UserID:      *user.GitlabID,
+		AccessLevel: gitlab.AccessLevel(gitlab.DeveloperPermissions),
+	})
+	if err != nil {
+		log.Error("Failed to add user to the project", zap.Error(err))
+		return errors.Wrap(err, "Failed to add user to the project")
+	}
+	log.Info("Added user to the project")
+	return nil
+}
+
+func (c Client) forEachProject(callback func(project *gitlab.Project) error) error {
+	options := gitlab.ListGroupProjectsOptions{}
+
+	for {
+		projects, resp, err := c.gitlab.Groups.ListGroupProjects(c.config.GitLab.Group.ID, &options)
+		if err != nil {
+			c.logger.Error("Failed to list projects", zap.Error(err))
+			return err
+		}
+
+		for _, project := range projects {
+			if err = callback(project); err != nil {
+				c.logger.Error("Project callback failed", zap.Error(err))
+				return err
+			}
+		}
+
+		if resp.CurrentPage >= resp.TotalPages {
+			break
+		}
+		options.Page = resp.NextPage
+	}
+
+	return nil
 }
 
 func (c Client) cleanupName(name string) string {
@@ -226,32 +280,10 @@ func (c Client) MakeBranchURL(user *models.User, pipeline *models.Pipeline) stri
 	return fmt.Sprintf("%s/-/tree/submits/%s", c.MakeProjectURL(user), pipeline.Task)
 }
 
-func (c Client) MakeTaskURL(task string) string {
-	return fmt.Sprintf("%s/%s", c.config.GitLab.TaskUrlPrefix, task)
+func (c Client) MakeMergeRequestURL(user *models.User, mergeRequest *models.MergeRequest) string {
+	return fmt.Sprintf("%s/-/merge_requests/%d", c.MakeProjectURL(user), mergeRequest.IID)
 }
 
-func (c Client) forEachProject(callback func(project *gitlab.Project) error) error {
-	options := gitlab.ListGroupProjectsOptions{}
-
-	for {
-		projects, resp, err := c.gitlab.Groups.ListGroupProjects(c.config.GitLab.Group.ID, &options)
-		if err != nil {
-			c.logger.Error("Failed to list projects", zap.Error(err))
-			return err
-		}
-
-		for _, project := range projects {
-			if err = callback(project); err != nil {
-				c.logger.Error("Project callback failed", zap.Error(err))
-				return err
-			}
-		}
-
-		if resp.CurrentPage >= resp.TotalPages {
-			break
-		}
-		options.Page = resp.NextPage
-	}
-
-	return nil
+func (c Client) MakeTaskURL(task string) string {
+	return fmt.Sprintf("%s/%s", c.config.GitLab.TaskUrlPrefix, task)
 }
