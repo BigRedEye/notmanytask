@@ -176,6 +176,12 @@
                                             <td class="task table-info"
                                         {{ else if eq .Status "banned"}}
                                             <td class="task bg-danger"
+                                        {{ else if eq .Status "pending"}}
+                                            <td class="task table-warning"
+                                        {{ else if eq .Status "on_review"}}
+                                            <td class="task table-info"
+                                        {{ else if eq .Status "review_resolved"}}
+                                            <td class="task table-primary"
                                         {{ else }}
                                             <td class="task"
                                         {{ end }}
@@ -185,13 +191,17 @@
                                             {{ else }}
                                                 title="Score has been changed by the teacher"
                                             {{ end }}
+                                        {{ else if .Message }}
+                                            title="{{ .Message }}"
                                         {{ end }}
                                         >
                                         {{ if .BranchUrl }}
                                             <a href="{{ .BranchUrl }}" class="text-decoration-none text-dark">
+                                        {{ else if .PipelineUrl }}
+                                            <a href="{{ .PipelineUrl }}" class="text-decoration-none text-dark">
                                         {{ end }}
-                                        {{ .Score }}{{ if .Overridden }}*{{ end }}
-                                        {{ if .BranchUrl }}
+                                        {{ .Score }}{{ if .Overridden }}*{{ end }}{{ if .HasReview }}👁{{ end }}
+                                        {{ if or .BranchUrl .PipelineUrl }}
                                             </a>
                                         {{ end }}
                                         </td>
