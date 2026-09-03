@@ -324,6 +324,9 @@ func (s Scorer) calcUserScoresImpl(
 		User: User{
 			FirstName:     user.FirstName,
 			LastName:      user.LastName,
+			Email:         user.Email,
+			Group:         user.GroupName,
+			Subgroup:      user.SubgroupName,
 			GitlabLogin:   *user.GitlabLogin,
 			GitlabProject: user.GetProjectName(),
 		},

@@ -17,11 +17,13 @@ type User struct {
 
 	GitlabUser
 
-	FirstName  string `gorm:"uniqueIndex:idx_name"`
-	LastName   string `gorm:"uniqueIndex:idx_name"`
-	GroupName  string `gorm:"uniqueIndex:idx_name"`
-	TelegramID *int64
-	HasRetake  bool
+	FirstName    string `gorm:"uniqueIndex:idx_name"`
+	LastName     string `gorm:"uniqueIndex:idx_name"`
+	GroupName    string `gorm:"uniqueIndex:idx_name"`
+	SubgroupName string `gorm:"uniqueIndex:idx_name;not null;default:''"`
+	Email        string
+	TelegramID   *int64
+	HasRetake    bool
 }
 
 // GetProjectName returns the project name extracted from Repository URL.
