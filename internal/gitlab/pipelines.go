@@ -2,7 +2,6 @@ package gitlab
 
 import (
 	"context"
-	"strings"
 	"sync"
 	"time"
 
@@ -147,32 +146,6 @@ func (p *PipelinesFetcher) fetchAllPipelines() {
 	}
 }
 
-func (p *PipelinesFetcher) forEachProject(callback func(project *gitlab.Project) error) error {
-	options := gitlab.ListGroupProjectsOptions{}
-
-	for {
-		projects, resp, err := p.gitlab.Groups.ListGroupProjects(p.config.GitLab.Group.ID, &options)
-		if err != nil {
-			p.logger.Error("Failed to list projects", zap.Error(err))
-			return err
-		}
-
-		for _, project := range projects {
-			if err = callback(project); err != nil {
-				p.logger.Error("Project callback failed", zap.Error(err))
-				return err
-			}
-		}
-
-		if resp.CurrentPage >= resp.TotalPages {
-			break
-		}
-		options.Page = resp.NextPage
-	}
-
-	return nil
-}
-
 func (p *PipelinesFetcher) fetchFreshPipelines() {
 	removed := make([]interface{}, 0)
 	p.fresh.Range(func(key, _ interface{}) bool {
@@ -190,13 +163,4 @@ func (p *PipelinesFetcher) fetchFreshPipelines() {
 	for _, id := range removed {
 		p.fresh.Delete(id)
 	}
-}
-
-const (
-	branchPrefix = "submits/"
-	tasksPrefix  = "tasks/"
-)
-
-func ParseTaskFromBranch(task string) string {
-	return strings.TrimPrefix(strings.TrimPrefix(task, branchPrefix), tasksPrefix)
 }
