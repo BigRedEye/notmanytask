@@ -7,6 +7,7 @@ const (
 	MergeRequestStateClosed = "closed"
 	MergeRequestStateMerged = "merged"
 
+	MergeRequestStatusCanBeMerged    = "can_be_merged"
 	MergeRequestStatusCannotBeMerged = "cannot_be_merged"
 )
 
@@ -20,6 +21,7 @@ type MergeRequest struct {
 	StartedAt             time.Time
 	MergeStatus           string
 	IID                   int
+	SHA                   string
 	MergeUserLogin        string
 	HasUnresolvedNotes    bool
 	LastNoteCreatedAt     time.Time
