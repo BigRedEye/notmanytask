@@ -11,6 +11,11 @@ const (
 	TaskStatusFailed   = "failed"
 	TaskStatusChecking = "checking"
 	TaskStatusSuccess  = "success"
+
+	// Merge request workflow only
+	TaskStatusPending        = "pending"         // waiting for the review period to pass
+	TaskStatusOnReview       = "on_review"       // has unresolved review notes
+	TaskStatusReviewResolved = "review_resolved" // review notes resolved, waiting for merge
 )
 
 type TaskStatus = string
@@ -42,6 +47,10 @@ type ScoredTask struct {
 	Score      int
 	MaxScore   int
 	Overridden bool
+	// Message is a short human-readable status detail (merge request workflow)
+	Message string
+	// HasReview is true if a human reviewed the merge request
+	HasReview bool
 
 	TaskUrl     string
 	PipelineUrl string
