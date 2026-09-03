@@ -220,6 +220,7 @@ func (db *DataBase) UpsertMergeRequest(mergeRequest *models.MergeRequest) error 
 			"state",
 			"user_notes_count",
 			"merge_status",
+			"sha",
 			"merge_user_login",
 			"has_unresolved_notes",
 			"last_note_created_at",
@@ -232,7 +233,7 @@ func (db *DataBase) UpsertMergeRequest(mergeRequest *models.MergeRequest) error 
 
 func (db *DataBase) ListProjectMergeRequests(project string) (mergeRequests []models.MergeRequest, err error) {
 	mergeRequests = make([]models.MergeRequest, 0)
-	err = db.Find(&mergeRequests, "project = ?", project).Error
+	err = db.Order("id").Find(&mergeRequests, "project = ?", project).Error
 	if err != nil {
 		mergeRequests = nil
 	}
@@ -241,11 +242,37 @@ func (db *DataBase) ListProjectMergeRequests(project string) (mergeRequests []mo
 
 func (db *DataBase) ListAllMergeRequests() (mergeRequests []models.MergeRequest, err error) {
 	mergeRequests = make([]models.MergeRequest, 0)
-	err = db.Find(&mergeRequests).Error
+	err = db.Order("id").Find(&mergeRequests).Error
 	if err != nil {
 		mergeRequests = nil
 	}
 	return
+}
+
+func (db *DataBase) ListProjectTaskMergeRequests(project, task string) (mergeRequests []models.MergeRequest, err error) {
+	mergeRequests = make([]models.MergeRequest, 0)
+	err = db.Order("id").Find(&mergeRequests, "project = ? AND task = ?", project, task).Error
+	if err != nil {
+		mergeRequests = nil
+	}
+	return
+}
+
+// ListMergedTasks returns tasks of the project that already have a merged
+// merge request with a successful, timestamped pipeline.
+func (db *DataBase) ListMergedTasks(project string) (map[string]bool, error) {
+	mergeRequests := make([]models.MergeRequest, 0)
+	err := db.Find(&mergeRequests, "project = ? AND state = ? AND last_pipeline_status = ? AND last_pipeline_created_at > ?",
+		project, models.MergeRequestStateMerged, models.PipelineStatusSuccess, time.Time{}).Error
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make(map[string]bool, len(mergeRequests))
+	for i := range mergeRequests {
+		tasks[mergeRequests[i].Task] = true
+	}
+	return tasks, nil
 }
 
 func (db *DataBase) CreateSession(user uint) (*models.Session, error) {
