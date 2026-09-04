@@ -2,6 +2,7 @@ package scorer
 
 import (
 	"fmt"
+	"net/url"
 	"path"
 	"regexp"
 	"sort"
@@ -81,15 +82,32 @@ type pipelinesProvider = func(project string) (pipelines []models.Pipeline, err 
 type flagsProvider = func(gitlabLogin string) (flags []models.Flag, err error)
 type mergeRequestsProvider = func(project string) (mergeRequests []models.MergeRequest, err error)
 
-func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider) (pipelinesMap, error) {
+type submissionBans map[int]models.SubmissionBan
+
+func (s Scorer) loadSubmissionBans() (submissionBans, error) {
+	rows, err := s.db.ListSubmissionBans()
+	if err != nil {
+		return nil, err
+	}
+	bans := make(submissionBans, len(rows))
+	for _, ban := range rows {
+		bans[ban.PipelineID] = ban
+	}
+	return bans, nil
+}
+
+func (s Scorer) loadUserPipelines(user *models.User, provider pipelinesProvider, bans submissionBans) (pipelinesMap, error) {
 	pipelines, err := provider(user.GetProjectName())
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to list use rpipelines")
+		return nil, errors.Wrap(err, "failed to list user pipelines")
 	}
 
 	pipelinesMap := make(pipelinesMap)
 	for i := range pipelines {
 		pipeline := &pipelines[i]
+		if _, banned := bans[pipeline.ID]; banned {
+			continue
+		}
 		prev, found := pipelinesMap[pipeline.Task]
 		if !found || pipelineLess(pipeline, prev) {
 			prev = pipeline
@@ -141,6 +159,7 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 		return nil, err
 	}
 
+	groupUsers := users
 	if filter != nil {
 		allUsers := users
 		users = make([]*models.User, 0, len(allUsers))
@@ -170,10 +189,19 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all overrides: %w", err)
 	}
+	bans, err := s.loadSubmissionBans()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list submission bans: %w", err)
+	}
+
+	boards, err := s.CalcLeaderboards(currentDeadlines, groupUsers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
+	}
 
 	scores := make([]*UserScores, len(users))
 	for i, user := range users {
-		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags, mergeRequests, overrides)
+		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags, mergeRequests, overrides, boards, bans)
 		if err != nil {
 			return nil, err
 		}
@@ -269,7 +297,21 @@ func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 		mergeRequests = s.db.ListProjectMergeRequests
 	}
 
-	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, mergeRequests, overrides)
+	groupUsers, err := s.db.ListGroupUsers(user.GroupName)
+	if err != nil {
+		return nil, err
+	}
+
+	boards, err := s.CalcLeaderboards(currentDeadlines, groupUsers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
+	}
+	bans, err := s.loadSubmissionBans()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list submission bans: %w", err)
+	}
+
+	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, mergeRequests, overrides, boards, bans)
 }
 
 type overrideKey struct {
@@ -295,8 +337,10 @@ func (s Scorer) calcUserScoresImpl(
 	flagsP flagsProvider,
 	mergeRequestsP mergeRequestsProvider,
 	rawOverrides []models.OverriddenScore,
+	boards leaderboardsMap,
+	bans submissionBans,
 ) (*UserScores, error) {
-	pipelinesMap, err := s.loadUserPipelines(user, pipelinesP)
+	pipelinesMap, err := s.loadUserPipelines(user, pipelinesP, bans)
 	if err != nil {
 		return nil, err
 	}
@@ -374,6 +418,20 @@ func (s Scorer) calcUserScoresImpl(
 				tasks[i].BranchUrl = s.projects.MakeBranchURL(user, pipeline)
 			}
 
+			if task.Leaderboard != nil {
+				tasks[i].LeaderboardUrl = makeLeaderboardURL(task.Task, user.GroupName)
+				if board, ok := boards[task.Task]; ok {
+					if rank, ok := board.Rank(*user.GitlabLogin); ok {
+						tasks[i].Rank = rank
+						tasks[i].Metric = board.Entries[rank-1].Metric
+						tasks[i].HasMetric = true
+						if tasks[i].Status == TaskStatusSuccess {
+							tasks[i].Score = leaderboardScore(tasks[i].Score, task.Leaderboard.Bonus, rank, len(board.Entries))
+						}
+					}
+				}
+			}
+
 			override, found := overrides[overrideKey{login: *user.GitlabLogin, task: task.Task}]
 			if found {
 				tasks[i].Score = override.Score
@@ -423,6 +481,10 @@ func capitalizeWords(title string) string {
 
 func makeShortTaskName(name string) string {
 	return path.Base(name)
+}
+
+func makeLeaderboardURL(task, group string) string {
+	return "/leaderboard/" + task + "?group=" + url.QueryEscape(group)
 }
 
 func (s Scorer) scorePipeline(

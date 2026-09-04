@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
+    <title>{{ .Title }}</title>
+    {{ template "metrika" }}
+    <style>
+      .navbar-brand { font-size: 2.5rem; font-weight: 300; }
+      .nav-link { color: rgba(0, 0, 0, 0.9); }
+      .submission-table td { vertical-align: middle; }
+      .reason-input { min-width: 14rem; }
+	  .bulk-reason-input { min-width: 18rem; }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-light bg-light">
+      <div class="container-fluid px-4">
+        <span class="navbar-brand"><a href="/" class="text-decoration-none text-dark">{{ .CourseName }}</a></span>
+        <div class="d-flex gap-3 align-items-center">
+          <a class="nav-link" href="{{ .Links.Standings }}">Standings</a>
+          <a class="nav-link fw-bold" href="{{ .Links.Admin }}">Admin</a>
+          <a class="nav-link" href="{{ .Links.Logout }}">Logout</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container-fluid px-4 py-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h2 class="mb-1">Submission administration</h2>
+          <p class="text-muted mb-0">Banned pipelines are excluded from task scoring and leaderboard ranks.</p>
+        </div>
+        <div class="btn-group" role="group" aria-label="Submission kind">
+          <a class="btn {{ if eq .Filters.Kind "all" }}btn-primary{{ else }}btn-outline-primary{{ end }}" href="{{ .AllURL }}">All</a>
+          <a class="btn {{ if eq .Filters.Kind "regular" }}btn-primary{{ else }}btn-outline-primary{{ end }}" href="{{ .RegularURL }}">Regular</a>
+          <a class="btn {{ if eq .Filters.Kind "leaderboard" }}btn-primary{{ else }}btn-outline-primary{{ end }}" href="{{ .BoardURL }}">Leaderboard</a>
+        </div>
+      </div>
+
+      <section aria-labelledby="admin-statistics-title" class="mb-4">
+        <h3 id="admin-statistics-title" class="h5">Moderation insights</h3>
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Active bans</div><div class="fs-3">{{ .Statistics.Summary.ActiveBans }}</div></div></div></div>
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Ban actions · 7 days</div><div class="fs-3">{{ .Statistics.Summary.BanActionsLast7Days }}</div></div></div></div>
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Repeat offenders</div><div class="fs-3">{{ .Statistics.Summary.RepeatOffenders }}</div></div></div></div>
+          <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Affected tasks</div><div class="fs-3">{{ .Statistics.Summary.AffectedTasks }}</div></div></div></div>
+        </div>
+        <div class="row g-3">
+          <div class="col-xl-4">
+            <div class="card h-100"><div class="card-header">Repeated violations</div><div class="table-responsive"><table class="table table-sm mb-0">
+              <thead><tr><th>Student</th><th>Bans</th><th>Active</th></tr></thead><tbody>
+              {{ range .Statistics.RepeatOffenders }}<tr><td>{{ if .Name }}{{ .Name }}{{ else }}{{ .GitlabLogin }}{{ end }}<br><small class="text-muted">{{ .GitlabLogin }}</small></td><td>{{ .BanCount }}</td><td>{{ .ActiveBans }}</td></tr>
+              {{ else }}<tr><td colspan="3" class="text-muted">No repeated violations.</td></tr>{{ end }}
+              </tbody></table></div></div>
+          </div>
+          <div class="col-xl-4">
+            <div class="card h-100"><div class="card-header">Most moderated tasks</div><div class="table-responsive"><table class="table table-sm mb-0">
+              <thead><tr><th>Task</th><th>Bans</th><th>Active</th><th>Latest</th></tr></thead><tbody>
+              {{ range .Statistics.ModeratedTasks }}<tr><td><code>{{ .Task }}</code></td><td>{{ .BanCount }}</td><td>{{ .ActiveBans }}</td><td class="text-nowrap">{{ .LastBannedAt.Format "02 Jan" }}</td></tr>
+              {{ else }}<tr><td colspan="4" class="text-muted">No moderation events.</td></tr>{{ end }}
+              </tbody></table></div></div>
+          </div>
+          <div class="col-xl-4">
+            <div class="card h-100"><div class="card-header">Benchmark trend · 7 days</div><div class="table-responsive"><table class="table table-sm mb-0">
+              <thead><tr><th>Task</th><th>Reports</th><th>Average</th><th>vs prior</th></tr></thead><tbody>
+              {{ range .Statistics.BenchmarkTrends }}<tr><td><code>{{ .Task }}</code></td><td>{{ .ReportsLast7 }}</td><td>{{ if gt .ReportsLast7 0 }}{{ printf "%.4f" .AverageLast7 }}{{ else }}—{{ end }}</td><td>{{ if eq .ReportsPrevious7 0 }}new{{ else if eq .ChangePercent 0.0 }}<span class="text-muted">0.0%</span>{{ else if .Improved }}<span class="text-success">{{ printf "%+.1f%%" .ChangePercent }}</span>{{ else }}<span class="text-danger">{{ printf "%+.1f%%" .ChangePercent }}</span>{{ end }}</td></tr>
+              {{ else }}<tr><td colspan="4" class="text-muted">No reports in the last 14 days.</td></tr>{{ end }}
+              </tbody></table></div><div class="card-footer small text-muted">Lower benchmark metrics are better.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <form method="get" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="kind" value="{{ .Filters.Kind }}">
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label" for="group">Group</label>
+          <select class="form-select" id="group" name="group">
+            <option value="">All groups</option>
+            {{ range .Groups }}<option value="{{ . }}" {{ if eq $.Filters.Group . }}selected{{ end }}>{{ . }}</option>{{ end }}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label" for="task">Task</label>
+          <select class="form-select" id="task" name="task">
+            <option value="">All tasks</option>
+            {{ range .Tasks }}<option value="{{ . }}" {{ if eq $.Filters.Task . }}selected{{ end }}>{{ . }}</option>{{ end }}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label" for="login">Student</label>
+          <input class="form-control" id="login" name="login" value="{{ .Filters.Login }}" placeholder="Name or login">
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label" for="state">Moderation</label>
+          <select class="form-select" id="state" name="state">
+            <option value="all" {{ if eq .Filters.State "all" }}selected{{ end }}>All</option>
+            <option value="active" {{ if eq .Filters.State "active" }}selected{{ end }}>Active</option>
+            <option value="banned" {{ if eq .Filters.State "banned" }}selected{{ end }}>Banned</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-auto">
+          <button class="btn btn-primary" type="submit">Apply filters</button>
+          <a class="btn btn-outline-secondary" href="{{ .ResetURL }}">Reset</a>
+        </div>
+      </form>
+
+	  <form id="bulk-moderation-form" method="post" action="/admin/submissions/bulk" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+		<input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+		<input type="hidden" name="return_to" value="{{ .CurrentURL }}">
+		<label class="visually-hidden" for="bulk-reason">Bulk moderation reason</label>
+		<input id="bulk-reason" class="form-control bulk-reason-input w-auto" name="reason" data-max-runes="500" required placeholder="Reason for selected pipelines">
+		<button class="btn btn-danger bulk-action" name="action" value="ban" type="submit">Ban selected</button>
+		<button class="btn btn-outline-danger bulk-action" name="action" value="unban" type="submit">Unban selected</button>
+		<span id="bulk-selected-count" class="text-muted" aria-live="polite">0 selected</span>
+	  </form>
+
+      <div class="table-responsive">
+        <table class="table table-hover submission-table">
+          <thead>
+            <tr>
+			  <th><input id="select-page" class="form-check-input" type="checkbox" aria-label="Select all pipelines on this page"></th><th>Submitted</th><th>Student</th><th>Group</th><th>Task</th><th>Kind</th><th>Result</th><th>Pipeline</th><th>Moderation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .Rows }}
+            <tr {{ if .Banned }}class="table-danger" title="{{ .ModerationTitle }}"{{ end }}>
+			  <td><input class="form-check-input pipeline-select" type="checkbox" form="bulk-moderation-form" name="pipeline_id" value="{{ .PipelineID }}" aria-label="Select pipeline {{ .PipelineID }}"></td>
+              <td class="text-nowrap">{{ .StartedAt.Format "02 Jan 2006 15:04" }}</td>
+              <td><div>{{ if .Name }}{{ .Name }}{{ else }}Unknown user{{ end }}</div><small class="text-muted">{{ .GitlabLogin }}</small></td>
+              <td>{{ if .Group }}{{ .Group }}{{ else }}—{{ end }}</td>
+              <td><code>{{ .Task }}</code></td>
+              <td>{{ if .Leaderboard }}<span class="badge bg-warning text-dark">Leaderboard</span>{{ else }}<span class="badge bg-secondary">Regular</span>{{ end }}</td>
+              <td>{{ .Status }}{{ if .HasMetric }}<br><strong>{{ printf "%.4f" .Metric }}</strong>{{ end }}</td>
+              <td><a href="{{ .PipelineURL }}" target="_blank" rel="noopener">#{{ .PipelineID }}</a></td>
+              <td>
+                {{ if .Banned }}
+                  <div class="mb-1"><strong>Banned</strong>{{ if .BanReason }}: {{ .BanReason }}{{ end }}</div>
+                  <small class="d-block text-muted mb-2">{{ .BannedByName }} · {{ .BannedAt.Format "02 Jan 15:04" }}</small>
+                  <form method="post" action="/admin/submissions/{{ .PipelineID }}/unban" class="d-flex gap-2" onsubmit="return confirm('Restore pipeline #{{ .PipelineID }} to scoring?')">
+                    <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+                    <input class="form-control form-control-sm reason-input" name="reason" data-max-runes="500" required placeholder="Unban reason">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Unban</button>
+                  </form>
+                {{ else }}
+                  <form method="post" action="/admin/submissions/{{ .PipelineID }}/ban" class="d-flex gap-2" onsubmit="return confirm('Exclude pipeline #{{ .PipelineID }} from scoring?')">
+                    <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+                    <input class="form-control form-control-sm reason-input" name="reason" data-max-runes="500" required placeholder="Reason (up to 500 characters)">
+                    <button class="btn btn-sm btn-danger" type="submit">Ban</button>
+                  </form>
+                {{ end }}
+                {{ if .History }}
+                  <details class="mt-2">
+                    <summary>History ({{ len .History }})</summary>
+                    <ol class="small ps-3 mt-1 mb-0">
+                      {{ range .History }}
+                        <li class="mb-1">
+                          <strong>{{ .Action }}</strong> by {{ if .AdminName }}{{ .AdminName }}{{ else }}user #{{ .AdminUserID }}{{ end }}
+                          · {{ .CreatedAt.Format "02 Jan 2006 15:04" }}
+                          <br>{{ .Reason }}
+                          <span class="text-muted">({{ if .PreviousBanned }}banned{{ else }}active{{ end }} → {{ if .CurrentBanned }}banned{{ else }}active{{ end }})</span>
+                        </li>
+                      {{ end }}
+                    </ol>
+                  </details>
+                {{ end }}
+              </td>
+            </tr>
+            {{ else }}
+			<tr><td colspan="9" class="text-center text-muted py-5">No matching submissions.</td></tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2" aria-label="Submission pages">
+        <span class="text-muted">Page {{ .Pagination.Page }} of {{ .Pagination.TotalPages }} · {{ .Pagination.Total }} submissions</span>
+        <div class="btn-group">
+          {{ if .Pagination.HasPrevious }}
+            <a class="btn btn-outline-primary" href="{{ .Pagination.PreviousURL }}">Previous</a>
+          {{ else }}
+            <span class="btn btn-outline-secondary disabled" aria-disabled="true">Previous</span>
+          {{ end }}
+          {{ if .Pagination.HasNext }}
+            <a class="btn btn-outline-primary" href="{{ .Pagination.NextURL }}">Next</a>
+          {{ else }}
+            <span class="btn btn-outline-secondary disabled" aria-disabled="true">Next</span>
+          {{ end }}
+        </div>
+      </nav>
+    </main>
+    <script>
+      document.querySelectorAll('[data-max-runes]').forEach(function (input) {
+        var maxRunes = Number(input.dataset.maxRunes);
+        var validate = function () {
+          input.setCustomValidity(Array.from(input.value).length > maxRunes ? 'Use no more than ' + maxRunes + ' characters' : '');
+        };
+        input.addEventListener('input', validate);
+        validate();
+      });
+	  var selectPage = document.getElementById('select-page');
+	  var pipelineSelections = Array.from(document.querySelectorAll('.pipeline-select'));
+	  var bulkButtons = Array.from(document.querySelectorAll('.bulk-action'));
+	  var selectedCount = document.getElementById('bulk-selected-count');
+	  var updateBulkSelection = function () {
+		var count = pipelineSelections.filter(function (checkbox) { return checkbox.checked; }).length;
+		selectedCount.textContent = count + ' selected';
+		bulkButtons.forEach(function (button) { button.disabled = count === 0; });
+		selectPage.checked = pipelineSelections.length > 0 && count === pipelineSelections.length;
+		selectPage.indeterminate = count > 0 && count < pipelineSelections.length;
+	  };
+	  selectPage.addEventListener('change', function () {
+		pipelineSelections.forEach(function (checkbox) { checkbox.checked = selectPage.checked; });
+		updateBulkSelection();
+	  });
+	  pipelineSelections.forEach(function (checkbox) { checkbox.addEventListener('change', updateBulkSelection); });
+	  document.getElementById('bulk-moderation-form').addEventListener('submit', function (event) {
+		var action = event.submitter && event.submitter.value === 'unban' ? 'unban' : 'ban';
+		if (!confirm(action.charAt(0).toUpperCase() + action.slice(1) + ' ' + pipelineSelections.filter(function (checkbox) { return checkbox.checked; }).length + ' selected pipelines?')) {
+		  event.preventDefault();
+		}
+	  });
+	  updateBulkSelection();
+    </script>
+  </body>
+</html>

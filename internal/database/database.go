@@ -57,8 +57,17 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{}, &models.SubmissionBan{}, &models.SubmissionModerationEvent{})
 	if err != nil {
+		return nil, err
+	}
+	if err := migrateBenchmarkResults(db); err != nil {
+		return nil, err
+	}
+	if err := backfillUserProjectNames(db); err != nil {
+		return nil, err
+	}
+	if err := backfillSubmissionModerationEvents(db); err != nil {
 		return nil, err
 	}
 
@@ -116,6 +125,12 @@ func (db *DataBase) FindUserByTelegramID(id int64) (*models.User, error) {
 	return &user, nil
 }
 
+func (db *DataBase) ListUsers() (users []*models.User, err error) {
+	users = make([]*models.User, 0)
+	err = db.Order("created_at").Find(&users).Error
+	return
+}
+
 func (db *DataBase) ListUsersWithoutRepos() ([]*models.User, error) {
 	var users []*models.User
 	err := db.Find(&users, "repository IS NULL AND gitlab_id IS NOT NULL AND gitlab_login IS NOT NULL").Error
@@ -156,13 +171,21 @@ func (db *DataBase) SetUserGitlabAccount(uid uint, user *models.GitlabUser) erro
 }
 
 func (db *DataBase) SetUserRepository(user *models.User) error {
-	res := db.Model(user).Update("repository", user.Repository)
+	projectName := ""
+	if user.Repository != nil {
+		projectName = models.ProjectNameFromRepository(*user.Repository)
+	}
+	res := db.Model(user).Updates(map[string]interface{}{
+		"repository":   user.Repository,
+		"project_name": projectName,
+	})
 	if res.Error != nil {
 		return res.Error
 	}
 	if res.RowsAffected < 1 {
 		return fmt.Errorf("unknown user %d", user.ID)
 	}
+	user.ProjectName = projectName
 	return nil
 }
 
@@ -191,7 +214,7 @@ func (db *DataBase) SetUserGroupName(user *models.User) error {
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status"}),
+		DoUpdates: clause.AssignmentColumns([]string{"project", "task", "status", "started_at"}),
 	}).Create(pipeline).Error
 }
 
@@ -200,6 +223,48 @@ func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pip
 	err = db.Find(&pipelines, "project = ?", project).Error
 	if err != nil {
 		pipelines = nil
+	}
+	return
+}
+
+func (db *DataBase) FindPipelineByID(id int) (*models.Pipeline, error) {
+	var pipeline models.Pipeline
+	if err := db.First(&pipeline, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &pipeline, nil
+}
+
+func (db *DataBase) ListSubmissionBans() (bans []models.SubmissionBan, err error) {
+	bans = make([]models.SubmissionBan, 0)
+	err = db.Find(&bans).Error
+	return
+}
+
+func (db *DataBase) AddBenchmarkResult(result *models.BenchmarkResult) error {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "pipeline_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"gitlab_login", "task", "metric", "created_at"}),
+	}).Create(result).Error
+}
+
+func (db *DataBase) ListAllBenchmarks() (results []models.BenchmarkResult, err error) {
+	results = make([]models.BenchmarkResult, 0)
+	err = db.Find(&results).Error
+	if err != nil {
+		results = nil
+	}
+	return
+}
+
+func (db *DataBase) ListBenchmarksForLogins(logins []string) (results []models.BenchmarkResult, err error) {
+	results = make([]models.BenchmarkResult, 0)
+	if len(logins) == 0 {
+		return
+	}
+	err = db.Find(&results, "gitlab_login IN ?", logins).Error
+	if err != nil {
+		results = nil
 	}
 	return
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -88,10 +89,11 @@ type Links struct {
 	Submits         string
 	Logout          string
 	SubmitFlag      string
+	Admin           string
 }
 
 func (s *server) makeLinks(user *models.User) *Links {
-	return &Links{
+	links := &Links{
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
 		TasksRepository: s.config.GitLab.TaskUrlPrefix,
@@ -100,6 +102,10 @@ func (s *server) makeLinks(user *models.User) *Links {
 		Logout:          s.config.Endpoints.Logout,
 		SubmitFlag:      s.config.Endpoints.Flag,
 	}
+	if s.isAdmin(user) {
+		links.Admin = "/admin/submissions"
+	}
+	return links
 }
 
 func (s *server) RenderHomePage(c *gin.Context) {
@@ -207,9 +213,108 @@ func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 		"CourseName":  s.config.Server.CourseName,
 		"Title":       s.config.Server.CourseName,
 		"Config":      s.config,
+		"Group":       group,
 		"GroupConfig": s.config.Groups.FindGroup(group),
 		"Standings":   scores,
 		"Error":       err,
 		"Links":       s.makeLinks(user),
+	})
+}
+
+type LeaderboardRow struct {
+	Rank        int
+	Name        string
+	GitlabLogin string
+	Metric      float64
+	SubmittedAt time.Time
+	PipelineID  int
+	Banned      bool
+}
+
+func (s *server) RenderLeaderboardPage(c *gin.Context) {
+	task := strings.TrimPrefix(c.Param("task"), "/")
+
+	group := c.Query("group")
+	if group == "" {
+		if defaul := s.config.Groups.FindDefaultGroup(); defaul != nil {
+			group = defaul.Name
+		}
+	}
+
+	var links *Links
+	if user, session, err := s.tryFindUserByToken(c); err == nil && session != nil {
+		links = s.makeLinks(user)
+	}
+
+	currentDeadlines := s.deadlines.GroupDeadlines(group)
+	if currentDeadlines == nil {
+		c.String(http.StatusNotFound, "no deadlines found")
+		return
+	}
+	spec := currentDeadlines.FindTask(task)
+	if spec == nil || spec.Leaderboard == nil {
+		c.String(http.StatusNotFound, "task %s has no leaderboard", task)
+		return
+	}
+	taskGroup := currentDeadlines.FindTaskGroup(task)
+
+	rows, err := s.cache.Fetch(fmt.Sprintf("leaderboard/%s/%s", group, task), time.Second*10, func() (interface{}, error) {
+		names := make(map[string]string)
+		users, err := s.db.ListGroupUsers(group)
+		if err != nil {
+			return nil, err
+		}
+		for _, user := range users {
+			if user.GitlabLogin != nil {
+				names[*user.GitlabLogin] = user.FirstName + " " + user.LastName
+			}
+		}
+
+		boards, err := s.scorer.CalcLeaderboards(currentDeadlines, users)
+		if err != nil {
+			return nil, err
+		}
+
+		board := boards[task]
+		rows := make([]LeaderboardRow, 0)
+		if board != nil {
+			for i, entry := range board.Entries {
+				rows = append(rows, LeaderboardRow{
+					Rank:        i + 1,
+					Name:        names[entry.GitlabLogin],
+					GitlabLogin: entry.GitlabLogin,
+					Metric:      entry.Metric,
+					SubmittedAt: entry.SubmittedAt,
+					PipelineID:  entry.PipelineID,
+				})
+			}
+			for _, entry := range board.BannedEntries {
+				rows = append(rows, LeaderboardRow{
+					Name:        names[entry.GitlabLogin],
+					GitlabLogin: entry.GitlabLogin,
+					Metric:      entry.Metric,
+					SubmittedAt: entry.SubmittedAt,
+					PipelineID:  entry.PipelineID,
+					Banned:      true,
+				})
+			}
+		}
+		return rows, nil
+	})
+	leaderboardRows := make([]LeaderboardRow, 0)
+	if rows != nil {
+		leaderboardRows = rows.Value().([]LeaderboardRow)
+	}
+
+	c.HTML(http.StatusOK, "leaderboard.tmpl", gin.H{
+		"CourseName": s.config.Server.CourseName,
+		"Title":      fmt.Sprintf("%s — leaderboard", task),
+		"Task":       task,
+		"Group":      group,
+		"Bonus":      spec.Leaderboard.Bonus,
+		"Deadline":   taskGroup.Deadline.String(),
+		"Rows":       leaderboardRows,
+		"Error":      err,
+		"Links":      links,
 	})
 }
