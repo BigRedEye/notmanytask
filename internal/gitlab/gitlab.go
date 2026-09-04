@@ -332,7 +332,11 @@ func (c Client) MakeProjectWithNamespace(project string) string {
 }
 
 func (c Client) MakePipelineURL(user *models.User, pipeline *models.Pipeline) string {
-	return fmt.Sprintf("%s/-/pipelines/%d", c.MakeProjectURL(user), pipeline.ID)
+	return c.MakeProjectPipelineURL(user.GetProjectName(), pipeline.ID)
+}
+
+func (c Client) MakeProjectPipelineURL(project string, pipelineID int) string {
+	return fmt.Sprintf("%s/-/pipelines/%d", c.makeProjectURL(project), pipelineID)
 }
 
 func (c Client) MakeBranchURL(user *models.User, pipeline *models.Pipeline) string {

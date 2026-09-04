@@ -75,7 +75,7 @@ func (p *PipelinesFetcher) AddFresh(id int, project string) error {
 	return nil
 }
 
-func (p *PipelinesFetcher) fetch(id int, project string) (*gitlab.PipelineInfo, error) {
+func (p *PipelinesFetcher) Refresh(id int, project string) (*models.Pipeline, error) {
 	log := p.logger.With(
 		lf.PipelineID(id),
 		lf.ProjectName(project),
@@ -89,14 +89,14 @@ func (p *PipelinesFetcher) fetch(id int, project string) (*gitlab.PipelineInfo, 
 		return nil, errors.Wrap(err, "Failed to fetch pipeline")
 	}
 
-	info := &gitlab.PipelineInfo{
+	info := &models.Pipeline{
 		ID:        pipeline.ID,
-		Ref:       pipeline.Ref,
+		Task:      ParseTaskFromBranch(pipeline.Ref),
 		Status:    pipeline.Status,
-		CreatedAt: pipeline.CreatedAt,
-		ProjectID: pipeline.ProjectID,
+		Project:   project,
+		StartedAt: *pipeline.CreatedAt,
 	}
-	return info, p.addPipeline(project, info)
+	return info, p.db.AddPipeline(info)
 }
 
 func (p *PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.PipelineInfo) error {
@@ -150,7 +150,7 @@ func (p *PipelinesFetcher) fetchFreshPipelines() {
 	removed := make([]interface{}, 0)
 	p.fresh.Range(func(key, _ interface{}) bool {
 		id := key.(*qualifiedPipelineID)
-		info, err := p.fetch(id.id, id.project)
+		info, err := p.Refresh(id.id, id.project)
 		if err != nil {
 			p.logger.Error("Failed to fetch pipeline", zap.Error(err))
 		} else if info.Status != models.PipelineStatusRunning {
