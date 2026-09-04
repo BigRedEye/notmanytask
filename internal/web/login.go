@@ -56,7 +56,20 @@ func (s loginService) signup(c *gin.Context) {
 	})
 }
 
-var nameRe = regexp.MustCompile("^[А-ЯËа-яë-]+$")
+var nameRe = regexp.MustCompile("^[А-ЯЁËа-яёë-]+$")
+
+func (s loginService) validateEmail(email string) bool {
+	pattern := s.config.Server.SignupEmailPattern
+	if pattern == "" {
+		return true
+	}
+	matched, err := regexp.MatchString(pattern, email)
+	if err != nil {
+		s.log.Error("Invalid signup email pattern", zap.String("pattern", pattern), zap.Error(err))
+		return false
+	}
+	return matched
+}
 
 func normalizeName(name string) string {
 	return strings.Title(strings.ToLower(name))
@@ -66,10 +79,12 @@ func (s loginService) signupForm(c *gin.Context) {
 	firstName := c.PostForm("firstname")
 	lastName := c.PostForm("lastname")
 	secret := c.PostForm("secret")
+	email := strings.TrimSpace(c.PostForm("email"))
 
 	log := s.log.With(
 		zap.String("first_name", firstName),
 		zap.String("last_name", lastName),
+		zap.String("email", email),
 		zap.String("secret", secret),
 	)
 
@@ -86,24 +101,31 @@ func (s loginService) signupForm(c *gin.Context) {
 		return
 	}
 
-	// Find group by secret
-	groupName := ""
-	for _, group := range s.config.Groups {
-		if secret == group.Secret {
-			groupName = group.Name
-		}
+	if !s.validateEmail(email) {
+		log.Warn("Invalid email from form")
+		s.RedirectToSignup(c, "Invalid email")
+		return
 	}
-	if groupName == "" {
+
+	// Find group by secret
+	group, subgroup := s.config.Groups.FindBySecret(secret)
+	if group == nil {
 		log.Warn("Unknown secret")
 		s.RedirectToSignup(c, "Invalid secret")
 		return
 	}
-	log = log.With(zap.String("group_name", groupName))
+	subgroupName := ""
+	if subgroup != nil {
+		subgroupName = subgroup.Name
+	}
+	log = log.With(zap.String("group_name", group.Name), zap.String("subgroup_name", subgroupName))
 
 	user, err := s.server.db.AddUser(&models.User{
-		FirstName: normalizeName(firstName),
-		LastName:  normalizeName(lastName),
-		GroupName: groupName,
+		FirstName:    normalizeName(firstName),
+		LastName:     normalizeName(lastName),
+		GroupName:    group.Name,
+		SubgroupName: subgroupName,
+		Email:        email,
 	})
 	if err != nil {
 		if database.IsDuplicateKey(err) {

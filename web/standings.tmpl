@@ -137,6 +137,7 @@
                         <tr>
                             <th scope="col" class="num sticky-header sticky-col first-col corner">#</th>
                             <th scope="col" class="name sticky-header sticky-col second-col corner">Student</th>
+                            {{ if $.GroupConfig.Subgroups }}<th scope="col" class="sticky-header">Group</th>{{ end }}
                             {{ if $.GroupConfig.ShowMarks }}<th scope="col" class="sticky-header">Mark</th>{{ end }}
                             <th scope="col" class="sticky-header">Score</th>
                             {{ range .Standings.Deadlines.Assignments }}
@@ -151,6 +152,7 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">0</th>
                                 <th scope="row" class="name sticky-col second-col">Chuck Norris</th>
+                                {{ if $.GroupConfig.Subgroups }}<td></td>{{ end }}
                                 {{ if $.GroupConfig.ShowMarks }}<td>13.37</td>{{ end }}
                                 <td>{{ .MaxScore }}</td>
                                 {{ range .Groups }}
@@ -164,6 +166,9 @@
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">{{ inc $index }}</th>
                                 <th scope="row" class="name sticky-col second-col">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
+                                {{ if $.GroupConfig.Subgroups }}
+                                    <td><a href="?group={{ $.Group }}&subgroup={{ $user.User.Subgroup }}" class="text-decoration-none text-dark">{{ $user.User.Subgroup }}</a></td>
+                                {{ end }}
                                 {{ if $.GroupConfig.ShowMarks }}<td>{{printf "%.3f" $user.FinalMark}}</td>{{ end }}
                                 <td>{{ $user.Score }}</td>
                                 {{ range $user.Groups }}
