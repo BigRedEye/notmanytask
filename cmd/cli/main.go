@@ -47,6 +47,7 @@ func initCommands() {
 	dumpCmd.AddCommand(makeDumpStandingsCommand())
 	dumpCmd.AddCommand(makeDumpSuccessfulSubmits())
 	rootCmd.AddCommand(makeOverrideCommand())
+	rootCmd.AddCommand(makeRenderCommand())
 	rootCmd.AddCommand(dumpCmd)
 }
 
