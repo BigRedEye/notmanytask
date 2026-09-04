@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/bigredeye/notmanytask/internal/database"
@@ -25,6 +26,8 @@ func (p ProjectsMaker) AsyncPrepareProject(user *models.User) {
 	p.users <- user
 }
 
+const forkRetryDelay = 5 * time.Second
+
 func (p ProjectsMaker) Run(ctx context.Context) {
 	if p.config.PullIntervals.Projects == nil {
 		return
@@ -41,9 +44,7 @@ func (p ProjectsMaker) Run(ctx context.Context) {
 				zap.Intp("gitlab_id", user.GitlabID),
 				zap.Stringp("gitlab_login", user.GitlabLogin),
 			)
-			if !p.maybeInitializeProject(user) {
-				p.users <- user
-			}
+			p.maybeInitializeProject(user)
 		case <-tick.C:
 			p.initializeMissingProjects()
 		case <-ctx.Done():
@@ -86,10 +87,15 @@ func (p ProjectsMaker) maybeInitializeProject(user *models.User) bool {
 	log = log.With(zap.Intp("gitlab_id", user.GitlabID), zap.Stringp("gitlab_login", user.GitlabLogin))
 
 	projectURL, err := p.InitializeProject(user)
+	if errors.Is(err, ErrProjectNotReady) {
+		// Forking takes a few seconds: try once more soon. The periodic pass
+		// over users without a repository is the fallback for everything
+		// else, so never sleep or re-queue from the worker loop itself.
+		time.AfterFunc(forkRetryDelay, func() { p.users <- user })
+		return false
+	}
 	if err != nil {
 		log.Error("Failed to initialize project", zap.Error(err))
-		// TODO(BigRedEye): nice backoff
-		time.Sleep(time.Second * 1)
 		return false
 	}
 	log = log.With(zap.String("project", projectURL))
