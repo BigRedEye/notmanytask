@@ -32,7 +32,7 @@ jobs:
           fail_ci_if_error: false
 
   # Pull requests only build the image; pushes to master publish it as
-  # `master` and `sha-<short>`; tags v1.2.3 publish `v1.2.3`, `1.2` and
+  # `master` and `sha-<short>`; tags v1.2.3 publish `v1.2.3`, `v1.2` and
   # `latest`; prerelease tags like v1.2.3-rc.1 publish only themselves.
   docker:
     runs-on: ubuntu-latest
@@ -57,7 +57,7 @@ jobs:
             type=ref,event=branch
             type=sha
             type=ref,event=tag
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern=v{{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
           flavor: latest=auto
       - uses: docker/build-push-action@v6
         with:
