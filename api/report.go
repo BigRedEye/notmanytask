@@ -9,6 +9,10 @@ type ReportRequest struct {
 	ProjectName string `json:"project_name" form:"project_name"`
 	Failed      int    `json:"failed,omitempty" form:"failed"`
 	Status      string `json:"status,omitempty" form:"status"`
+
+	// Benchmark metric of a leaderboard task (lower is better).
+	// Only accepted for tasks configured with a leaderboard.
+	Metric string `json:"metric,omitempty" form:"metric"`
 }
 
 type ReportResponse struct {

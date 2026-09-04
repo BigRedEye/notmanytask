@@ -2,6 +2,7 @@ package scorer
 
 import (
 	"fmt"
+	"net/url"
 	"path"
 	"regexp"
 	"sort"
@@ -141,6 +142,7 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 		return nil, err
 	}
 
+	groupUsers := users
 	if filter != nil {
 		allUsers := users
 		users = make([]*models.User, 0, len(allUsers))
@@ -171,9 +173,14 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 		return nil, fmt.Errorf("failed to list all overrides: %w", err)
 	}
 
+	boards, err := s.CalcLeaderboards(currentDeadlines, groupUsers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
+	}
+
 	scores := make([]*UserScores, len(users))
 	for i, user := range users {
-		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags, mergeRequests, overrides)
+		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags, mergeRequests, overrides, boards)
 		if err != nil {
 			return nil, err
 		}
@@ -269,7 +276,17 @@ func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 		mergeRequests = s.db.ListProjectMergeRequests
 	}
 
-	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, mergeRequests, overrides)
+	groupUsers, err := s.db.ListGroupUsers(user.GroupName)
+	if err != nil {
+		return nil, err
+	}
+
+	boards, err := s.CalcLeaderboards(currentDeadlines, groupUsers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
+	}
+
+	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, mergeRequests, overrides, boards)
 }
 
 type overrideKey struct {
@@ -295,6 +312,7 @@ func (s Scorer) calcUserScoresImpl(
 	flagsP flagsProvider,
 	mergeRequestsP mergeRequestsProvider,
 	rawOverrides []models.OverriddenScore,
+	boards leaderboardsMap,
 ) (*UserScores, error) {
 	pipelinesMap, err := s.loadUserPipelines(user, pipelinesP)
 	if err != nil {
@@ -374,6 +392,20 @@ func (s Scorer) calcUserScoresImpl(
 				tasks[i].BranchUrl = s.projects.MakeBranchURL(user, pipeline)
 			}
 
+			if task.Leaderboard != nil {
+				tasks[i].LeaderboardUrl = makeLeaderboardURL(task.Task, user.GroupName)
+				if board, ok := boards[task.Task]; ok {
+					if rank, ok := board.Rank(*user.GitlabLogin); ok {
+						tasks[i].Rank = rank
+						tasks[i].Metric = board.Entries[rank-1].Metric
+						tasks[i].HasMetric = true
+						if tasks[i].Status == TaskStatusSuccess {
+							tasks[i].Score = leaderboardScore(tasks[i].Score, task.Leaderboard.Bonus, rank, len(board.Entries))
+						}
+					}
+				}
+			}
+
 			override, found := overrides[overrideKey{login: *user.GitlabLogin, task: task.Task}]
 			if found {
 				tasks[i].Score = override.Score
@@ -423,6 +455,10 @@ func capitalizeWords(title string) string {
 
 func makeShortTaskName(name string) string {
 	return path.Base(name)
+}
+
+func makeLeaderboardURL(task, group string) string {
+	return "/leaderboard/" + task + "?group=" + url.QueryEscape(group)
 }
 
 func (s Scorer) scorePipeline(

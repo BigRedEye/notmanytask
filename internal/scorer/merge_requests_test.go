@@ -84,6 +84,7 @@ func scoreMergeRequests(t *testing.T, mergeRequests []models.MergeRequest) Score
 			return mergeRequests, nil
 		},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -276,6 +277,7 @@ func TestMergeRequestOverride(t *testing.T) {
 		func(string) ([]models.Flag, error) { return nil, nil },
 		func(string) ([]models.MergeRequest, error) { return []models.MergeRequest{opened(1)}, nil },
 		[]models.OverriddenScore{{GitlabLogin: login, Task: testTask, Score: 42, Status: models.PipelineStatusSuccess}},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

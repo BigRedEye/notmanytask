@@ -166,6 +166,22 @@ func (f *Fetcher) GroupDeadlines(group string) *Deadlines {
 	return groupDeadlines[group]
 }
 
+// TaskHasLeaderboard reports whether any group configures the task
+// as a benchmark (leaderboard) task.
+func (f *Fetcher) TaskHasLeaderboard(task string) bool {
+	cur := f.current.Load()
+	if cur == nil {
+		return false
+	}
+	groupDeadlines := cur.(deadlinesMap)
+	for _, deadlines := range groupDeadlines {
+		if t := deadlines.FindTask(task); t != nil && t.Leaderboard != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *Fetcher) AnyGroupHasTask(task string) bool {
 	cur := f.current.Load()
 	if cur == nil {

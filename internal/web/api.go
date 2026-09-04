@@ -2,17 +2,46 @@ package web
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 
 	"github.com/bigredeye/notmanytask/api"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
+	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
 type apiService struct {
 	webService
+}
+
+func parseBenchmarkMetric(raw string) (float64, error) {
+	metric, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(metric) || math.IsInf(metric, 0) {
+		return 0, fmt.Errorf("metric must be finite")
+	}
+	return metric, nil
+}
+
+func validateBenchmarkReport(user *models.User, pipeline *models.Pipeline, task, project string) error {
+	if user.GetProjectName() == "" || user.GetProjectName() != project {
+		return fmt.Errorf("project %s does not belong to user", project)
+	}
+	if pipeline.Project != project {
+		return fmt.Errorf("pipeline project %s does not match report project %s", pipeline.Project, project)
+	}
+	if pipeline.Task != task {
+		return fmt.Errorf("pipeline task %s does not match report task %s", pipeline.Task, task)
+	}
+	if pipeline.Status != models.PipelineStatusSuccess {
+		return fmt.Errorf("pipeline %d is not successful", pipeline.ID)
+	}
+	return nil
 }
 
 func setupApiService(server *server, r *gin.Engine) error {
@@ -72,10 +101,65 @@ func (s apiService) report(c *gin.Context) {
 		return
 	}
 
-	err = s.server.pipelines.AddFresh(id, req.ProjectName)
-	if err != nil {
-		onError(http.StatusInternalServerError, err)
-		return
+	if req.Metric != "" {
+		metric, err := parseBenchmarkMetric(req.Metric)
+		if err != nil {
+			onError(http.StatusBadRequest, fmt.Errorf("failed to parse metric: %w", err))
+			return
+		}
+		if req.Failed != 0 || (req.Status != "" && req.Status != models.PipelineStatusSuccess) {
+			onError(http.StatusBadRequest, fmt.Errorf("metric is only accepted for successful reports"))
+			return
+		}
+		user, err := s.server.db.FindUserByGitlabID(userID)
+		if err != nil || user.GitlabLogin == nil {
+			onError(http.StatusNotFound, fmt.Errorf("unknown user %d", userID))
+			return
+		}
+		currentDeadlines := s.server.deadlines.GroupDeadlines(user.GroupName)
+		if currentDeadlines == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("no deadlines found for group %s", user.GroupName))
+			return
+		}
+		task := currentDeadlines.FindTask(req.Task)
+		if task == nil || task.Leaderboard == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("task %s has no leaderboard for group %s", req.Task, user.GroupName))
+			return
+		}
+		if user.GetProjectName() == "" || user.GetProjectName() != req.ProjectName {
+			onError(http.StatusBadRequest, fmt.Errorf("project %s does not belong to user %d", req.ProjectName, userID))
+			return
+		}
+		pipeline, err := s.server.pipelines.Refresh(id, req.ProjectName)
+		if err != nil {
+			onError(http.StatusBadGateway, fmt.Errorf("failed to verify pipeline: %w", err))
+			return
+		}
+		if err := validateBenchmarkReport(user, pipeline, req.Task, req.ProjectName); err != nil {
+			onError(http.StatusBadRequest, err)
+			return
+		}
+		err = s.server.db.AddBenchmarkResult(&models.BenchmarkResult{
+			GitlabLogin: *user.GitlabLogin,
+			Task:        req.Task,
+			PipelineID:  pipeline.ID,
+			Metric:      metric,
+			CreatedAt:   pipeline.StartedAt,
+		})
+		if err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+		s.log.Info("Stored benchmark result",
+			lf.GitlabLogin(*user.GitlabLogin),
+			zap.String("task", req.Task),
+			zap.Float64("metric", metric),
+		)
+	} else {
+		if err := s.server.pipelines.AddFresh(id, req.ProjectName); err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, &api.ReportResponse{
