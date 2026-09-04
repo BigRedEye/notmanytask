@@ -45,6 +45,21 @@
     background-color: #f8f9fa;
 }
 
+.task-review_pending {
+    border-color: #ece1be;
+    background-color: #fff3cd;
+}
+
+.task-review_unresolved {
+    border-color: #cff4fc;
+    background-color: #bfe2e9;
+}
+
+.task-review_resolved {
+    border-color: #97b0d5;
+    background-color: #cfe2ff;
+}
+
 .navbar-brand {
   font-size: 3rem;
   font-weight: 300
@@ -113,6 +128,9 @@
                                                 </p>
                                             {{ if .PipelineUrl }}
                                                 </a>
+                                            {{ end }}
+                                            {{ if .Message }}
+                                                <span class="text-secondary">{{ .Message }}</span>
                                             {{ end }}
                                         </div>
                                     </div>
