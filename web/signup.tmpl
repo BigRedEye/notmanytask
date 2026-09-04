@@ -31,19 +31,28 @@
             <div class="card-body">
               <form method="post" action="{{ .Config.Endpoints.Signup }}" class="needs-validation was-validated">
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingFirstName" placeholder="Ivan" name="firstname" required pattern="[А-ЯËа-яë-]+">
+                  <input type="text" class="form-control" id="floatingFirstName" placeholder="Иван" name="firstname" required pattern="[А-ЯЁËа-яёë-]+">
                   <label for="floatingFirstName">First name</label>
                   <div class="invalid-feedback">
                     Please use only Cyrillic letters
                   </div>
                 </div>
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingLastName" placeholder="Petrov" name="lastname" required pattern="[А-ЯËа-яë-]+">
+                  <input type="text" class="form-control" id="floatingLastName" placeholder="Петров" name="lastname" required pattern="[А-ЯЁËа-яёë-]+">
                   <label for="floatingLastName">Last name</label>
                   <div class="invalid-feedback">
                     Please use only Cyrillic letters
                   </div>
                 </div>
+                {{ if .Config.Server.SignupEmailPattern }}
+                <div class="form-floating mb-3">
+                  <input type="email" class="form-control" id="floatingEmail" placeholder="ipetrov@edu.hse.ru" name="email" required pattern="{{ .Config.Server.SignupEmailPattern }}">
+                  <label for="floatingEmail">Email</label>
+                  <div class="invalid-feedback">
+                    Please use your university email
+                  </div>
+                </div>
+                {{ end }}
                 <div class="form-floating mb-3">
                   <input type="text" class="form-control" id="floatingSecretCode" placeholder="LolKekCheburek" name="secret" required pattern="[A-Za-z0-9-_]+">
                   <label for="floatingSecretCode">Secret code</label>

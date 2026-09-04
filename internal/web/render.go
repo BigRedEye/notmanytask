@@ -151,12 +151,26 @@ func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter score
 			group = defaul.Name
 		}
 	}
+	groupConfig := s.config.Groups.FindGroup(group)
+
+	// Optional subgroup filter; unknown subgroups are ignored
+	subgroup := c.Query("subgroup")
+	if groupConfig == nil || groupConfig.FindSubgroup(subgroup) == nil {
+		subgroup = ""
+	}
+	if subgroup != "" {
+		userFilter := filter
+		filter = func(user *models.User) bool {
+			return user.SubgroupName == subgroup && (userFilter == nil || userFilter(user))
+		}
+	}
+
 	var links *Links
 	if user, session, err := s.tryFindUserByToken(c); err == nil && session != nil {
 		links = s.makeLinks(user)
 	}
 
-	scores, err := s.cache.Fetch(fmt.Sprintf("scores/%s/%s", group, name), time.Second*10, func() (interface{}, error) {
+	scores, err := s.cache.Fetch(fmt.Sprintf("scores/%s/%s/%s", group, subgroup, name), time.Second*10, func() (interface{}, error) {
 		scores, err := s.scorer.CalcScoreboardWithFilter(group, filter)
 		reverseScoreboardGroups(scores)
 		return scores, err
@@ -165,7 +179,9 @@ func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter score
 		"CourseName":  s.config.Server.CourseName,
 		"Title":       s.config.Server.CourseName,
 		"Config":      s.config,
-		"GroupConfig": s.config.Groups.FindGroup(group),
+		"GroupConfig": groupConfig,
+		"Group":       group,
+		"Subgroup":    subgroup,
 		"Standings":   scores.Value().(*scorer.Standings),
 		"Error":       err,
 		"Links":       links,

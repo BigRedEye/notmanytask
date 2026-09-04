@@ -83,7 +83,10 @@ type ServerConfig struct {
 	ListenAddress string
 	CourseName    string
 	HeaderName    string
-	Cookies       struct {
+	// SignupEmailPattern, when set, adds a required email field to the
+	// signup form validated by this regular expression.
+	SignupEmailPattern string
+	Cookies            struct {
 		AuthenticationKey string
 		EncryptionKey     string
 	}
@@ -101,6 +104,11 @@ type TestingConfig struct {
 	Tokens []string
 }
 
+type SubgroupConfig struct {
+	Name   string
+	Secret string
+}
+
 type GroupConfig struct {
 	Name            string
 	Secret          string
@@ -108,6 +116,18 @@ type GroupConfig struct {
 	DeadlinesFormat string
 	ShowMarks       bool
 	Default         bool
+	// Subgroups optionally split the group by signup secret; each subgroup
+	// has its own standings view.
+	Subgroups []SubgroupConfig
+}
+
+func (g *GroupConfig) FindSubgroup(name string) *SubgroupConfig {
+	for i := range g.Subgroups {
+		if g.Subgroups[i].Name == name {
+			return &g.Subgroups[i]
+		}
+	}
+	return nil
 }
 
 type GroupsConfig []GroupConfig
@@ -119,6 +139,25 @@ func (g GroupsConfig) FindGroup(name string) *GroupConfig {
 		}
 	}
 	return nil
+}
+
+// FindBySecret resolves a signup secret to a group and, if the secret
+// belongs to a subgroup, to that subgroup.
+func (g GroupsConfig) FindBySecret(secret string) (group *GroupConfig, subgroup *SubgroupConfig) {
+	if secret == "" {
+		return nil, nil
+	}
+	for i := range g {
+		if g[i].Secret == secret {
+			return &g[i], nil
+		}
+		for j := range g[i].Subgroups {
+			if g[i].Subgroups[j].Secret == secret {
+				return &g[i], &g[i].Subgroups[j]
+			}
+		}
+	}
+	return nil, nil
 }
 
 func (g GroupsConfig) FindDefaultGroup() *GroupConfig {
