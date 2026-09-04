@@ -30,3 +30,21 @@ func TestScorePipelineNonSuccess(t *testing.T) {
 		}
 	}
 }
+
+func TestPipelineLessPicksEarliestSuccessLatestFailure(t *testing.T) {
+	early := &models.Pipeline{Status: models.PipelineStatusSuccess, StartedAt: testDeadline}
+	late := &models.Pipeline{Status: models.PipelineStatusSuccess, StartedAt: testDeadline.Add(time.Hour)}
+	if !pipelineLess(early, late) || pipelineLess(late, early) {
+		t.Fatal("earliest success must represent the task")
+	}
+
+	earlyFail := &models.Pipeline{Status: models.PipelineStatusFailed, StartedAt: testDeadline}
+	lateFail := &models.Pipeline{Status: models.PipelineStatusFailed, StartedAt: testDeadline.Add(time.Hour)}
+	if !pipelineLess(lateFail, earlyFail) || pipelineLess(earlyFail, lateFail) {
+		t.Fatal("latest failure must represent the task")
+	}
+
+	if !pipelineLess(late, lateFail) {
+		t.Fatal("any success beats any failure")
+	}
+}

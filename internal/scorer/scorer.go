@@ -65,9 +65,15 @@ func classifyPipelineStatus(status models.PipelineStatus) taskStatus {
 	}
 }
 
+// pipelineLess picks the pipeline that represents a task: the best status
+// wins; among successful ones the earliest (it sets the score), among the
+// others the latest (it is the one the student is working on).
 func pipelineLess(left *models.Pipeline, right *models.Pipeline) bool {
 	if classifyPipelineStatus(left.Status) == classifyPipelineStatus(right.Status) {
-		return left.StartedAt.Before(right.StartedAt)
+		if left.Status == models.PipelineStatusSuccess {
+			return left.StartedAt.Before(right.StartedAt)
+		}
+		return left.StartedAt.After(right.StartedAt)
 	}
 
 	return classifyPipelineStatus(left.Status) > classifyPipelineStatus(right.Status)
