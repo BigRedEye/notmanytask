@@ -76,6 +76,18 @@ func Run() error {
 
 	scorer := scorer.NewScorer(db, deadlines, git, config.GitLab.MergeRequests)
 
+	if config.GitLab.MergeRequests != nil {
+		mergeRequests, err := gitlab.NewMergeRequestsFetcher(git, db)
+		if err != nil {
+			return errors.Wrap(err, "Failed to create merge requests fetcher")
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mergeRequests.Run(ctx)
+		}()
+	}
+
 	wg.Add(5)
 	go func() {
 		defer wg.Done()
