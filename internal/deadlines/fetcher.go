@@ -42,7 +42,7 @@ func parseV1(body []byte) (*Deadlines, error) {
 		},
 	}
 
-	err = deadlines.buildScoringGroups()
+	err = deadlines.BuildScoringGroups()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to build scoring groups")
 	}
@@ -57,7 +57,7 @@ func parseV2(body []byte) (*Deadlines, error) {
 		return nil, errors.New("Failed to unmarshal deadlines")
 	}
 
-	err = deadlines.buildScoringGroups()
+	err = deadlines.BuildScoringGroups()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to build scoring groups")
 	}
