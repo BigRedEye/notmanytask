@@ -70,6 +70,7 @@ func fetch(url, format string) (*Deadlines, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch deadlines")
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("failed to fetch deadlines: %s", resp.Status)
