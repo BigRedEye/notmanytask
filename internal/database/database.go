@@ -258,23 +258,6 @@ func (db *DataBase) ListProjectTaskMergeRequests(project, task string) (mergeReq
 	return
 }
 
-// ListMergedTasks returns tasks of the project that already have a merged
-// merge request with a successful, timestamped pipeline.
-func (db *DataBase) ListMergedTasks(project string) (map[string]bool, error) {
-	mergeRequests := make([]models.MergeRequest, 0)
-	err := db.Find(&mergeRequests, "project = ? AND state = ? AND last_pipeline_status = ? AND last_pipeline_created_at > ?",
-		project, models.MergeRequestStateMerged, models.PipelineStatusSuccess, time.Time{}).Error
-	if err != nil {
-		return nil, err
-	}
-
-	tasks := make(map[string]bool, len(mergeRequests))
-	for i := range mergeRequests {
-		tasks[mergeRequests[i].Task] = true
-	}
-	return tasks, nil
-}
-
 func (db *DataBase) CreateSession(user uint) (*models.Session, error) {
 	session := &models.Session{
 		Token:  uuid.Must(uuid.NewUUID()).String(),
