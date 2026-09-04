@@ -17,6 +17,11 @@ type GitLabConfig struct {
 	DefaultReadme string
 	TaskUrlPrefix string
 
+	// TemplateProject is a project in this GitLab (path with namespace or
+	// numeric id) that every new student repository is forked from. Empty
+	// means an empty repository with README.
+	TemplateProject string
+
 	Application struct {
 		ClientID string
 		Secret   string
@@ -25,6 +30,30 @@ type GitLabConfig struct {
 		Token string
 	}
 	CIConfigPath string
+
+	// MergeRequests enables the merge-request workflow: submissions are
+	// merge requests into the main branch, reviewed and auto-merged by the
+	// robot. When nil, submissions are scored by pipelines only.
+	MergeRequests *MergeRequestsConfig
+}
+
+type MergeRequestsConfig struct {
+	// TargetBranch is the branch merge requests are opened against.
+	TargetBranch string
+	// ReviewTtl is how long a merge request must stay quiet (no new
+	// pipelines, no new notes) before it is merged automatically. Zero keeps
+	// merge requests tracked and scored but never merges them.
+	ReviewTtl time.Duration
+	// RobotLogin is the gitlab login of the API token owner. Merges done by
+	// anyone else count as human review.
+	RobotLogin string
+}
+
+func (c *MergeRequestsConfig) GetTargetBranch() string {
+	if c.TargetBranch == "" {
+		return "main"
+	}
+	return c.TargetBranch
 }
 
 type EndpointsConfig struct {
@@ -107,9 +136,10 @@ func (g GroupsConfig) FindDefaultGroup() *GroupConfig {
 }
 
 type PullIntervalsConfig struct {
-	Deadlines time.Duration
-	Projects  *time.Duration
-	Pipelines *time.Duration
+	Deadlines     time.Duration
+	Projects      *time.Duration
+	Pipelines     *time.Duration
+	MergeRequests *time.Duration
 }
 
 type TelegramBotConfig struct {
@@ -134,5 +164,23 @@ func ParseConfig() (*Config, error) {
 	if err := conf.ParseConfig(config, conf.EnvPrefix("NMT")); err != nil {
 		return nil, errors.Wrap(err, "Failed to parse config")
 	}
+	if err := config.Validate(); err != nil {
+		return nil, errors.Wrap(err, "Invalid config")
+	}
 	return config, nil
+}
+
+func (c *Config) Validate() error {
+	if mr := c.GitLab.MergeRequests; mr != nil {
+		if mr.RobotLogin == "" {
+			return errors.New("gitlab.mergeRequests.robotLogin is required")
+		}
+		if mr.ReviewTtl < 0 {
+			return errors.New("gitlab.mergeRequests.reviewTtl must not be negative")
+		}
+		if c.PullIntervals.MergeRequests == nil {
+			return errors.New("pullIntervals.mergeRequests is required in merge request mode")
+		}
+	}
+	return nil
 }
