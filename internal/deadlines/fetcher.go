@@ -81,6 +81,11 @@ func fetch(url, format string) (*Deadlines, error) {
 		return nil, errors.Wrap(err, "Failed to read response")
 	}
 
+	return Parse(body, format)
+}
+
+// Parse reads a deadlines document in the given format ("v1" or "v2").
+func Parse(body []byte, format string) (*Deadlines, error) {
 	switch format {
 	case "v1":
 		return parseV1(body)

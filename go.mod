@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/alexsergivan/transliterator v1.0.0
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/gin-contrib/sessions v0.0.5
@@ -25,6 +26,7 @@ require (
 	golang.org/x/exp v0.0.0-20221227203929-1b447090c38c
 	golang.org/x/oauth2 v0.6.0
 	golang.org/x/sync v0.1.0
+	golang.org/x/text v0.8.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/postgres v1.4.5
@@ -78,7 +80,6 @@ require (
 	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.29.1 // indirect
