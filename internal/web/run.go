@@ -74,7 +74,7 @@ func Run() error {
 		return errors.Wrap(err, "Failed to create projects maker")
 	}
 
-	scorer := scorer.NewScorer(db, deadlines, git)
+	scorer := scorer.NewScorer(db, deadlines, git, config.GitLab.MergeRequests)
 
 	wg.Add(5)
 	go func() {

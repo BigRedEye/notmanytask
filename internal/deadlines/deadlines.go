@@ -89,7 +89,7 @@ type Deadlines struct {
 	groups   map[string]*ScoringGroup `yaml:"-"`
 }
 
-func (d *Deadlines) buildScoringGroups() error {
+func (d *Deadlines) BuildScoringGroups() error {
 	d.policies = make(map[string]ScoringPolicy)
 	for i := range d.Scoring.Policies {
 		policy := &d.Scoring.Policies[i]
