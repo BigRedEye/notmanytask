@@ -11,7 +11,23 @@ const (
 	FieldProjectID      = "project_id"
 	FieldPipelineID     = "pipeline_id"
 	FieldPipelineStatus = "pipeline_status"
+
+	FieldMergeRequestID    = "merge_request_id"
+	FieldMergeRequestState = "merge_request_state"
+	FieldBranchName        = "branch_name"
 )
+
+func MergeRequestID(ID int) zap.Field {
+	return zap.Int(FieldMergeRequestID, ID)
+}
+
+func MergeRequestState(state string) zap.Field {
+	return zap.String(FieldMergeRequestState, state)
+}
+
+func BranchName(name string) zap.Field {
+	return zap.String(FieldBranchName, name)
+}
 
 func Token(token string) zap.Field {
 	return zap.String(FieldToken, token)
