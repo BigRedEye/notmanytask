@@ -75,6 +75,12 @@ groups:
   secret: ihatecpp
   deadlinesUrl: https://gitlab.com/{USER}/{REPO}/-/raw/main/deadlines/hse.yml
   deadlinesFormat: v2
+  # Deadlines may live in a private repository: use the API raw endpoint and
+  # a read-only project access token. Groups and tasks with `published: false`
+  # in the file are invisible to the server until the flag is flipped.
+  # deadlinesUrl: https://gitlab.com/api/v4/projects/{USER}%2F{PRIVATE_REPO}/repository/files/deadlines%2Fhse.yml/raw?ref=main
+  # deadlinesHeaders:
+  #   PRIVATE-TOKEN: {READ_REPOSITORY_TOKEN}
   # Optional subgroups with their own signup secrets and standings filter
   # subgroups:
   # - name: 254-1

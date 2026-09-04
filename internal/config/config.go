@@ -114,8 +114,11 @@ type GroupConfig struct {
 	Secret          string
 	DeadlinesURL    string
 	DeadlinesFormat string
-	ShowMarks       bool
-	Default         bool
+	// DeadlinesHeaders are sent with every deadlines request, e.g.
+	// PRIVATE-TOKEN for a file in a private gitlab repository.
+	DeadlinesHeaders map[string]string
+	ShowMarks        bool
+	Default          bool
 	// Subgroups optionally split the group by signup secret; each subgroup
 	// has its own standings view.
 	Subgroups []SubgroupConfig

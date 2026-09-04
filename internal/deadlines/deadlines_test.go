@@ -2,6 +2,8 @@ package deadlines
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -411,4 +413,76 @@ func TestDeadlinesParsingV2(t *testing.T) {
 			t.Fatal("Not equal")
 		}
 	*/
+}
+
+const unpublishedYaml = `
+scoring:
+  policies:
+  - name: week
+    kind: linear
+    spec: {after: 168h, multiplier: 0}
+  groups:
+  - name: default
+    weight: 10.0
+    policy: week
+  defaultGroup: default
+
+assignments:
+- title: 01-numbers
+  deadline: 10-02-2026 23:59
+  tasks:
+  - task: palindrome
+    score: 100
+  - task: fp16
+    score: 400
+    published: false
+- title: 02-classes
+  published: false
+  deadline: 04-03-2026 23:59
+  tasks:
+  - task: lru_cache
+    score: 100
+`
+
+func TestDeadlinesUnpublished(t *testing.T) {
+	deadlines, err := parseV2([]byte(unpublishedYaml))
+	if err != nil {
+		t.Fatal("Failed to parse deadlines:", err)
+	}
+	if len(deadlines.Assignments) != 1 || deadlines.Assignments[0].Title != "01-numbers" {
+		t.Fatalf("unpublished group must be dropped: %+v", deadlines.Assignments)
+	}
+	tasks := deadlines.Assignments[0].Tasks
+	if len(tasks) != 1 || tasks[0].Task != "palindrome" {
+		t.Fatalf("unpublished task must be dropped: %+v", tasks)
+	}
+	if deadlines.HasTask("fp16") || deadlines.HasTask("lru_cache") {
+		t.Fatal("unpublished tasks must not exist for the server")
+	}
+	// MaxScore of the scoring group counts published tasks only
+	if group := deadlines.GetScoringGroup(&deadlines.Assignments[0]); group.MaxScore != 100 {
+		t.Fatalf("max score must ignore unpublished tasks, got %d", group.MaxScore)
+	}
+}
+
+func TestFetchSendsHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("PRIVATE-TOKEN") != "secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(unpublishedYaml))
+	}))
+	defer server.Close()
+
+	if _, err := fetch(server.URL, "v2", nil); err == nil {
+		t.Fatal("request without the header must fail")
+	}
+	deadlines, err := fetch(server.URL, "v2", map[string]string{"PRIVATE-TOKEN": "secret"})
+	if err != nil {
+		t.Fatal("request with the header failed:", err)
+	}
+	if len(deadlines.Assignments) != 1 {
+		t.Fatalf("unexpected deadlines: %+v", deadlines.Assignments)
+	}
 }

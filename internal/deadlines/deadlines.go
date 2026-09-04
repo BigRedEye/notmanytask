@@ -69,6 +69,9 @@ type Task struct {
 	Task    string
 	Score   int
 	Crashme bool
+	// Published: false hides the task from the server until the flag is
+	// flipped; it lets the deadlines file keep the whole course layout
+	Published *bool
 }
 
 type TaskGroup struct {
@@ -79,6 +82,32 @@ type TaskGroup struct {
 	Start    Date
 
 	Tasks []Task
+	// Published: false hides the whole group, see Task.Published
+	Published *bool
+}
+
+func isPublished(published *bool) bool {
+	return published == nil || *published
+}
+
+// dropUnpublished removes groups and tasks marked published: false, so the
+// rest of the server never sees them.
+func dropUnpublished(groups []TaskGroup) []TaskGroup {
+	result := make([]TaskGroup, 0, len(groups))
+	for _, group := range groups {
+		if !isPublished(group.Published) {
+			continue
+		}
+		tasks := make([]Task, 0, len(group.Tasks))
+		for _, task := range group.Tasks {
+			if isPublished(task.Published) {
+				tasks = append(tasks, task)
+			}
+		}
+		group.Tasks = tasks
+		result = append(result, group)
+	}
+	return result
 }
 
 type Deadlines struct {

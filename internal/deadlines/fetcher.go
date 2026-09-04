@@ -23,7 +23,7 @@ func parseV1(body []byte) (*Deadlines, error) {
 	}
 
 	deadlines := &Deadlines{
-		Assignments: assignments,
+		Assignments: dropUnpublished(assignments),
 		Scoring: Scoring{
 			Policies: []ScoringPolicySpec{{
 				Name: "default",
@@ -56,6 +56,7 @@ func parseV2(body []byte) (*Deadlines, error) {
 	if err != nil {
 		return nil, errors.New("Failed to unmarshal deadlines")
 	}
+	deadlines.Assignments = dropUnpublished(deadlines.Assignments)
 
 	err = deadlines.BuildScoringGroups()
 	if err != nil {
@@ -65,11 +66,19 @@ func parseV2(body []byte) (*Deadlines, error) {
 	return deadlines, nil
 }
 
-func fetch(url, format string) (*Deadlines, error) {
-	resp, err := http.Get(url)
+func fetch(url, format string, headers map[string]string) (*Deadlines, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to build deadlines request")
+	}
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch deadlines")
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("failed to fetch deadlines: %s", resp.Status)
@@ -136,7 +145,7 @@ func (f *Fetcher) reload() error {
 
 	groupDeadlines := make(deadlinesMap)
 	for _, group := range f.config.Groups {
-		deadlines, err := fetch(group.DeadlinesURL, group.DeadlinesFormat)
+		deadlines, err := fetch(group.DeadlinesURL, group.DeadlinesFormat, group.DeadlinesHeaders)
 		if err != nil {
 			f.logger.Error("Failed to reload deadlines", zap.Error(err))
 			return errors.Wrap(err, "Failed to reload deadlines")
