@@ -58,6 +58,15 @@ type ScoredTaskGroup struct {
 	MaxScore int
 }
 
+type ScoredScoringGroup struct {
+	Name          string
+	Score         int
+	MaxScore      int
+	Weight        float64
+	WeightedScore float64
+	TenScaleScore float64
+}
+
 type User struct {
 	FirstName     string
 	LastName      string
@@ -70,10 +79,12 @@ func (u User) FullName() string {
 }
 
 type UserScores struct {
-	Groups    []ScoredTaskGroup
-	Score     int
-	MaxScore  int
-	FinalMark float64
+	Groups        []ScoredTaskGroup
+	ScoringGroups []ScoredScoringGroup
+	Score         int
+	MaxScore      int
+	FinalMark     float64
+	MaxFinalMark  float64
 
 	User User
 }
