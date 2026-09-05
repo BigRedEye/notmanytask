@@ -193,6 +193,9 @@ func TestMergeRequestOpen(t *testing.T) {
 		{"extra changes", func(m *models.MergeRequest) {
 			m.ExtraChanges = true
 		}, TaskStatusFailed, "extra changes"},
+		{"no changes", func(m *models.MergeRequest) {
+			m.NoChanges = true
+		}, TaskStatusFailed, "no changes"},
 		{"on review", func(m *models.MergeRequest) {
 			m.UserNotesCount = 1
 			m.HasUnresolvedNotes = true

@@ -36,6 +36,7 @@ func TestReadyToMerge(t *testing.T) {
 		"unresolved notes": func(m *branchMergeRequests) { m.HasUnresolvedNotes = true },
 		"fresh note":       func(m *branchMergeRequests) { m.LastNoteCreatedAt = after },
 		"extra changes":    func(m *branchMergeRequests) { m.Open.ExtraChanges = true },
+		"no changes":       func(m *branchMergeRequests) { m.Open.NoChanges = true },
 		"pipeline failed":  func(m *branchMergeRequests) { m.Open.LastPipelineStatus = models.PipelineStatusFailed },
 		"pipeline running": func(m *branchMergeRequests) { m.Open.LastPipelineStatus = models.PipelineStatusRunning },
 		"no pipeline":      func(m *branchMergeRequests) { m.Open.LastPipelineStatus = "" },

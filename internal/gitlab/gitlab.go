@@ -65,11 +65,15 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 	// Fill the repository: wait for the fork of the template, or commit a
 	// README into the empty project
 	branch := master
+	pushLevel := gitlab.MaintainerPermissions
 	if c.useTemplateProject() {
 		if err = c.checkForkReady(log, project); err != nil {
 			return "", err
 		}
 		branch = project.DefaultBranch
+		// Students push to main themselves ("Update fork" needs it), only the
+		// robot merges; the score comes from merged requests, not from main
+		pushLevel = gitlab.DeveloperPermissions
 	} else if err = c.createReadme(log, project); err != nil {
 		return "", err
 	}
@@ -78,7 +82,7 @@ func (c Client) InitializeProject(user *models.User) (projectURL string, err err
 		return "", err
 	}
 
-	if err = c.protectBranch(log, project, branch); err != nil {
+	if err = c.protectBranch(log, project, branch, pushLevel); err != nil {
 		return "", err
 	}
 
@@ -220,26 +224,35 @@ func (c Client) createReadme(log *zap.Logger, project *gitlab.Project) error {
 	return nil
 }
 
-// protectBranch protects the branch from unintended commits: only
-// maintainers (the robot) may push and merge.
-func (c Client) protectBranch(log *zap.Logger, project *gitlab.Project, branch string) error {
+// protectBranch protects the branch: pushLevel says who may push, merging
+// is for maintainers (the robot) only. An existing protection is replaced
+// so that the levels always match the configuration.
+func (c Client) protectBranch(log *zap.Logger, project *gitlab.Project, branch string, pushLevel gitlab.AccessLevelValue) error {
 	log = log.With(lf.BranchName(branch))
-	_, _, err := c.gitlab.ProtectedBranches.ProtectRepositoryBranches(project.ID, &gitlab.ProtectRepositoryBranchesOptions{
-		Name:                 gitlab.String(branch),
-		PushAccessLevel:      gitlab.AccessLevel(gitlab.MaintainerPermissions),
-		MergeAccessLevel:     gitlab.AccessLevel(gitlab.MaintainerPermissions),
-		UnprotectAccessLevel: gitlab.AccessLevel(gitlab.MaintainerPermissions),
-	})
+	protect := func() error {
+		_, _, err := c.gitlab.ProtectedBranches.ProtectRepositoryBranches(project.ID, &gitlab.ProtectRepositoryBranchesOptions{
+			Name:                 gitlab.String(branch),
+			PushAccessLevel:      gitlab.AccessLevel(pushLevel),
+			MergeAccessLevel:     gitlab.AccessLevel(gitlab.MaintainerPermissions),
+			UnprotectAccessLevel: gitlab.AccessLevel(gitlab.MaintainerPermissions),
+		})
+		return err
+	}
+	err := protect()
 	var errresp *gitlab.ErrorResponse
-	if err != nil {
-		if goerrors.As(err, &errresp) && errresp.Message == fmt.Sprintf("{message: Protected branch '%s' already exists}", branch) {
-			log.Warn("Branch is already protected", zap.Error(err))
-			return nil
+	if err != nil && goerrors.As(err, &errresp) && errresp.Message == fmt.Sprintf("{message: Protected branch '%s' already exists}", branch) {
+		log.Info("Branch is already protected, replacing the protection")
+		if _, err = c.gitlab.ProtectedBranches.UnprotectRepositoryBranches(project.ID, branch); err != nil {
+			log.Error("Failed to unprotect branch", zap.Error(err))
+			return errors.Wrap(err, "Failed to unprotect branch")
 		}
+		err = protect()
+	}
+	if err != nil {
 		log.Error("Failed to protect branch", zap.Error(err))
 		return errors.Wrap(err, "Failed to protect branch")
 	}
-	log.Info("Protected branch")
+	log.Info("Protected branch", zap.Int("push_level", int(pushLevel)))
 	return nil
 }
 

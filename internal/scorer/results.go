@@ -23,6 +23,7 @@ const (
 	//   merged, last pipeline not green (re-check) failed             0
 	//   open, last pipeline failed                 failed             0
 	//   open, touches files outside tasks/<task>/  failed             0
+	//   open, empty diff (solution pushed to main) failed             0
 	//   open, gitlab says conflict                 failed             0
 	//   open, unresolved review threads            review_unresolved  0
 	//   open, threads resolved, waiting            review_resolved    0

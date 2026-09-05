@@ -476,6 +476,7 @@ const (
 	mergeRequestStatusReviewResolved
 	mergeRequestStatusCantBeMerged
 	mergeRequestStatusHasExtraChanges
+	mergeRequestStatusNoChanges
 	mergeRequestStatusPipelineFailed
 	// A merged request is the final state: nothing can shadow it
 	mergeRequestStatusMerged
@@ -497,6 +498,8 @@ func classifyMergeRequest(mergeRequest *models.MergeRequest) mergeRequestStatus 
 		return mergeRequestStatusOnReview
 	case mergeRequest.UserNotesCount > 0:
 		return mergeRequestStatusReviewResolved
+	case mergeRequest.NoChanges:
+		return mergeRequestStatusNoChanges
 	case mergeRequest.ExtraChanges:
 		return mergeRequestStatusHasExtraChanges
 	default:
@@ -600,6 +603,9 @@ func (s Scorer) scoreMergeRequest(
 	case mergeRequestStatusHasExtraChanges:
 		scored.Status = TaskStatusFailed
 		scored.Message = "extra changes"
+	case mergeRequestStatusNoChanges:
+		scored.Status = TaskStatusFailed
+		scored.Message = "no changes"
 	case mergeRequestStatusCantBeMerged:
 		scored.Status = TaskStatusFailed
 		scored.Message = "merge conflict"

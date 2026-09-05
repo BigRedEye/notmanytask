@@ -28,4 +28,7 @@ type MergeRequest struct {
 	LastPipelineStatus    PipelineStatus
 	LastPipelineCreatedAt time.Time
 	ExtraChanges          bool
+	// NoChanges: the request has an empty diff (the solution was pushed to
+	// main directly); it never counts
+	NoChanges bool
 }
