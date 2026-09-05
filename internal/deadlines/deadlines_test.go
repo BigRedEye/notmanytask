@@ -444,3 +444,23 @@ assignments:
 		t.Fatalf("valid document rejected: %v", err)
 	}
 }
+
+func TestDeadlinesRejectUnknownKeys(t *testing.T) {
+	v2 := `
+scoring:
+  policies: [{name: week, kind: linear, spec: {after: 168h, multiplier: 0}}]
+  groups: [{name: default, weight: 10.0, policy: week}]
+  defaultGroup: default
+assignments:
+- title: 01-numbers
+  deadlnie: 10-02-2026 23:59
+  tasks: [{task: a, score: 1}]
+`
+	if _, err := parseV2([]byte(v2)); err == nil {
+		t.Fatal("a misspelled key must be rejected")
+	}
+	v1 := "- title: x\n  deadline: 10-02-2026 23:59\n  tasks: [{task: a, scroe: 1}]\n"
+	if _, err := parseV1([]byte(v1)); err == nil {
+		t.Fatal("a misspelled task key must be rejected in v1 too")
+	}
+}
