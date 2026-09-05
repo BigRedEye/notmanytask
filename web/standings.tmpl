@@ -157,7 +157,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {{ with index .Standings.Users 0 }}
+                        {{ if .Standings.Users }}{{ with index .Standings.Users 0 }}
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">0</th>
                                 <th scope="row" class="name sticky-col second-col">Chuck Norris</th>
@@ -170,7 +170,7 @@
                                     {{ end }}
                                 {{ end }}
                             </tr>
-                        {{ end }}
+                        {{ end }}{{ end }}
                         {{ range $index, $user := .Standings.Users }}
                             <tr>
                                 <th scope="row" class="num sticky-col first-col">{{ inc $index }}</th>
