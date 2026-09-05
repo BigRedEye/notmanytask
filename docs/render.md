@@ -53,27 +53,32 @@ nmt render --source . --out ./public
 ones deleted, a `.git` directory inside is left alone. The command prints the
 changed files and refuses to write anything if a forbidden substring is found.
 
-## Publishing from CI
+## Publishing
+
+```sh
+nmt publish --source . --target git@gitlab.example.org:course/template.git [--dry-run]
+```
+
+Clones the template, renders into the clone and pushes one commit
+`Publish <date> <time> from <short hash of the source>`; nothing is pushed when the public tree did not change.
+`--dry-run` shows the diff instead. Authentication is git's own: an ssh key,
+or a token in the URL. The template is never force-pushed: student forks
+update from it.
+
+From CI of the private repository:
 
 ```yaml
 render:
   script:
-    - git clone "$TEMPLATE_URL" public
-    - nmt render --source . --out public
-    - git -C public add -A && git -C public status --short
+    - nmt publish --source . --target "$TEMPLATE_URL" --dry-run
 
 publish:
   when: manual
   only: [main]
   script:
-    - git clone "$TEMPLATE_URL" public
-    - nmt render --source . --out public
-    - git -C public add -A
-    - git -C public -c user.name=notmanytask -c user.email=robot@example.org commit -m "Publish $(date +%F)" || exit 0
-    - git -C public push
+    - nmt publish --source . --target "$TEMPLATE_URL"
 ```
 
 `TEMPLATE_URL` is the template project with credentials for the robot, e.g.
 `https://oauth2:$TOKEN@gitlab.example.org/course/template.git`. The `render`
-job shows the diff on every push; `publish` is a button on `main`. Never
-force-push the template: student forks update from it.
+job shows the diff on every push; `publish` is a button on `main`.
