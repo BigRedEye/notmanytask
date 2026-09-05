@@ -412,3 +412,35 @@ func TestDeadlinesParsingV2(t *testing.T) {
 		}
 	*/
 }
+
+func TestDeadlinesV2Validation(t *testing.T) {
+	scoring := `
+scoring:
+  policies: [{name: week, kind: linear, spec: {after: 168h, multiplier: 0}}]
+  groups: [{name: default, weight: 10.0, policy: week}]
+  defaultGroup: default
+`
+	cases := map[string]string{
+		"group instead of title": scoring + `
+assignments:
+- group: 01-numbers
+  deadline: 10-02-2026 23:59
+  tasks: [{task: a, score: 1}]
+`,
+		"unknown scoring group": scoring + `
+assignments:
+- title: 01-numbers
+  group: nope
+  deadline: 10-02-2026 23:59
+  tasks: [{task: a, score: 1}]
+`,
+	}
+	for name, body := range cases {
+		if _, err := parseV2([]byte(body)); err == nil {
+			t.Errorf("%s: must be rejected", name)
+		}
+	}
+	if _, err := parseV2([]byte(scoring + "\nassignments:\n- title: ok\n  deadline: 10-02-2026 23:59\n  tasks: [{task: a, score: 1}]\n")); err != nil {
+		t.Fatalf("valid document rejected: %v", err)
+	}
+}

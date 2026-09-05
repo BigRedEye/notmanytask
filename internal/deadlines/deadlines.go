@@ -1,6 +1,7 @@
 package deadlines
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -103,8 +104,15 @@ func (d *Deadlines) BuildScoringGroups() error {
 
 	maxScores := make(map[string]int)
 	for i := range d.Assignments {
-		group := d.GetScoringGroup(&d.Assignments[i])
-		if group != nil && group.MaxScore == 0 {
+		assignment := &d.Assignments[i]
+		if assignment.Title == "" {
+			return fmt.Errorf("assignment #%d has no title (v2 uses `title:`, `group:` names a scoring group)", i+1)
+		}
+		group := d.GetScoringGroup(assignment)
+		if group == nil {
+			return fmt.Errorf("assignment %q refers to unknown scoring group %q", assignment.Title, assignment.Group)
+		}
+		if group.MaxScore == 0 {
 			totalScore := 0
 			for j := range d.Assignments[i].Tasks {
 				totalScore += d.Assignments[i].Tasks[j].Score
