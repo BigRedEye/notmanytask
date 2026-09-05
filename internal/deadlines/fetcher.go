@@ -19,7 +19,7 @@ func parseV1(body []byte) (*Deadlines, error) {
 	assignments := []TaskGroup{}
 	err := yaml.Unmarshal(body, &assignments)
 	if err != nil {
-		return nil, errors.New("Failed to unmarshal deadlines")
+		return nil, errors.Wrap(err, "Failed to unmarshal deadlines")
 	}
 
 	deadlines := &Deadlines{
@@ -54,7 +54,7 @@ func parseV2(body []byte) (*Deadlines, error) {
 	deadlines := &Deadlines{}
 	err := yaml.Unmarshal(body, &deadlines)
 	if err != nil {
-		return nil, errors.New("Failed to unmarshal deadlines")
+		return nil, errors.Wrap(err, "Failed to unmarshal deadlines")
 	}
 
 	err = deadlines.BuildScoringGroups()
