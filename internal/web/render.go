@@ -91,15 +91,19 @@ type Links struct {
 }
 
 func (s *server) makeLinks(user *models.User) *Links {
-	return &Links{
+	links := &Links{
 		Deadlines:       s.config.Endpoints.Home,
 		Standings:       s.config.Endpoints.Standings,
 		TasksRepository: s.config.GitLab.TaskUrlPrefix,
-		Repository:      s.gitlab.MakeProjectURL(user),
-		Submits:         s.gitlab.MakeProjectSubmitsURL(user),
 		Logout:          s.config.Endpoints.Logout,
 		SubmitFlag:      s.config.Endpoints.Flag,
 	}
+	// No repository yet (still being created): no links into nowhere
+	if user != nil && user.Repository != nil {
+		links.Repository = s.gitlab.MakeProjectURL(user)
+		links.Submits = s.gitlab.MakeProjectSubmitsURL(user)
+	}
+	return links
 }
 
 func (s *server) RenderHomePage(c *gin.Context) {

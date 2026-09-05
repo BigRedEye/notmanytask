@@ -84,12 +84,16 @@
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.SubmitFlag }}"><h5>Submit flag</h5></a>
                   </div>
+                  {{ if .Links.Repository }}
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Repository }}"><h5>My Repo</h5></a>
                   </div>
+                  {{ end }}
+                  {{ if .Links.Submits }}
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Submits }}"><h5>Submits</h5></a>
                   </div>
+                  {{ end }}
                   <div class="col-auto">
                       <a class="nav-link" href="{{ .Links.Logout }}"><h5>Logout</h5></a>
                   </div>
@@ -97,6 +101,14 @@
             </div>
             </div>
         </nav>
+
+        {{ if not .Links.Repository }}
+            <div class="container my-3">
+                <div class="alert alert-info" role="alert">
+                    Your repository is being created, this takes a minute. Refresh the page a bit later.
+                </div>
+            </div>
+        {{ end }}
 
         {{ if .Scores }}
             {{ range .Scores.Groups }}
