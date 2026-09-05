@@ -2,6 +2,7 @@ package conf
 
 import (
 	"flag"
+	"github.com/mitchellh/mapstructure"
 	"reflect"
 	"strings"
 
@@ -74,7 +75,9 @@ func ParseConfig(config interface{}, options ...Option) error {
 
 	bindEnvs(config)
 
-	if err := viper.Unmarshal(config); err != nil {
+	// Strict: an unknown key is a typo or a stale setting, fail instead of
+	// silently ignoring it
+	if err := viper.Unmarshal(config, func(dc *mapstructure.DecoderConfig) { dc.ErrorUnused = true }); err != nil {
 		return errors.Wrap(err, "Failed to unmarshal config")
 	}
 

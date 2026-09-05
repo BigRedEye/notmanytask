@@ -20,6 +20,7 @@ type Config struct {
 	MaxSize     string
 	MaxBackups  int
 	MaxAgeDays  int
+	Compress    bool
 	Development bool
 }
 
@@ -67,6 +68,7 @@ func Init(config Config) (*zap.Logger, error) {
 		MaxSize:    int(maxSizeBytes / mebibyte),
 		MaxBackups: config.MaxBackups,
 		MaxAge:     config.MaxAgeDays,
+		Compress:   config.Compress,
 	}
 	sighupChan := make(chan os.Signal, 1)
 	signal.Notify(sighupChan, syscall.SIGHUP)
