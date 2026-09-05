@@ -227,6 +227,7 @@ func (db *DataBase) UpsertMergeRequest(mergeRequest *models.MergeRequest) error 
 			"last_pipeline_status",
 			"last_pipeline_created_at",
 			"extra_changes",
+			"no_changes",
 		}),
 	}).Create(mergeRequest).Error
 }

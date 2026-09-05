@@ -119,7 +119,7 @@ func (p *MergeRequestsFetcher) syncMergeRequest(log *zap.Logger, project *gitlab
 	if err != nil {
 		return errors.Wrap(err, "Failed to list notes")
 	}
-	extraChanges, err := p.hasExtraChanges(project, mr, task)
+	extraChanges, noChanges, err := p.inspectChanges(project, mr, task)
 	if err != nil {
 		return errors.Wrap(err, "Failed to list changes")
 	}
@@ -153,6 +153,7 @@ func (p *MergeRequestsFetcher) syncMergeRequest(log *zap.Logger, project *gitlab
 		LastPipelineStatus:    pipeline.Status,
 		LastPipelineCreatedAt: pipeline.CreatedAt,
 		ExtraChanges:          extraChanges,
+		NoChanges:             noChanges,
 	})
 	if err != nil {
 		return errors.Wrap(err, "Failed to upsert merge request")
@@ -219,26 +220,30 @@ func (p *MergeRequestsFetcher) getNotesInfo(project *gitlab.Project, mr *gitlab.
 	return result, nil
 }
 
-// hasExtraChanges reports whether the merge request touches anything outside
-// of its task directory.
-func (p *MergeRequestsFetcher) hasExtraChanges(project *gitlab.Project, mr *gitlab.MergeRequest, task string) (bool, error) {
+// inspectChanges reports whether the merge request touches anything outside
+// of its task directory (extra) or nothing at all (empty: the solution went
+// to main directly, bypassing review).
+func (p *MergeRequestsFetcher) inspectChanges(project *gitlab.Project, mr *gitlab.MergeRequest, task string) (extra bool, empty bool, err error) {
 	allowedPrefix := fmt.Sprintf("%s%s/", tasksPrefix, task)
 
 	changes, _, err := p.gitlab.MergeRequests.GetMergeRequestChanges(project.ID, mr.IID, &gitlab.GetMergeRequestChangesOptions{})
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	if changes.Overflow {
 		// The diff is truncated, we cannot prove it is clean
-		return true, nil
+		return true, false, nil
+	}
+	if len(changes.Changes) == 0 {
+		return false, true, nil
 	}
 
 	for _, change := range changes.Changes {
 		if !strings.HasPrefix(change.NewPath, allowedPrefix) || !strings.HasPrefix(change.OldPath, allowedPrefix) {
-			return true, nil
+			return true, false, nil
 		}
 	}
-	return false, nil
+	return false, false, nil
 }
 
 type pipelineInfo struct {
@@ -366,6 +371,7 @@ func readyToMerge(mrs *branchMergeRequests, reviewDeadline time.Time) bool {
 		!mrs.HasUnresolvedNotes &&
 		mrs.LastNoteCreatedAt.Before(reviewDeadline) &&
 		!open.ExtraChanges &&
+		!open.NoChanges &&
 		open.LastPipelineStatus == models.PipelineStatusSuccess &&
 		!open.LastPipelineCreatedAt.IsZero() &&
 		open.LastPipelineCreatedAt.Before(reviewDeadline)
