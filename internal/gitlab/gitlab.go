@@ -111,8 +111,11 @@ func (c Client) findOrCreateProject(log *zap.Logger, projectName string) (*gitla
 	if c.useTemplateProject() {
 		// Forking is asynchronous: gitlab returns the project at once and
 		// fills the repository in the background, see checkForkReady.
+		// Path must be explicit: the fork API defaults it to the path of
+		// the template, not to the name
 		project, _, err = c.gitlab.Projects.ForkProject(c.config.GitLab.TemplateProject, &gitlab.ForkProjectOptions{
 			Name:                          &projectName,
+			Path:                          &projectName,
 			NamespaceID:                   &c.config.GitLab.Group.ID,
 			Visibility:                    gitlab.Visibility(gitlab.PrivateVisibility),
 			MergeRequestDefaultTargetSelf: gitlab.Bool(true),
