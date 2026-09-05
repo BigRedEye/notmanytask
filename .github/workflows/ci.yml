@@ -58,7 +58,8 @@ jobs:
             type=sha
             type=ref,event=tag
             type=semver,pattern=v{{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
-          flavor: latest=auto
+          # latest only for release tags; `auto` also tagged prereleases
+          flavor: latest=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
       - uses: docker/build-push-action@v6
         with:
           context: .
