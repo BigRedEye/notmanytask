@@ -108,7 +108,10 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.Flag, s.validateSession(true), s.RenderSubmitFlagPage)
 	r.GET(s.config.Endpoints.Retakes, s.validateSession(true), s.RenderRetakesPage)
 	r.POST(s.config.Endpoints.Flag, s.validateSession(true), s.handleFlagSubmit)
-	r.GET(s.config.Endpoints.Standings /* no need to validate session */, s.RenderStandingsPage)
+	// Standings are public: /standings, /standings/<group>, /standings/<group>/<subgroup>
+	r.GET(s.config.Endpoints.Standings, s.RenderStandingsPage)
+	r.GET(s.config.Endpoints.Standings+"/:group", s.RenderStandingsPage)
+	r.GET(s.config.Endpoints.Standings+"/:group/:subgroup", s.RenderStandingsPage)
 	r.GET("/private/solutions/:group/:task", s.handleChuckNorris)
 
 	r.StaticFS("/static", http.FS(web.StaticContent))

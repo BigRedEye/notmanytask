@@ -131,6 +131,15 @@
       </nav>
 
         <div class="p-2 my-2">
+            {{ if gt (len .Groups) 1 }}
+            <div class="row p-2">
+                {{ range .Groups }}
+                    <div class="col-auto">
+                        <a class="nav-link{{ if .Active }} fw-bold{{ end }}" href="{{ .Link }}"><h5>{{ .Name }}</h5></a>
+                    </div>
+                {{ end }}
+            </div>
+            {{ end }}
             <div class="">
                 <table class="table table-hover">
                     <thead>
@@ -167,7 +176,7 @@
                                 <th scope="row" class="num sticky-col first-col">{{ inc $index }}</th>
                                 <th scope="row" class="name sticky-col second-col">{{ $user.User.FirstName }} {{ $user.User.LastName }}</th>
                                 {{ if $.GroupConfig.Subgroups }}
-                                    <td><a href="?group={{ $.Group }}&subgroup={{ $user.User.Subgroup }}" class="text-decoration-none text-dark">{{ $user.User.Subgroup }}</a></td>
+                                    <td><a href="{{ $.GroupLink }}/{{ $user.User.Subgroup }}" class="text-decoration-none text-dark">{{ $user.User.Subgroup }}</a></td>
                                 {{ end }}
                                 {{ if $.GroupConfig.ShowMarks }}<td>{{printf "%.3f" $user.FinalMark}}</td>{{ end }}
                                 <td>{{ $user.Score }}</td>

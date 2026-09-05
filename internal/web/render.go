@@ -143,8 +143,37 @@ func reverseScoreboardGroups(standings *scorer.Standings) {
 	}
 }
 
+// GroupLink is one entry of the group switcher above the standings table.
+type GroupLink struct {
+	Name   string
+	Link   string
+	Active bool
+}
+
+// standingsLink builds the pretty standings path: /standings/<group> or
+// /standings/<group>/<subgroup>.
+func (s *server) standingsLink(group, subgroup string) string {
+	link := s.config.Endpoints.Standings + "/" + group
+	if subgroup != "" {
+		link += "/" + subgroup
+	}
+	return link
+}
+
+func (s *server) makeGroupLinks(active string) []GroupLink {
+	links := make([]GroupLink, 0, len(s.config.Groups))
+	for _, group := range s.config.Groups {
+		links = append(links, GroupLink{Name: group.Name, Link: s.standingsLink(group.Name, ""), Active: group.Name == active})
+	}
+	return links
+}
+
 func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter scorer.UserFilter) {
-	group := c.Query("group")
+	// Pretty paths /standings/<group>[/<subgroup>] first, ?group=&subgroup= for old links
+	group := c.Param("group")
+	if group == "" {
+		group = c.Query("group")
+	}
 	if group == "" {
 		defaul := s.config.Groups.FindDefaultGroup()
 		if defaul != nil {
@@ -154,7 +183,10 @@ func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter score
 	groupConfig := s.config.Groups.FindGroup(group)
 
 	// Optional subgroup filter; unknown subgroups are ignored
-	subgroup := c.Query("subgroup")
+	subgroup := c.Param("subgroup")
+	if subgroup == "" {
+		subgroup = c.Query("subgroup")
+	}
 	if groupConfig == nil || groupConfig.FindSubgroup(subgroup) == nil {
 		subgroup = ""
 	}
@@ -182,6 +214,8 @@ func (s *server) doRenderStandingsPage(c *gin.Context, name string, filter score
 		"GroupConfig": groupConfig,
 		"Group":       group,
 		"Subgroup":    subgroup,
+		"Groups":      s.makeGroupLinks(group),
+		"GroupLink":   s.standingsLink(group, ""),
 		"Standings":   scores.Value().(*scorer.Standings),
 		"Error":       err,
 		"Links":       links,
