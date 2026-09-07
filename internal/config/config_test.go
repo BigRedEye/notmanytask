@@ -59,7 +59,11 @@ func TestValidateMergeRequests(t *testing.T) {
 			GitLab: GitLabConfig{MergeRequests: &MergeRequestsConfig{ReviewTtl: 1, RobotLogin: "robot"}},
 		}, false},
 	}
+	if err := (&Config{}).Validate(); err == nil {
+		t.Fatal("gitlab.group.name must be required")
+	}
 	for _, c := range cases {
+		c.config.GitLab.Group.Name = "g"
 		err := c.config.Validate()
 		if (err == nil) != c.valid {
 			t.Errorf("%s: valid=%v, err=%v", c.name, c.valid, err)

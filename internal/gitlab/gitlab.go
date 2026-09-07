@@ -28,6 +28,15 @@ func NewClient(conf *config.Config, logger *zap.Logger) (*Client, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create gitlab client")
 	}
+	if conf.GitLab.Group.ID == 0 {
+		// The id is only needed by the API; resolve it from the name once
+		group, _, err := client.Groups.GetGroup(conf.GitLab.Group.Name, nil)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to resolve gitlab group %q", conf.GitLab.Group.Name)
+		}
+		conf.GitLab.Group.ID = group.ID
+		logger.Info("Resolved gitlab group", zap.String("group", conf.GitLab.Group.Name), zap.Int("group_id", group.ID))
+	}
 	return &Client{
 		config:   conf,
 		gitlab:   client,

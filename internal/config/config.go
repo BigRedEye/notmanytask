@@ -12,7 +12,8 @@ type GitLabConfig struct {
 	BaseURL string
 	Group   struct {
 		Name string
-		ID   int
+		// ID is optional: resolved from Name at startup when zero
+		ID int
 	}
 	DefaultReadme string
 	TaskUrlPrefix string
@@ -210,6 +211,9 @@ func ParseConfig() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	if c.GitLab.Group.Name == "" {
+		return errors.New("gitlab.group.name is required")
+	}
 	if mr := c.GitLab.MergeRequests; mr != nil {
 		if mr.RobotLogin == "" {
 			return errors.New("gitlab.mergeRequests.robotLogin is required")
