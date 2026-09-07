@@ -74,3 +74,22 @@ func TestValidateMergeRequests(t *testing.T) {
 		t.Fatal("default target branch must be main")
 	}
 }
+
+func TestValidateTelegramProxy(t *testing.T) {
+	base := Config{}
+	base.GitLab.Group.Name = "g"
+	for proxy, valid := range map[string]bool{
+		"":                              true,
+		"socks5://127.0.0.1:1080":       true,
+		"socks5://user:pass@proxy:1080": true,
+		"http://proxy:3128":             true,
+		"proxy:1080":                    false,
+		"ftp://proxy":                   false,
+	} {
+		c := base
+		c.Telegram = &TelegramBotConfig{Proxy: proxy}
+		if err := c.Validate(); (err == nil) != valid {
+			t.Errorf("proxy %q: valid=%v, err=%v", proxy, valid, err)
+		}
+	}
+}

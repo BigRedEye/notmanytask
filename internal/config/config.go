@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"time"
 
 	"github.com/bigredeye/notmanytask/pkg/conf"
@@ -185,6 +186,9 @@ type PullIntervalsConfig struct {
 type TelegramBotConfig struct {
 	BotLogin string
 	BotToken string
+	// Proxy for the Bot API, e.g. socks5://user:pass@host:1080 or
+	// http://host:3128. Empty: direct, honouring HTTPS_PROXY.
+	Proxy string
 }
 
 type Config struct {
@@ -213,6 +217,12 @@ func ParseConfig() (*Config, error) {
 func (c *Config) Validate() error {
 	if c.GitLab.Group.Name == "" {
 		return errors.New("gitlab.group.name is required")
+	}
+	if c.Telegram != nil && c.Telegram.Proxy != "" {
+		u, err := url.Parse(c.Telegram.Proxy)
+		if err != nil || u.Host == "" || (u.Scheme != "socks5" && u.Scheme != "http" && u.Scheme != "https") {
+			return errors.New("telegram.proxy must be a socks5:// or http(s):// URL")
+		}
 	}
 	if mr := c.GitLab.MergeRequests; mr != nil {
 		if mr.RobotLogin == "" {

@@ -3,6 +3,8 @@ package tgbot
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -24,11 +26,28 @@ func NewBot(conf *config.Config, log *zap.Logger, db *database.DataBase) (*Bot, 
 		return nil, nil
 	}
 
-	bot, err := tgbotapi.NewBotAPI(conf.Telegram.BotToken)
+	client, err := newHTTPClient(conf.Telegram.Proxy)
+	if err != nil {
+		return nil, err
+	}
+	bot, err := tgbotapi.NewBotAPIWithClient(conf.Telegram.BotToken, tgbotapi.APIEndpoint, client)
 	if err != nil {
 		return nil, err
 	}
 	return &Bot{bot, log, db}, nil
+}
+
+// newHTTPClient routes the Bot API through the configured proxy; without one
+// the default client is used, which honours HTTPS_PROXY.
+func newHTTPClient(proxy string) (*http.Client, error) {
+	if proxy == "" {
+		return http.DefaultClient, nil
+	}
+	u, err := url.Parse(proxy)
+	if err != nil {
+		return nil, fmt.Errorf("bad telegram proxy: %w", err)
+	}
+	return &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(u)}}, nil
 }
 
 func (b *Bot) Run(ctx context.Context) {
