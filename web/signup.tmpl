@@ -31,14 +31,14 @@
             <div class="card-body">
               <form method="post" action="{{ .Config.Endpoints.Signup }}" class="needs-validation was-validated">
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingFirstName" placeholder="Иван" name="firstname" required pattern="[А-ЯЁËа-яёë-]+">
+                  <input type="text" class="form-control" id="floatingFirstName" placeholder="Иван" name="firstname" required pattern="[А-ЯЁËа-яёë\-]+">
                   <label for="floatingFirstName">First name</label>
                   <div class="invalid-feedback">
                     Please use only Cyrillic letters
                   </div>
                 </div>
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingLastName" placeholder="Петров" name="lastname" required pattern="[А-ЯЁËа-яёë-]+">
+                  <input type="text" class="form-control" id="floatingLastName" placeholder="Петров" name="lastname" required pattern="[А-ЯЁËа-яёë\-]+">
                   <label for="floatingLastName">Last name</label>
                   <div class="invalid-feedback">
                     Please use only Cyrillic letters
@@ -54,7 +54,7 @@
                 </div>
                 {{ end }}
                 <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="floatingSecretCode" placeholder="LolKekCheburek" name="secret" required pattern="[A-Za-z0-9-_]+">
+                  <input type="text" class="form-control" id="floatingSecretCode" placeholder="LolKekCheburek" name="secret" required pattern="[A-Za-z0-9_\-]+">
                   <label for="floatingSecretCode">Secret code</label>
                   <div class="invalid-feedback">
                     Ask your teacher
