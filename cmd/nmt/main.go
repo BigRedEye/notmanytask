@@ -23,10 +23,14 @@ func unwrap[T any](value T, err error) T {
 	return value
 }
 
+// version is set at build time: -ldflags "-X main.version=v1.2.3"
+var version = "dev"
+
 var (
 	rootCmd = &cobra.Command{
-		Use:   "nmt",
-		Short: "Notmanytask client",
+		Use:     "nmt",
+		Short:   "Notmanytask client",
+		Version: version,
 	}
 
 	dumpCmd = &cobra.Command{
