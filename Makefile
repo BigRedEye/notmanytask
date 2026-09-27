@@ -1,4 +1,6 @@
-all: web crashme
+VERSION ?= dev
+
+all: web crashme nmt
 
 protos:
 	true
@@ -11,6 +13,9 @@ web: make_build
 
 crashme: make_build
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -ldflags="-extldflags=-static" -o build ./cmd/crashme
+
+nmt: make_build
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -ldflags "-X main.version=$(VERSION)" -o build ./cmd/nmt
 
 run_web: web
 	./build/web
