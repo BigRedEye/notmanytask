@@ -65,20 +65,44 @@ Clones the template, renders into the clone and pushes one commit
 or a token in the URL. The template is never force-pushed: student forks
 update from it.
 
-From CI of the private repository:
+## Installing nmt
+
+- On your machine: download `nmt-<os>-<arch>` from the [releases](https://github.com/BigRedEye/notmanytask/releases) (check it against `sha256sums.txt`), or `go install github.com/bigredeye/notmanytask/cmd/nmt@latest`.
+- In CI: the `ghcr.io/bigredeye/notmanytask-cli:<version>` image has `nmt` and `git` and no entrypoint, so any CI runs its scripts as is. Pin the version: rendering rules change with notmanytask.
+
+## Publishing from CI
+
+Two projects on the course GitLab: a private **beta** that follows `main` of the course repository automatically, and the **public** template students fork from, updated by a button. The button copies the head of beta as is, so what goes to students is exactly what you looked at in beta. Nothing is ever force-pushed: pressing the button in an old pipeline still ships the current beta, and a commit made in public by hand makes the push fail instead of being overwritten.
 
 ```yaml
-render:
-  script:
-    - nmt publish --source . --target "$TEMPLATE_URL" --dry-run
+variables:
+  BETA_URL: https://token:${BETA_TOKEN}@gitlab.example.org/course/beta.git
+  PUBLIC_URL: https://token:${PUBLIC_TOKEN}@gitlab.example.org/course/public.git
 
-publish:
-  when: manual
-  only: [main]
+.nmt:
+  image: ghcr.io/bigredeye/notmanytask-cli:v1.0.0
+  stage: publish
+  variables:
+    GIT_SUBMODULE_STRATEGY: none    # private tests are not needed to publish
+
+beta:                               # every push to main
+  extends: .nmt
+  needs: [testenv]                  # the grader image with the new tasks goes first
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    - nmt publish --source . --target "$TEMPLATE_URL"
+    - nmt publish --source . --target "$BETA_URL"
+
+public:                             # the button
+  extends: .nmt
+  needs: [beta]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true           # otherwise every main pipeline shows as blocked
+  script:
+    - git fetch "$BETA_URL" main
+    - git push "$PUBLIC_URL" FETCH_HEAD:main
 ```
 
-`TEMPLATE_URL` is the template project with credentials for the robot, e.g.
-`https://oauth2:$TOKEN@gitlab.example.org/course/template.git`. The `render`
-job shows the diff on every push; `publish` is a button on `main`.
+`BETA_TOKEN` and `PUBLIC_TOKEN` are project access tokens of the two projects (Maintainer, `write_repository`), stored as masked and protected CI variables of the course repository, so branch pipelines cannot read them. Review what the button will ship in beta: its commits after the one public already has.
