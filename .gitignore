@@ -26,7 +26,7 @@ build
 
 # Generated data
 cmd/fuzz/jpeg/
-cmd/cli/2025/
+cmd/nmt/2025/
 
 # macOS
 .DS_Store
