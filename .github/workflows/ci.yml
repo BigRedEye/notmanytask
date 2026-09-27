@@ -100,6 +100,22 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # Static nmt binaries attached to the release, for installing anywhere
+      - name: Build nmt binaries
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            os=${target%/*}; arch=${target#*/}; ext=""
+            [ "$os" = windows ] && ext=.exe
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X main.version=$TAG" -o "dist/nmt-$os-$arch$ext" ./cmd/nmt
+          done
+          (cd dist && sha256sum * > sha256sums.txt)
       # A draft: review the generated notes and publish by hand
       - name: Create draft GitHub release with generated notes
         env:
@@ -108,4 +124,4 @@ jobs:
         run: |
           prerelease=""
           case "$TAG" in *-*) prerelease="--prerelease";; esac
-          gh release create "$TAG" --draft --verify-tag --generate-notes $prerelease
+          gh release create "$TAG" --draft --verify-tag --generate-notes $prerelease dist/*
