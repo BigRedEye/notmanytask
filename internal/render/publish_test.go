@@ -46,8 +46,19 @@ func TestPublish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Pushed || !strings.Contains(result.Diff, "tasks/palindrome/test.cpp") {
-		t.Fatalf("dry run must show the diff and push nothing: %+v", result)
+	if result.Pushed || !strings.Contains(result.Diff, "tasks/palindrome/test.cpp") || result.Patch != "" {
+		t.Fatalf("dry run must show the stat, no patch unless asked, and push nothing: %+v", result)
+	}
+
+	result, err = Publish(PublishOptions{Source: source, Target: bare, DryRun: true, Patch: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result.Patch, "+TEST_CASE(\"public\")") || strings.Contains(result.Patch, "\x1b[") {
+		t.Fatalf("patch must hold the file contents without colors: %q", result.Patch)
+	}
+	if strings.Contains(result.Patch, "Private_") || strings.Contains(result.Patch, "answer") {
+		t.Fatal("patch must not contain private files")
 	}
 	if len(templateFiles(t, bare)) != 0 {
 		t.Fatal("dry run must not push")
