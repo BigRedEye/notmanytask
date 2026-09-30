@@ -60,6 +60,14 @@ func TestPublish(t *testing.T) {
 	if strings.Contains(result.Patch, "Private_") || strings.Contains(result.Patch, "answer") {
 		t.Fatal("patch must not contain private files")
 	}
+
+	result, err = Publish(PublishOptions{Source: source, Target: bare, DryRun: true, Patch: true, Color: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result.Patch, "\x1b[") {
+		t.Fatal("a colored patch must contain terminal colors")
+	}
 	if len(templateFiles(t, bare)) != 0 {
 		t.Fatal("dry run must not push")
 	}

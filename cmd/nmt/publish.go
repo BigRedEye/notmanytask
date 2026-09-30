@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -25,19 +26,7 @@ not change. Authentication is git's: an ssh key or a token in the URL.`,
 			if err != nil {
 				return err
 			}
-			// The patch is the output; the status goes to stderr so that
-			// `nmt publish --dry-run --diff > publish.patch` stays clean
-			fmt.Print(result.Patch)
-			fmt.Fprint(os.Stderr, result.Diff)
-			fmt.Fprintln(os.Stderr, result.Summary)
-			switch {
-			case result.Pushed:
-				fmt.Fprintln(os.Stderr, "pushed to", opts.Target)
-			case opts.DryRun:
-				fmt.Fprintln(os.Stderr, "dry run, nothing pushed")
-			default:
-				fmt.Fprintln(os.Stderr, "nothing to publish")
-			}
+			writePublishResult(os.Stdout, os.Stderr, opts, result)
 			return nil
 		},
 	}
@@ -49,4 +38,21 @@ not change. Authentication is git's: an ssh key or a token in the URL.`,
 	cmd.Flags().BoolVar(&opts.Patch, "diff", false, "print the full diff to stdout (status goes to stderr)")
 	_ = cmd.MarkFlagRequired("target")
 	return cmd
+}
+
+// writePublishResult prints the patch, if any, to out and the stat, summary
+// and status to status, so that `nmt publish --dry-run --diff > publish.patch`
+// stays a clean patch.
+func writePublishResult(out, status io.Writer, opts render.PublishOptions, result *render.PublishResult) {
+	fmt.Fprint(out, result.Patch)
+	fmt.Fprint(status, result.Diff)
+	fmt.Fprintln(status, result.Summary)
+	switch {
+	case result.Pushed:
+		fmt.Fprintln(status, "pushed to", opts.Target)
+	case opts.DryRun:
+		fmt.Fprintln(status, "dry run, nothing pushed")
+	default:
+		fmt.Fprintln(status, "nothing to publish")
+	}
 }
