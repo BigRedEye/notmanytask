@@ -20,6 +20,10 @@ type PublishOptions struct {
 	Message string
 	// DryRun renders and shows the diff without committing or pushing
 	DryRun bool
+	// Patch fills PublishResult.Patch with the full diff of the publish
+	Patch bool
+	// Color makes the patch use git's terminal colors
+	Color bool
 	// Author of the publish commit
 	AuthorName  string
 	AuthorEmail string
@@ -29,8 +33,10 @@ type PublishOptions struct {
 // would-be commit.
 type PublishResult struct {
 	Summary *Summary
-	Diff    string
-	Pushed  bool
+	// Diff is the --stat of the change, Patch the full diff when asked for
+	Diff   string
+	Patch  string
+	Pushed bool
 }
 
 // Publish clones the target, renders the source into the clone and pushes
@@ -76,6 +82,15 @@ func Publish(opts PublishOptions) (*PublishResult, error) {
 		return nil, err
 	}
 	result := &PublishResult{Summary: summary, Diff: diff}
+	if opts.Patch {
+		color := "--color=never"
+		if opts.Color {
+			color = "--color=always"
+		}
+		if result.Patch, err = git(clone, "diff", "--cached", color); err != nil {
+			return nil, err
+		}
+	}
 	if strings.TrimSpace(diff) == "" || opts.DryRun {
 		return result, nil
 	}
