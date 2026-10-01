@@ -25,6 +25,7 @@ type MergeRequest struct {
 	MergeUserLogin        string
 	HasUnresolvedNotes    bool
 	LastNoteCreatedAt     time.Time
+	LastPipelineID        int
 	LastPipelineStatus    PipelineStatus
 	LastPipelineCreatedAt time.Time
 	ExtraChanges          bool

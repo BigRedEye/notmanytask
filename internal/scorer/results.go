@@ -74,6 +74,10 @@ type ScoredTask struct {
 	TaskUrl     string
 	PipelineUrl string
 	BranchUrl   string
+
+	// Leaderboard (benchmark) tasks: position at the deadline, 0 if none.
+	Rank           int
+	LeaderboardUrl string
 }
 
 type ScoredTaskGroup struct {

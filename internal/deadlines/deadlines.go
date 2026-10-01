@@ -66,10 +66,19 @@ func (t Date) MarshalJSON() ([]byte, error) {
 	return res, nil
 }
 
+// LeaderboardSpec marks a task as a benchmark (leaderboard) task.
+// A correct solution always earns the task score; positions on the
+// leaderboard at the deadline additionally scale it up to Score*(1+Bonus)
+// for the first place.
+type LeaderboardSpec struct {
+	Bonus float64
+}
+
 type Task struct {
-	Task    string
-	Score   int
-	Crashme bool
+	Task        string
+	Score       int
+	Crashme     bool
+	Leaderboard *LeaderboardSpec
 }
 
 type TaskGroup struct {
@@ -154,13 +163,19 @@ func (d *Deadlines) GetScoringPolicy(group *TaskGroup) ScoringPolicy {
 	return policy
 }
 
-func (d *Deadlines) HasTask(name string) bool {
-	for _, assignment := range d.Assignments {
-		for _, task := range assignment.Tasks {
-			if task.Task == name {
-				return true
+// FindTask returns the task and the assignment group containing it.
+func (d *Deadlines) FindTask(name string) (*Task, *TaskGroup) {
+	for i := range d.Assignments {
+		for j := range d.Assignments[i].Tasks {
+			if d.Assignments[i].Tasks[j].Task == name {
+				return &d.Assignments[i].Tasks[j], &d.Assignments[i]
 			}
 		}
 	}
-	return false
+	return nil, nil
+}
+
+func (d *Deadlines) HasTask(name string) bool {
+	task, _ := d.FindTask(name)
+	return task != nil
 }
