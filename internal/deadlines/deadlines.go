@@ -5,6 +5,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	// Deadlines are in Europe/Moscow: embed the time zone database so that
+	// binaries work on systems without tzdata (alpine images, Windows)
+	_ "time/tzdata"
 )
 
 type Date struct {
