@@ -85,7 +85,8 @@ jobs:
           context: .
           target: cli
           platforms: linux/amd64
-          build-args: VERSION=${{ steps.meta-cli.outputs.version }}
+          # not outputs.version alone: on release tags it is the short v1.0
+          build-args: VERSION=${{ github.ref_type == 'tag' && github.ref_name || steps.meta-cli.outputs.version }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-cli.outputs.tags }}
           labels: ${{ steps.meta-cli.outputs.labels }}
