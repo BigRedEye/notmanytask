@@ -84,6 +84,27 @@ func (c *Client) OverrideScore(user, task, status string, score int) error {
 	return nil
 }
 
+// BanSubmission excludes a pipeline from scoring; UnbanSubmission restores it.
+func (c *Client) BanSubmission(pipelineID int, reason string) error {
+	return c.moderate("/api/ban", api.BanRequest{PipelineID: pipelineID, Reason: reason})
+}
+
+func (c *Client) UnbanSubmission(pipelineID int) error {
+	return c.moderate("/api/unban", api.BanRequest{PipelineID: pipelineID})
+}
+
+func (c *Client) moderate(path string, req api.BanRequest) error {
+	res := &api.BanResponse{}
+	_, err := c.client.R().SetResult(res).SetBody(req).Post(path)
+	if err != nil {
+		return err
+	}
+	if !res.Ok {
+		return fmt.Errorf("failed to moderate submission: %s", res.Error)
+	}
+	return nil
+}
+
 func (c *Client) LoadSuccessfulSubmits(group, taskname string) ([]*scorer.User, error) {
 	standings, err := c.LoadStandings(group)
 	if err != nil {

@@ -137,6 +137,15 @@ func (p *MergeRequestsFetcher) syncMergeRequest(log *zap.Logger, project *gitlab
 		startedAt = *mr.CreatedAt
 	}
 
+	// The pipeline row carries the task of the request: a merge request
+	// pipeline runs on refs/merge-requests/<iid>/head, which names no task.
+	if pipeline.ID != 0 {
+		err = p.db.AddPipeline(&models.Pipeline{ID: pipeline.ID, Project: project.Name, Task: task, Status: pipeline.Status, StartedAt: pipeline.CreatedAt})
+		if err != nil {
+			return errors.Wrap(err, "Failed to upsert merge request pipeline")
+		}
+	}
+
 	err = p.db.UpsertMergeRequest(&models.MergeRequest{
 		ID:                    mr.ID,
 		IID:                   mr.IID,
@@ -150,6 +159,7 @@ func (p *MergeRequestsFetcher) syncMergeRequest(log *zap.Logger, project *gitlab
 		MergeUserLogin:        mergeUserLogin,
 		HasUnresolvedNotes:    notes.HasUnresolvedNotes,
 		LastNoteCreatedAt:     notes.LastNoteCreatedAt,
+		LastPipelineID:        pipeline.ID,
 		LastPipelineStatus:    pipeline.Status,
 		LastPipelineCreatedAt: pipeline.CreatedAt,
 		ExtraChanges:          extraChanges,
@@ -247,6 +257,7 @@ func (p *MergeRequestsFetcher) inspectChanges(project *gitlab.Project, mr *gitla
 }
 
 type pipelineInfo struct {
+	ID        int
 	Status    models.PipelineStatus
 	CreatedAt time.Time
 }
@@ -261,7 +272,7 @@ func (p *MergeRequestsFetcher) getLatestPipeline(project *gitlab.Project, mr *gi
 
 	for _, pipeline := range pipelines {
 		if pipeline.CreatedAt != nil {
-			return pipelineInfo{Status: pipeline.Status, CreatedAt: *pipeline.CreatedAt}, nil
+			return pipelineInfo{ID: pipeline.ID, Status: pipeline.Status, CreatedAt: *pipeline.CreatedAt}, nil
 		}
 	}
 	return pipelineInfo{}, nil

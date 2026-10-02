@@ -3,6 +3,8 @@ package database
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,7 +59,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{}, &models.SubmissionBan{})
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +100,19 @@ func (db *DataBase) FindUserByGitlabLogin(login string) (*models.User, error) {
 func (db *DataBase) FindUserByGitlabID(id int) (*models.User, error) {
 	var user models.User
 	err := db.First(&user, "gitlab_id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// FindUserByProjectName resolves the owner of a pipeline's project.
+func (db *DataBase) FindUserByProjectName(project string) (*models.User, error) {
+	if project == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var user models.User
+	err := db.First(&user, projectNameSQL("repository")+" = ? AND repository IS NOT NULL", project).Error
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +205,68 @@ func (db *DataBase) SetUserGroupName(user *models.User) error {
 
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	return db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status"}),
+		Columns: []clause.Column{{Name: "id"}},
+		// task: a merge request pipeline is stored under its ref until the
+		// request is synced, see MergeRequestPipelineTask.
+		DoUpdates: clause.AssignmentColumns([]string{"status", "task"}),
 	}).Create(pipeline).Error
+}
+
+var mergeRequestRef = regexp.MustCompile(`^refs/merge-requests/(\d+)/(head|merge)$`)
+
+// parseMergeRequestRef returns the iid of a merge request pipeline ref
+// (refs/merge-requests/<iid>/head or /merge).
+func parseMergeRequestRef(ref string) (int, bool) {
+	match := mergeRequestRef.FindStringSubmatch(ref)
+	if match == nil {
+		return 0, false
+	}
+	iid, err := strconv.Atoi(match[1])
+	return iid, err == nil
+}
+
+// MergeRequestPipelineTask resolves the task of a merge request pipeline
+// through the synced merge request. isMergeRequest is false for any other
+// ref; an empty task with isMergeRequest set means the request is not
+// synced yet.
+func (db *DataBase) MergeRequestPipelineTask(project, ref string) (task string, isMergeRequest bool) {
+	iid, ok := parseMergeRequestRef(ref)
+	if !ok {
+		return "", false
+	}
+	var mergeRequest models.MergeRequest
+	if err := db.First(&mergeRequest, "project = ? AND iid = ?", project, iid).Error; err != nil {
+		return "", true
+	}
+	return mergeRequest.Task, true
+}
+
+func (db *DataBase) FindPipelineByID(id int) (*models.Pipeline, error) {
+	var pipeline models.Pipeline
+	if err := db.First(&pipeline, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &pipeline, nil
+}
+
+func (db *DataBase) BanSubmission(pipelineID int, reason, adminLogin string) error {
+	ban := &models.SubmissionBan{PipelineID: pipelineID, Reason: reason, AdminLogin: adminLogin}
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "pipeline_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"reason", "admin_login", "created_at"}),
+	}).Create(ban).Error
+}
+
+// UnbanSubmission lifts the ban; found is false if there was none.
+func (db *DataBase) UnbanSubmission(pipelineID int) (found bool, err error) {
+	res := db.Delete(&models.SubmissionBan{}, "pipeline_id = ?", pipelineID)
+	return res.RowsAffected > 0, res.Error
+}
+
+func (db *DataBase) ListSubmissionBans() (bans []models.SubmissionBan, err error) {
+	bans = make([]models.SubmissionBan, 0)
+	err = db.Find(&bans).Error
+	return
 }
 
 func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pipeline, err error) {
@@ -200,6 +274,41 @@ func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pip
 	err = db.Find(&pipelines, "project = ?", project).Error
 	if err != nil {
 		pipelines = nil
+	}
+	return
+}
+
+func (db *DataBase) AddBenchmarkResult(result *models.BenchmarkResult) error {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "pipeline_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"gitlab_login", "task", "metric", "created_at"}),
+	}).Create(result).Error
+}
+
+// GroupBenchmark is a benchmark result of a student from the requested
+// group whose pipeline succeeded on the branch of the reported task and is
+// not banned.
+type GroupBenchmark struct {
+	GitlabLogin string
+	FirstName   string
+	LastName    string
+	Task        string
+	PipelineID  int
+	Metric      float64
+	SubmittedAt time.Time
+}
+
+func (db *DataBase) ListGroupBenchmarks(group string) (results []GroupBenchmark, err error) {
+	results = make([]GroupBenchmark, 0)
+	err = db.Table("benchmark_results AS b").
+		Select("b.gitlab_login, u.first_name, u.last_name, b.task, b.pipeline_id, b.metric, p.started_at AS submitted_at").
+		Joins("JOIN pipelines AS p ON p.id = b.pipeline_id AND p.task = b.task AND p.status = ?", models.PipelineStatusSuccess).
+		Joins("JOIN users AS u ON u.gitlab_login = b.gitlab_login AND u.deleted_at IS NULL").
+		Joins("LEFT JOIN submission_bans AS sb ON sb.pipeline_id = p.id").
+		Where("u.group_name = ? AND u.repository IS NOT NULL AND sb.pipeline_id IS NULL", group).
+		Scan(&results).Error
+	if err != nil {
+		results = nil
 	}
 	return
 }
@@ -224,6 +333,7 @@ func (db *DataBase) UpsertMergeRequest(mergeRequest *models.MergeRequest) error 
 			"merge_user_login",
 			"has_unresolved_notes",
 			"last_note_created_at",
+			"last_pipeline_id",
 			"last_pipeline_status",
 			"last_pipeline_created_at",
 			"extra_changes",
@@ -366,14 +476,17 @@ func (db *DataBase) AddOverride(gitlabLogin, task string, score int, status mode
 		Status:      status,
 	}
 	return db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "gitlab_login"}, {Name: "task"}},
-		DoUpdates: clause.AssignmentColumns([]string{"score", "status"}),
+		Columns: []clause.Column{{Name: "gitlab_login"}, {Name: "task"}},
+		// deleted_at: RemoveOverride soft-deletes, setting the override again
+		// must bring the row back.
+		DoUpdates: clause.AssignmentColumns([]string{"score", "status", "deleted_at"}),
 	}).Create(overridenScore).Error
 }
 
 func (db *DataBase) RemoveOverride(gitlabLogin, task string) error {
+	// A soft delete needs a pointer: gorm rejects a struct value here.
 	return db.
 		Where("gitlab_login = ? AND task = ?", gitlabLogin, task).
-		Delete(models.OverriddenScore{}).
+		Delete(&models.OverriddenScore{}).
 		Error
 }
