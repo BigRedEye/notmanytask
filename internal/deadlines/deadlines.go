@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	// Works on systems without tzdata: alpine images, Windows
+	_ "time/tzdata"
 )
 
 type Date struct {
