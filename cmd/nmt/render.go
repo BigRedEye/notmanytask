@@ -13,7 +13,7 @@ func makeRenderCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "render",
 		Short: "Build the public tree of a course from its private source",
-		Long: `Reads course.yaml in --source, exports the tasks listed in its deadlines
+		Long: `Reads notmanytask.yaml in --source, exports the tasks listed in its deadlines
 files without private and solution directories plus the files export.include
 names, and makes --out match that tree exactly (a .git directory in --out is
 left alone). Committing and pushing the result is left to git.`,

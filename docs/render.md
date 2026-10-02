@@ -7,7 +7,7 @@ tree students fork from, and git publishes it.
 ## Layout
 
 ```
-course.yaml
+notmanytask.yaml
 deadlines/ami.yml
 tasks/palindrome/                    statement, stubs, public tests: exported
 tasks/future/                        not in any deadlines file: private
@@ -26,7 +26,7 @@ grader image is built from the private repository (`COPY . /opt/shad`, then
 inside that image. The layout above is what the grader expects
 (`private/<task>/`), so keep it.
 
-## course.yaml
+## notmanytask.yaml
 
 ```yaml
 tasks: tasks                       # directory with one subdirectory per task

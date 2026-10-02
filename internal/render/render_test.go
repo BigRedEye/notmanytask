@@ -46,7 +46,7 @@ func write(t *testing.T, root, rel, body string) {
 func makeSource(t *testing.T) string {
 	t.Helper()
 	source := t.TempDir()
-	write(t, source, "course.yaml", testManifest)
+	write(t, source, ManifestName, testManifest)
 	write(t, source, "deadlines/ami.yml", testDeadlines)
 	write(t, source, "README.md", "# course")
 	write(t, source, "CMakeLists.txt", "project(x)")
@@ -160,5 +160,13 @@ func TestRenderMissingTask(t *testing.T) {
 	}
 	if _, err := Render(source, t.TempDir()); err == nil || !strings.Contains(err.Error(), "palindrome") {
 		t.Fatalf("a task in the deadlines without a directory must fail, got %v", err)
+	}
+}
+
+func TestLegacyManifestName(t *testing.T) {
+	source := t.TempDir()
+	write(t, source, "course.yaml", testManifest)
+	if _, err := Render(source, t.TempDir()); err == nil || !strings.Contains(err.Error(), "rename it to notmanytask.yaml") {
+		t.Fatalf("an old course.yaml must ask to rename it, got %v", err)
 	}
 }
