@@ -21,9 +21,13 @@ import (
 	"github.com/bigredeye/notmanytask/internal/deadlines"
 )
 
-const ManifestName = "course.yaml"
+// ManifestName is the nmt configuration at the root of the course repository.
+const ManifestName = "notmanytask.yaml"
 
-// Manifest is course.yaml at the root of the private course repository.
+// legacyManifestName is what the manifest used to be called.
+const legacyManifestName = "course.yaml"
+
+// Manifest is notmanytask.yaml at the root of the private course repository.
 type Manifest struct {
 	// Tasks is the directory with one subdirectory per task
 	Tasks string `yaml:"tasks"`
@@ -61,6 +65,11 @@ func (s Summary) String() string {
 
 func LoadManifest(source string) (*Manifest, error) {
 	body, err := os.ReadFile(filepath.Join(source, ManifestName))
+	if os.IsNotExist(err) {
+		if _, legacyErr := os.Stat(filepath.Join(source, legacyManifestName)); legacyErr == nil {
+			return nil, errors.Errorf("%s not found, but %s is there: rename it to %s", ManifestName, legacyManifestName, ManifestName)
+		}
+	}
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to read %s", ManifestName)
 	}
