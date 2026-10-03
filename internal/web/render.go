@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -245,9 +246,61 @@ func (s *server) RenderStandingsCheaterPage(c *gin.Context) {
 		"CourseName":  s.config.Server.CourseName,
 		"Title":       s.config.Server.CourseName,
 		"Config":      s.config,
+		"Group":       group,
 		"GroupConfig": s.config.Groups.FindGroup(group),
 		"Standings":   scores,
 		"Error":       err,
 		"Links":       s.makeLinks(user),
+	})
+}
+
+func (s *server) RenderLeaderboardPage(c *gin.Context) {
+	task := strings.TrimPrefix(c.Param("task"), "/")
+
+	group := c.Query("group")
+	if group == "" {
+		if defaul := s.config.Groups.FindDefaultGroup(); defaul != nil {
+			group = defaul.Name
+		}
+	}
+
+	var links *Links
+	if user, session, err := s.tryFindUserByToken(c); err == nil && session != nil {
+		links = s.makeLinks(user)
+	}
+
+	currentDeadlines := s.deadlines.GroupDeadlines(group)
+	if currentDeadlines == nil {
+		c.String(http.StatusNotFound, "no deadlines found")
+		return
+	}
+	spec, taskGroup := currentDeadlines.FindTask(task)
+	if spec == nil || spec.Leaderboard == nil {
+		c.String(http.StatusNotFound, "task %s has no leaderboard", task)
+		return
+	}
+
+	board, err := s.cache.Fetch(fmt.Sprintf("leaderboard/%s/%s", group, task), time.Second*10, func() (interface{}, error) {
+		boards, err := s.scorer.CalcLeaderboards(currentDeadlines, group)
+		if err != nil {
+			return nil, err
+		}
+		return boards[task], nil
+	})
+	var entries []scorer.LeaderboardEntry
+	if board != nil {
+		entries = board.Value().(*scorer.TaskLeaderboard).Entries
+	}
+
+	c.HTML(http.StatusOK, "leaderboard.tmpl", gin.H{
+		"CourseName": s.config.Server.CourseName,
+		"Title":      fmt.Sprintf("%s — leaderboard", task),
+		"Task":       task,
+		"Group":      group,
+		"Multiplier": 1 + spec.Leaderboard.Bonus,
+		"Deadline":   taskGroup.Deadline.String(),
+		"Entries":    entries,
+		"Error":      err,
+		"Links":      links,
 	})
 }

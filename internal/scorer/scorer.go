@@ -2,6 +2,7 @@ package scorer
 
 import (
 	"fmt"
+	"net/url"
 	"path"
 	"regexp"
 	"sort"
@@ -177,9 +178,14 @@ func (s Scorer) CalcScoreboardWithFilter(groupName string, filter UserFilter) (*
 		return nil, fmt.Errorf("failed to list all overrides: %w", err)
 	}
 
+	boards, err := s.CalcLeaderboards(currentDeadlines, groupName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
+	}
+
 	scores := make([]*UserScores, len(users))
 	for i, user := range users {
-		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags, mergeRequests, overrides)
+		userScores, err := s.calcUserScoresImpl(currentDeadlines, user, pipelines, flags, mergeRequests, overrides, boards)
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +281,12 @@ func (s Scorer) CalcUserScores(user *models.User) (*UserScores, error) {
 		mergeRequests = s.db.ListProjectMergeRequests
 	}
 
-	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, mergeRequests, overrides)
+	boards, err := s.CalcLeaderboards(currentDeadlines, user.GroupName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc leaderboards: %w", err)
+	}
+
+	return s.calcUserScoresImpl(currentDeadlines, user, s.db.ListProjectPipelines, s.db.ListUserFlags, mergeRequests, overrides, boards)
 }
 
 type overrideKey struct {
@@ -301,6 +312,7 @@ func (s Scorer) calcUserScoresImpl(
 	flagsP flagsProvider,
 	mergeRequestsP mergeRequestsProvider,
 	rawOverrides []models.OverriddenScore,
+	boards leaderboardsMap,
 ) (*UserScores, error) {
 	pipelinesMap, err := s.loadUserPipelines(user, pipelinesP)
 	if err != nil {
@@ -357,9 +369,13 @@ func (s Scorer) calcUserScoresImpl(
 			}
 			maxTotalScore += tasks[i].MaxScore
 
+			// submittedAt is when the submission that scores the task was
+			// made; the leaderboard bonus needs it by the deadline.
+			var submittedAt time.Time
 			flag, found := flagsMap[task.Task]
 			if found {
 				tasks[i].Status = TaskStatusSuccess
+				submittedAt = flag.CreatedAt
 
 				// FIXME(BigRedEye): I just want to sleep
 				// Do not try to mimic pipelines
@@ -371,13 +387,29 @@ func (s Scorer) calcUserScoresImpl(
 				// Only flags count
 			} else if mergeRequestsP != nil {
 				if mergeRequest, found := mergeRequestsMap[task.Task]; found {
+					submittedAt = mergeRequest.MergeRequest.LastPipelineCreatedAt
 					s.scoreMergeRequest(&tasks[i], policy, currentDeadlines, user, &task, &group, mergeRequest)
 				}
 			} else if pipeline, found := pipelinesMap[task.Task]; found {
+				submittedAt = pipeline.StartedAt
 				tasks[i].Status = ClassifyPipelineStatus(pipeline.Status)
 				tasks[i].Score = s.scorePipeline(policy, currentDeadlines, user, &task, &group, pipeline)
 				tasks[i].PipelineUrl = s.projects.MakePipelineURL(user, pipeline)
 				tasks[i].BranchUrl = s.projects.MakeBranchURL(user, pipeline)
+			}
+
+			if task.Leaderboard != nil {
+				tasks[i].LeaderboardUrl = makeLeaderboardURL(task.Task, user.GroupName)
+				if board, ok := boards[task.Task]; ok {
+					if rank, ok := board.Rank(*user.GitlabLogin); ok {
+						tasks[i].Rank = rank
+						// No bonus after the deadline: a task scored by a late
+						// submission keeps the score the policy gave it.
+						if tasks[i].Status == TaskStatusSuccess && !submittedAt.After(group.Deadline.Time) {
+							tasks[i].Score = leaderboardScore(tasks[i].Score, task.Leaderboard.Bonus, rank, len(board.Entries))
+						}
+					}
+				}
 			}
 
 			override, found := overrides[overrideKey{login: *user.GitlabLogin, task: task.Task}]
@@ -429,6 +461,10 @@ func capitalizeWords(title string) string {
 
 func makeShortTaskName(name string) string {
 	return path.Base(name)
+}
+
+func makeLeaderboardURL(task, group string) string {
+	return "/leaderboard/" + task + "?group=" + url.QueryEscape(group)
 }
 
 func (s Scorer) scorePipeline(

@@ -3,6 +3,8 @@ package database
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,7 +59,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.BenchmarkResult{})
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +192,40 @@ func (db *DataBase) SetUserGroupName(user *models.User) error {
 
 func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	return db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status"}),
+		Columns: []clause.Column{{Name: "id"}},
+		// task: a merge request pipeline is stored under its ref until the
+		// request is synced, see MergeRequestPipelineTask.
+		DoUpdates: clause.AssignmentColumns([]string{"status", "task"}),
 	}).Create(pipeline).Error
+}
+
+var mergeRequestRef = regexp.MustCompile(`^refs/merge-requests/(\d+)/(head|merge)$`)
+
+// parseMergeRequestRef returns the iid of a merge request pipeline ref
+// (refs/merge-requests/<iid>/head or /merge).
+func parseMergeRequestRef(ref string) (int, bool) {
+	match := mergeRequestRef.FindStringSubmatch(ref)
+	if match == nil {
+		return 0, false
+	}
+	iid, err := strconv.Atoi(match[1])
+	return iid, err == nil
+}
+
+// MergeRequestPipelineTask resolves the task of a merge request pipeline
+// through the synced merge request. isMergeRequest is false for any other
+// ref; an empty task with isMergeRequest set means the request is not
+// synced yet.
+func (db *DataBase) MergeRequestPipelineTask(project, ref string) (task string, isMergeRequest bool) {
+	iid, ok := parseMergeRequestRef(ref)
+	if !ok {
+		return "", false
+	}
+	var mergeRequest models.MergeRequest
+	if err := db.First(&mergeRequest, "project = ? AND iid = ?", project, iid).Error; err != nil {
+		return "", true
+	}
+	return mergeRequest.Task, true
 }
 
 func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pipeline, err error) {
@@ -200,6 +233,39 @@ func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pip
 	err = db.Find(&pipelines, "project = ?", project).Error
 	if err != nil {
 		pipelines = nil
+	}
+	return
+}
+
+func (db *DataBase) AddBenchmarkResult(result *models.BenchmarkResult) error {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "pipeline_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"gitlab_login", "task", "metric", "created_at"}),
+	}).Create(result).Error
+}
+
+// GroupBenchmark is a benchmark result of a student from the requested
+// group whose pipeline succeeded on the branch of the reported task.
+type GroupBenchmark struct {
+	GitlabLogin string
+	FirstName   string
+	LastName    string
+	Task        string
+	PipelineID  int
+	Metric      float64
+	SubmittedAt time.Time
+}
+
+func (db *DataBase) ListGroupBenchmarks(group string) (results []GroupBenchmark, err error) {
+	results = make([]GroupBenchmark, 0)
+	err = db.Table("benchmark_results AS b").
+		Select("b.gitlab_login, u.first_name, u.last_name, b.task, b.pipeline_id, b.metric, p.started_at AS submitted_at").
+		Joins("JOIN pipelines AS p ON p.id = b.pipeline_id AND p.task = b.task AND p.status = ?", models.PipelineStatusSuccess).
+		Joins("JOIN users AS u ON u.gitlab_login = b.gitlab_login AND u.deleted_at IS NULL").
+		Where("u.group_name = ? AND u.repository IS NOT NULL", group).
+		Scan(&results).Error
+	if err != nil {
+		results = nil
 	}
 	return
 }

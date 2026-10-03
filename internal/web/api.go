@@ -2,17 +2,30 @@ package web
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 
 	"github.com/bigredeye/notmanytask/api"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
+	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
 type apiService struct {
 	webService
+}
+
+func parseBenchmarkMetric(raw string) (float64, error) {
+	metric, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(metric) || math.IsInf(metric, 0) {
+		return 0, fmt.Errorf("metric must be finite")
+	}
+	return metric, nil
 }
 
 func setupApiService(server *server, r *gin.Engine) error {
@@ -70,6 +83,54 @@ func (s apiService) report(c *gin.Context) {
 		s.log.Warn("Unknown token", lf.Token(req.Token))
 		onError(http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))
 		return
+	}
+
+	if req.Metric != "" {
+		metric, err := parseBenchmarkMetric(req.Metric)
+		if err != nil {
+			onError(http.StatusBadRequest, fmt.Errorf("failed to parse metric: %w", err))
+			return
+		}
+		if req.Failed != 0 || (req.Status != "" && req.Status != models.PipelineStatusSuccess) {
+			onError(http.StatusBadRequest, fmt.Errorf("metric is only accepted for successful reports"))
+			return
+		}
+		user, err := s.server.db.FindUserByGitlabID(userID)
+		if err != nil || user.GitlabLogin == nil {
+			onError(http.StatusNotFound, fmt.Errorf("unknown user %d", userID))
+			return
+		}
+		if user.GetProjectName() == "" || user.GetProjectName() != req.ProjectName {
+			onError(http.StatusBadRequest, fmt.Errorf("project %s does not belong to user %d", req.ProjectName, userID))
+			return
+		}
+		currentDeadlines := s.server.deadlines.GroupDeadlines(user.GroupName)
+		if currentDeadlines == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("no deadlines found for group %s", user.GroupName))
+			return
+		}
+		if task, _ := currentDeadlines.FindTask(req.Task); task == nil || task.Leaderboard == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("task %s has no leaderboard for group %s", req.Task, user.GroupName))
+			return
+		}
+		// The grader reports from inside the CI job, so the pipeline is still
+		// running here: the result counts once the fresh pipeline poll below
+		// sees it succeed.
+		err = s.server.db.AddBenchmarkResult(&models.BenchmarkResult{
+			GitlabLogin: *user.GitlabLogin,
+			Task:        req.Task,
+			PipelineID:  id,
+			Metric:      metric,
+		})
+		if err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+		s.log.Info("Stored benchmark result",
+			lf.GitlabLogin(*user.GitlabLogin),
+			zap.String("task", req.Task),
+			zap.Float64("metric", metric),
+		)
 	}
 
 	err = s.server.pipelines.AddFresh(id, req.ProjectName)
