@@ -150,6 +150,7 @@ func (p *MergeRequestsFetcher) syncMergeRequest(log *zap.Logger, project *gitlab
 		MergeUserLogin:        mergeUserLogin,
 		HasUnresolvedNotes:    notes.HasUnresolvedNotes,
 		LastNoteCreatedAt:     notes.LastNoteCreatedAt,
+		LastPipelineID:        pipeline.ID,
 		LastPipelineStatus:    pipeline.Status,
 		LastPipelineCreatedAt: pipeline.CreatedAt,
 		ExtraChanges:          extraChanges,
@@ -247,6 +248,7 @@ func (p *MergeRequestsFetcher) inspectChanges(project *gitlab.Project, mr *gitla
 }
 
 type pipelineInfo struct {
+	ID        int
 	Status    models.PipelineStatus
 	CreatedAt time.Time
 }
@@ -261,7 +263,7 @@ func (p *MergeRequestsFetcher) getLatestPipeline(project *gitlab.Project, mr *gi
 
 	for _, pipeline := range pipelines {
 		if pipeline.CreatedAt != nil {
-			return pipelineInfo{Status: pipeline.Status, CreatedAt: *pipeline.CreatedAt}, nil
+			return pipelineInfo{ID: pipeline.ID, Status: pipeline.Status, CreatedAt: *pipeline.CreatedAt}, nil
 		}
 	}
 	return pipelineInfo{}, nil

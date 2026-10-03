@@ -75,6 +75,8 @@ type EndpointsConfig struct {
 		Report           string
 		Flag             string
 		Override         string
+		Ban              string
+		Unban            string
 		ChangeGroup      string
 		Standings        string
 		ListGroupMembers string

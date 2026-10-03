@@ -57,7 +57,7 @@ func OpenDataBase(logger *zap.Logger, dsn string) (*DataBase, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{})
+	err = db.AutoMigrate(&models.User{}, &models.Pipeline{}, &models.Session{}, &models.Flag{}, &models.OverriddenScore{}, &models.MergeRequest{}, &models.SubmissionBan{})
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +195,34 @@ func (db *DataBase) AddPipeline(pipeline *models.Pipeline) error {
 	}).Create(pipeline).Error
 }
 
+func (db *DataBase) FindPipelineByID(id int) (*models.Pipeline, error) {
+	var pipeline models.Pipeline
+	if err := db.First(&pipeline, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &pipeline, nil
+}
+
+func (db *DataBase) BanSubmission(pipelineID int, reason string) error {
+	ban := &models.SubmissionBan{PipelineID: pipelineID, Reason: reason}
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "pipeline_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"reason", "created_at"}),
+	}).Create(ban).Error
+}
+
+// UnbanSubmission lifts the ban; found is false if there was none.
+func (db *DataBase) UnbanSubmission(pipelineID int) (found bool, err error) {
+	res := db.Delete(&models.SubmissionBan{}, "pipeline_id = ?", pipelineID)
+	return res.RowsAffected > 0, res.Error
+}
+
+func (db *DataBase) ListSubmissionBans() (bans []models.SubmissionBan, err error) {
+	bans = make([]models.SubmissionBan, 0)
+	err = db.Find(&bans).Error
+	return
+}
+
 func (db *DataBase) ListProjectPipelines(project string) (pipelines []models.Pipeline, err error) {
 	pipelines = make([]models.Pipeline, 0)
 	err = db.Find(&pipelines, "project = ?", project).Error
@@ -224,6 +252,7 @@ func (db *DataBase) UpsertMergeRequest(mergeRequest *models.MergeRequest) error 
 			"merge_user_login",
 			"has_unresolved_notes",
 			"last_note_created_at",
+			"last_pipeline_id",
 			"last_pipeline_status",
 			"last_pipeline_created_at",
 			"extra_changes",

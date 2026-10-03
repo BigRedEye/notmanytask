@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/bigredeye/notmanytask/api"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
@@ -21,6 +22,8 @@ func setupApiService(server *server, r *gin.Engine) error {
 	r.POST(server.config.Endpoints.Api.Report, s.report)
 	r.POST(server.config.Endpoints.Api.Flag, s.createFlag)
 	r.POST(server.config.Endpoints.Api.Override, s.validateToken, s.override)
+	r.POST(server.config.Endpoints.Api.Ban, s.validateToken, s.ban)
+	r.POST(server.config.Endpoints.Api.Unban, s.validateToken, s.unban)
 	r.POST(server.config.Endpoints.Api.ChangeGroup, s.changeGroup)
 	r.GET(server.config.Endpoints.Api.Standings, s.validateToken, s.standings)
 	r.GET(server.config.Endpoints.Api.ListGroupMembers, s.validateToken, s.listGroupMembers)
@@ -349,6 +352,70 @@ func (s apiService) standings(c *gin.Context) {
 		},
 		Standings: standings,
 	})
+}
+
+// ban excludes a pipeline from scoring: the next eligible pipeline of the
+// task counts instead, and a merge request whose last pipeline is banned is
+// skipped. The token is the one of the override endpoint.
+func (s apiService) ban(c *gin.Context) {
+	s.moderate(c, true)
+}
+
+func (s apiService) unban(c *gin.Context) {
+	s.moderate(c, false)
+}
+
+func validateBanRequest(req *api.BanRequest, ban bool) error {
+	if req.PipelineID <= 0 {
+		return fmt.Errorf("pipeline_id is required")
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if ban && req.Reason == "" {
+		return fmt.Errorf("reason is required")
+	}
+	return nil
+}
+
+func (s apiService) moderate(c *gin.Context, ban bool) {
+	onError := func(code int, err error) {
+		s.log.Warn("Failed to moderate submission", zap.Error(err))
+		c.JSON(code, &api.BanResponse{Status: api.Status{Ok: false, Error: err.Error()}})
+	}
+
+	req := api.BanRequest{}
+	if err := c.Bind(&req); err != nil {
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err))
+		return
+	}
+	if err := validateBanRequest(&req, ban); err != nil {
+		onError(http.StatusBadRequest, err)
+		return
+	}
+	if _, err := s.server.db.FindPipelineByID(req.PipelineID); err != nil {
+		onError(http.StatusNotFound, fmt.Errorf("unknown pipeline %d", req.PipelineID))
+		return
+	}
+
+	if ban {
+		if err := s.server.db.BanSubmission(req.PipelineID, req.Reason); err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+	} else {
+		found, err := s.server.db.UnbanSubmission(req.PipelineID)
+		if err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+		if !found {
+			onError(http.StatusNotFound, fmt.Errorf("pipeline %d is not banned", req.PipelineID))
+			return
+		}
+	}
+	s.server.cache.Clear()
+	s.log.Info("Submission moderated", lf.PipelineID(req.PipelineID), zap.Bool("banned", ban), zap.String("reason", req.Reason))
+
+	c.JSON(http.StatusOK, &api.BanResponse{Status: api.Status{Ok: true}})
 }
 
 func (s apiService) validateToken(c *gin.Context) {
