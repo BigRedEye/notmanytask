@@ -65,14 +65,15 @@ func buildHTMLTemplates(funcMap template.FuncMap) (*template.Template, error) {
 	return tmpl.ParseFS(web.StaticTemplates, "*.tmpl")
 }
 
+var templateFuncs = template.FuncMap{
+	"inc": func(i int) int {
+		return i + 1
+	},
+	"prettifyTaskName": filepath.Base,
+}
+
 func (s *server) run() error {
-	funcs := template.FuncMap{
-		"inc": func(i int) int {
-			return i + 1
-		},
-		"prettifyTaskName": filepath.Base,
-	}
-	tmpl, err := buildHTMLTemplates(funcs)
+	tmpl, err := buildHTMLTemplates(templateFuncs)
 	if err != nil {
 		return errors.Wrap(err, "Failed to build html templates")
 	}
@@ -112,6 +113,10 @@ func (s *server) run() error {
 	r.GET(s.config.Endpoints.Standings, s.RenderStandingsPage)
 	r.GET(s.config.Endpoints.Standings+"/:group", s.RenderStandingsPage)
 	r.GET(s.config.Endpoints.Standings+"/:group/:subgroup", s.RenderStandingsPage)
+	r.GET("/leaderboard/*task" /* no need to validate session */, s.RenderLeaderboardPage)
+	r.GET("/admin/submissions", s.validateSession(true), s.validateAdmin, s.RenderAdminSubmissionsPage)
+	r.POST("/admin/submissions/:pipeline/ban", s.validateSession(true), s.validateAdmin, s.handleAdminBanSubmission)
+	r.POST("/admin/submissions/:pipeline/unban", s.validateSession(true), s.validateAdmin, s.handleAdminUnbanSubmission)
 	r.GET("/private/solutions/:group/:task", s.handleChuckNorris)
 
 	r.StaticFS("/static", http.FS(web.StaticContent))

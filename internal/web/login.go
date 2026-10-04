@@ -416,6 +416,26 @@ func (s *server) validateSession(verifyTelegram bool) func(c *gin.Context) {
 	}
 }
 
+func (s *server) isAdmin(user *models.User) bool {
+	if user == nil || user.GitlabLogin == nil {
+		return false
+	}
+	for _, login := range s.config.Server.Admins {
+		if login == *user.GitlabLogin {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *server) validateAdmin(c *gin.Context) {
+	if !s.isAdmin(s.getUser(c)) {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+	c.Next()
+}
+
 func (s *server) fillUserFromQuery(c *gin.Context) {
 	login := c.Query("login")
 	user, err := s.db.FindUserByGitlabLogin(login)

@@ -75,6 +75,8 @@ type EndpointsConfig struct {
 		Report           string
 		Flag             string
 		Override         string
+		Ban              string
+		Unban            string
 		ChangeGroup      string
 		Standings        string
 		ListGroupMembers string
@@ -88,6 +90,7 @@ type ServerConfig struct {
 	// SignupEmailPattern, when set, adds a required email field to the
 	// signup form validated by this regular expression.
 	SignupEmailPattern string
+	Admins             []string
 	Cookies            struct {
 		AuthenticationKey string
 		EncryptionKey     string

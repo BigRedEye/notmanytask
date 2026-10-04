@@ -99,10 +99,20 @@ func (p *PipelinesFetcher) fetch(id int, project string) (*gitlab.PipelineInfo, 
 	return info, p.addPipeline(project, info)
 }
 
+// taskOfRef is the task a pipeline belongs to: its submit branch, or for a
+// merge request pipeline the task of the synced request. An unsynced request
+// leaves the raw ref; the next refresh or the request sync replaces it.
+func (p *PipelinesFetcher) taskOfRef(project, ref string) string {
+	if task, isMergeRequest := p.db.MergeRequestPipelineTask(project, ref); isMergeRequest && task != "" {
+		return task
+	}
+	return ParseTaskFromBranch(ref)
+}
+
 func (p *PipelinesFetcher) addPipeline(projectName string, pipeline *gitlab.PipelineInfo) error {
 	return p.db.AddPipeline(&models.Pipeline{
 		ID:        pipeline.ID,
-		Task:      ParseTaskFromBranch(pipeline.Ref),
+		Task:      p.taskOfRef(projectName, pipeline.Ref),
 		Status:    pipeline.Status,
 		Project:   projectName,
 		StartedAt: *pipeline.CreatedAt,

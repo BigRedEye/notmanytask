@@ -2,11 +2,14 @@ package web
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/bigredeye/notmanytask/api"
 	lf "github.com/bigredeye/notmanytask/internal/logfield"
+	"github.com/bigredeye/notmanytask/internal/models"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -15,12 +18,25 @@ type apiService struct {
 	webService
 }
 
+func parseBenchmarkMetric(raw string) (float64, error) {
+	metric, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(metric) || math.IsInf(metric, 0) {
+		return 0, fmt.Errorf("metric must be finite")
+	}
+	return metric, nil
+}
+
 func setupApiService(server *server, r *gin.Engine) error {
 	s := apiService{webService{server, server.config, server.logger}}
 
 	r.POST(server.config.Endpoints.Api.Report, s.report)
 	r.POST(server.config.Endpoints.Api.Flag, s.createFlag)
 	r.POST(server.config.Endpoints.Api.Override, s.validateToken, s.override)
+	r.POST(server.config.Endpoints.Api.Ban, s.validateToken, s.ban)
+	r.POST(server.config.Endpoints.Api.Unban, s.validateToken, s.unban)
 	r.POST(server.config.Endpoints.Api.ChangeGroup, s.changeGroup)
 	r.GET(server.config.Endpoints.Api.Standings, s.validateToken, s.standings)
 	r.GET(server.config.Endpoints.Api.ListGroupMembers, s.validateToken, s.listGroupMembers)
@@ -70,6 +86,54 @@ func (s apiService) report(c *gin.Context) {
 		s.log.Warn("Unknown token", lf.Token(req.Token))
 		onError(http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))
 		return
+	}
+
+	if req.Metric != "" {
+		metric, err := parseBenchmarkMetric(req.Metric)
+		if err != nil {
+			onError(http.StatusBadRequest, fmt.Errorf("failed to parse metric: %w", err))
+			return
+		}
+		if req.Failed != 0 || (req.Status != "" && req.Status != models.PipelineStatusSuccess) {
+			onError(http.StatusBadRequest, fmt.Errorf("metric is only accepted for successful reports"))
+			return
+		}
+		user, err := s.server.db.FindUserByGitlabID(userID)
+		if err != nil || user.GitlabLogin == nil {
+			onError(http.StatusNotFound, fmt.Errorf("unknown user %d", userID))
+			return
+		}
+		if user.GetProjectName() == "" || user.GetProjectName() != req.ProjectName {
+			onError(http.StatusBadRequest, fmt.Errorf("project %s does not belong to user %d", req.ProjectName, userID))
+			return
+		}
+		currentDeadlines := s.server.deadlines.GroupDeadlines(user.GroupName)
+		if currentDeadlines == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("no deadlines found for group %s", user.GroupName))
+			return
+		}
+		if task, _ := currentDeadlines.FindTask(req.Task); task == nil || task.Leaderboard == nil {
+			onError(http.StatusBadRequest, fmt.Errorf("task %s has no leaderboard for group %s", req.Task, user.GroupName))
+			return
+		}
+		// The grader reports from inside the CI job, so the pipeline is still
+		// running here: the result counts once the fresh pipeline poll below
+		// sees it succeed.
+		err = s.server.db.AddBenchmarkResult(&models.BenchmarkResult{
+			GitlabLogin: *user.GitlabLogin,
+			Task:        req.Task,
+			PipelineID:  id,
+			Metric:      metric,
+		})
+		if err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+		s.log.Info("Stored benchmark result",
+			lf.GitlabLogin(*user.GitlabLogin),
+			zap.String("task", req.Task),
+			zap.Float64("metric", metric),
+		)
 	}
 
 	err = s.server.pipelines.AddFresh(id, req.ProjectName)
@@ -349,6 +413,70 @@ func (s apiService) standings(c *gin.Context) {
 		},
 		Standings: standings,
 	})
+}
+
+// ban excludes a pipeline from scoring: the next eligible pipeline of the
+// task counts instead, and a merge request whose last pipeline is banned is
+// skipped. The token is the one of the override endpoint.
+func (s apiService) ban(c *gin.Context) {
+	s.moderate(c, true)
+}
+
+func (s apiService) unban(c *gin.Context) {
+	s.moderate(c, false)
+}
+
+func validateBanRequest(req *api.BanRequest, ban bool) error {
+	if req.PipelineID <= 0 {
+		return fmt.Errorf("pipeline_id is required")
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if ban && req.Reason == "" {
+		return fmt.Errorf("reason is required")
+	}
+	return nil
+}
+
+func (s apiService) moderate(c *gin.Context, ban bool) {
+	onError := func(code int, err error) {
+		s.log.Warn("Failed to moderate submission", zap.Error(err))
+		c.JSON(code, &api.BanResponse{Status: api.Status{Ok: false, Error: err.Error()}})
+	}
+
+	req := api.BanRequest{}
+	if err := c.Bind(&req); err != nil {
+		onError(http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err))
+		return
+	}
+	if err := validateBanRequest(&req, ban); err != nil {
+		onError(http.StatusBadRequest, err)
+		return
+	}
+	if _, err := s.server.db.FindPipelineByID(req.PipelineID); err != nil {
+		onError(http.StatusNotFound, fmt.Errorf("unknown pipeline %d", req.PipelineID))
+		return
+	}
+
+	if ban {
+		if err := s.server.db.BanSubmission(req.PipelineID, req.Reason, ""); err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+	} else {
+		found, err := s.server.db.UnbanSubmission(req.PipelineID)
+		if err != nil {
+			onError(http.StatusInternalServerError, err)
+			return
+		}
+		if !found {
+			onError(http.StatusNotFound, fmt.Errorf("pipeline %d is not banned", req.PipelineID))
+			return
+		}
+	}
+	s.server.cache.Clear()
+	s.log.Info("Submission moderated", lf.PipelineID(req.PipelineID), zap.Bool("banned", ban), zap.String("reason", req.Reason))
+
+	c.JSON(http.StatusOK, &api.BanResponse{Status: api.Status{Ok: true}})
 }
 
 func (s apiService) validateToken(c *gin.Context) {
