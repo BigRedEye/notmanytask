@@ -74,7 +74,9 @@ func ParseConfig(config interface{}, options ...Option) error {
 
 	bindEnvs(config)
 
-	if err := viper.Unmarshal(config); err != nil {
+	// Exact: an unknown key is a typo or a stale setting, fail instead of
+	// silently ignoring it
+	if err := viper.UnmarshalExact(config); err != nil {
 		return errors.Wrap(err, "Failed to unmarshal config")
 	}
 

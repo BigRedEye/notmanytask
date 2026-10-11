@@ -17,7 +17,7 @@ import (
 
 func parseV1(body []byte) (*Deadlines, error) {
 	assignments := []TaskGroup{}
-	err := yaml.Unmarshal(body, &assignments)
+	err := yaml.UnmarshalStrict(body, &assignments)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to unmarshal deadlines")
 	}
@@ -52,7 +52,7 @@ func parseV1(body []byte) (*Deadlines, error) {
 
 func parseV2(body []byte) (*Deadlines, error) {
 	deadlines := &Deadlines{}
-	err := yaml.Unmarshal(body, &deadlines)
+	err := yaml.UnmarshalStrict(body, &deadlines)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to unmarshal deadlines")
 	}
