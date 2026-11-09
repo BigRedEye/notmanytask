@@ -76,6 +76,13 @@ func Run() error {
 
 	scorer := scorer.NewScorer(db, deadlines, git, config.GitLab.MergeRequests)
 
+	forks := gitlab.NewForksSyncer(git)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		forks.Run(ctx)
+	}()
+
 	if config.GitLab.MergeRequests != nil {
 		mergeRequests, err := gitlab.NewMergeRequestsFetcher(git, db)
 		if err != nil {
