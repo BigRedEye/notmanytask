@@ -16,6 +16,47 @@ server scores pipelines on `submits/<task>` branches as before.
 4. A merged request scores like a successful pipeline submitted at its last
    pipeline time, through the deadline policy of the group.
 
+## Publishing updates to student forks
+
+`nmt publish` updates the template repository. To distribute those updates
+automatically, enable the server's fork synchronization worker:
+
+```yaml
+gitlab:
+  templateProject: course/public
+pullIntervals:
+  forks: 5m
+```
+
+The worker runs on startup, then waits this interval after each sweep. It
+checks the course group's projects sequentially, with a one-second pause
+before each fork check and synchronization request. It only updates direct
+forks of the configured template owned by that group; shared, archived and
+subgroup projects are excluded. Without `pullIntervals.forks` it is disabled.
+
+GitLab merges the template's **default branch** into
+`gitlab.mergeRequests.targetBranch` (default `main`), or into the template's
+default branch when merge-request mode is disabled. The API token must be
+allowed to update that protected branch. This uses
+[GitLab's Update fork operation](https://docs.gitlab.com/api/graphql/reference/mutations/#projectsyncfork),
+preserving student commits without force-pushes. It does not change branch
+protections, submission branches or grading settings. CI follows the course's
+existing rules for pushes to the target branch.
+
+GitLab performs synchronization asynchronously. An accepted request is logged
+as requested, not completed; the next sweep checks its result. Temporary
+errors are retried next sweep, including when the template has not changed.
+Forks already synchronized or currently syncing are skipped. Conflicts are
+logged for manual resolution; GitLab's conflict flag describes the previous
+attempt, so after resolving a conflict an operator may need to use Update
+fork manually to clear it. Other students continue to receive updates.
+
+After the remote fork has updated, students with a clean working tree can run
+`git switch main && git pull --ff-only` (substitute the configured branch).
+Existing solution branches need a separate merge of `origin/main` if they
+need the new files. A diverged local main requires a normal Git merge/rebase;
+the server worker cannot update local checkouts.
+
 ## Re-checks
 
 Merged requests keep being synced. To re-check a task with new tests, run a

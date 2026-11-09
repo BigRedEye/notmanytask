@@ -181,6 +181,9 @@ type PullIntervalsConfig struct {
 	Projects      *time.Duration
 	Pipelines     *time.Duration
 	MergeRequests *time.Duration
+	// Forks enables upstream synchronization of course forks when set.
+	// The delay is measured from the end of each sequential sweep.
+	Forks *time.Duration
 }
 
 type TelegramBotConfig struct {
@@ -217,6 +220,14 @@ func ParseConfig() (*Config, error) {
 func (c *Config) Validate() error {
 	if c.GitLab.Group.Name == "" {
 		return errors.New("gitlab.group.name is required")
+	}
+	if interval := c.PullIntervals.Forks; interval != nil {
+		if *interval <= 0 {
+			return errors.New("pullIntervals.forks must be positive")
+		}
+		if c.GitLab.TemplateProject == "" {
+			return errors.New("gitlab.templateProject is required for fork synchronization")
+		}
 	}
 	if c.Telegram != nil && c.Telegram.Proxy != "" {
 		u, err := url.Parse(c.Telegram.Proxy)

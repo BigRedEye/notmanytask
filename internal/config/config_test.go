@@ -93,3 +93,28 @@ func TestValidateTelegramProxy(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateForkSync(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		interval time.Duration
+		template string
+		valid    bool
+	}{
+		{"enabled", time.Minute, "course/template", true},
+		{"numeric template", time.Minute, "7", true},
+		{"no template", time.Minute, "", false},
+		{"zero", 0, "course/template", false},
+		{"negative", -time.Second, "course/template", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := Config{}
+			c.GitLab.Group.Name = "course"
+			c.GitLab.TemplateProject = tc.template
+			c.PullIntervals.Forks = &tc.interval
+			if err := c.Validate(); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v err=%v", tc.valid, err)
+			}
+		})
+	}
+}
